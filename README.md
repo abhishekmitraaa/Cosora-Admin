@@ -116,6 +116,7 @@ Applied to the shared project (`supabase/migrations/`):
 | `20260717140000_admin_panel_schema` | `products.rejection_reason`; `advertisements.moderation_reason/_at/_by`; refund columns on `subscription_invoices`; the `admin_flags` table + RLS |
 | `20260717140100_role_gate_moderation_reasons` | Extends the Prompt-1 triggers so the *reason* columns are role-gated too (a vendor could otherwise stamp a fake `rejection_reason` on their own product) |
 | `20260717140200_ads_rejected_status` | Adds `'rejected'` to `advertisements_status_check` (it allowed only draft/active/paused/ended) |
+| `20260717150000_admin_role_values_rpc` | `admin_role_values()` — the real enum labels, so `admin-invite` validates a role against the live enum instead of a hardcoded copy that could drift |
 
 `vendor_profiles.account_status` already existed — Prompt 1 added it.
 
@@ -140,11 +141,81 @@ silent and expensive:
 |---|---|
 | 1 — Bootstrap, auth, role-gated shell | **Working**, verified in-browser across 3 roles |
 | 2 — Admin & role management | **Working**; grant/change/demote verified allowed for `super_admin`, refused (trigger `42501`) for all others |
+| 2b — Invite admin by email | **Working. Promote branch is production-ready; the invite-email branch works but is throttled by Supabase's built-in mailer — see below.** |
 | 3 — Product moderation queue | **Working**; approve/reject + required reason, live/rejected tabs |
 | 4 — Vendor accounts & verification | **Working for verification. Suspension writes the flag only — see below.** |
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
+
+## Inviting admins by email (`admin-invite`)
+
+The Admins screen can bring in someone who has **never used Cosora**. Deployed as
+the `admin-invite` edge function (`verify_jwt: true`), `super_admin`-only,
+verified server-side exactly like `admin-refund-payment` — a `support` session
+calling it directly gets a real `403 forbidden`, not a hidden button.
+
+**No password is ever generated or emailed.** New people get a Supabase-generated
+secure invite link and set their own password at `/set-password`. The credential
+is created by its owner and never travels through an inbox.
+
+Two outcomes, reported distinctly so the UI never implies an email that wasn't sent:
+
+| Situation | Outcome | Email sent? |
+|---|---|---|
+| Auth user already exists | `promoted` — role granted directly | **No** (they already sign in) |
+| No auth user yet | `invited` — user created + secure link emailed | Yes |
+
+The role is validated against the live enum via `admin_role_values()` **before**
+any user is created; validating after would orphan an auth user on a bad role.
+
+### Email sending: verified, but rate-limited
+
+Confirmed working end-to-end, not assumed — the auth log shows a real send:
+
+```
+{"event":"mail.send","mail_from":"noreply@mail.app.supabase.io",
+ "mail_to":"…+cosora-admin-invite@gmail.com","mail_type":"invite","level":"info"}
+```
+
+**But this project has no custom SMTP.** It uses Supabase's built-in mailer
+(`noreply@mail.app.supabase.io`), which is strictly rate-limited and intended for
+testing — a second invite minutes later failed with `email rate limit exceeded`.
+It may also refuse addresses outside the project team.
+
+That failure is handled correctly and was verified: the function returns the real
+error, the UI shows it verbatim, and **no account is created** (confirmed: zero
+orphaned users after a rate-limited attempt). Nothing is ever reported as invited
+when the email didn't go out.
+
+**To use invites for real, configure custom SMTP** in Supabase → Auth → SMTP
+Settings. Until then, expect invites to fail whenever the built-in quota is spent.
+
+### Invite links must be allow-listed
+
+The invite link returns to `<panel origin>/set-password`. That URL has to be added
+under Supabase → Auth → URL Configuration → **Redirect URLs**, or Supabase falls
+back to the project's Site URL and the invitee lands on the **main app** instead
+of this panel. For local use add `http://localhost:5174/set-password`; add the
+deployed origin when this panel is hosted. (`ADMIN_INVITE_REDIRECT_URL` overrides
+the client-supplied value if you set it as a function secret.)
+
+### Verifying the invite flow
+
+```bash
+scripts/seed-test-admins.sql          # throwaway logins
+node scripts/invite-tests.mjs         # authz + enum validation + promote branch (9 cases)
+node scripts/invite-send-test.mjs     # the invite branch — SENDS A REAL EMAIL
+node scripts/invite-ui-test.mjs       # drives the real form in a browser
+scripts/invite-tests-cleanup.sql      # ALWAYS run: reverts promotions, deletes test users
+```
+
+`invite-send-test.mjs` defaults to a plus-addressed variant of the project
+owner's own inbox, so a test invite can only ever reach the person running it.
+The cleanup script also reverts `demo-buyer` / `demo-vendor`, which the tests
+promote to exercise the existing-user branch.
+
+---
 
 ### Known limitations — read before trusting the UI
 

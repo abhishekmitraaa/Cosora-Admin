@@ -8,6 +8,7 @@ import Shell from "@/components/Shell";
 import { canSee } from "@/lib/roles";
 
 import Login from "@/pages/Login";
+import SetPassword from "@/pages/SetPassword";
 import Products from "@/pages/Products";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
@@ -38,6 +39,8 @@ export default function App() {
           <Toaster richColors position="top-right" />
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Invite links land here. Outside RequireAdmin on purpose — see SetPassword. */}
+            <Route path="/set-password" element={<SetPassword />} />
             <Route
               element={
                 <RequireAdmin>
