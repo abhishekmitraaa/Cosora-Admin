@@ -141,7 +141,7 @@ silent and expensive:
 |---|---|
 | 1 — Bootstrap, auth, role-gated shell | **Working**, verified in-browser across 3 roles |
 | 2 — Admin & role management | **Working**; grant/change/demote verified allowed for `super_admin`, refused (trigger `42501`) for all others |
-| 2b — Invite admin by email | **Working. Promote branch is production-ready; the invite-email branch works but is throttled by Supabase's built-in mailer — see below.** |
+| 2b — Invite admin by email | **Working. Promote branch is production-ready; `/reset-password` link-landing proven end-to-end (a link-style session sets a working password and lands in the panel). The invite-email branch works but is throttled by Supabase's built-in mailer — see below. Redirect-URL allow-listing is a dashboard step you must do.** |
 | 3 — Product moderation queue | **Working**; approve/reject + required reason, live/rejected tabs |
 | 4 — Vendor accounts & verification | **Working for verification. Suspension writes the flag only — see below.** |
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
@@ -156,8 +156,17 @@ verified server-side exactly like `admin-refund-payment` — a `support` session
 calling it directly gets a real `403 forbidden`, not a hidden button.
 
 **No password is ever generated or emailed.** New people get a Supabase-generated
-secure invite link and set their own password at `/set-password`. The credential
+secure invite link and set their own password at `/reset-password`. The credential
 is created by its owner and never travels through an inbox.
+
+The link-landing page (`src/pages/ResetPassword.tsx`, routed at `/reset-password`
+and the alias `/set-password`) is what makes invites usable at all. It sits
+outside `RequireAdmin` — a brand-new admin who has never signed in must be able to
+reach it. It establishes the session from the URL hash the link carries (explicit
+`onAuthStateChange` for `PASSWORD_RECOVERY` / `SIGNED_IN`, plus a direct
+`getSession()` fallback for the timing race), shows a set-password form, and on
+success drops them into the panel. With no link session it shows a plain
+"this link isn't valid" state, never a dead form.
 
 Two outcomes, reported distinctly so the UI never implies an email that wasn't sent:
 
@@ -191,20 +200,30 @@ when the email didn't go out.
 **To use invites for real, configure custom SMTP** in Supabase → Auth → SMTP
 Settings. Until then, expect invites to fail whenever the built-in quota is spent.
 
-### Invite links must be allow-listed
+### Invite links must be allow-listed (DASHBOARD STEP — you must do this)
 
-The invite link returns to `<panel origin>/set-password`. That URL has to be added
-under Supabase → Auth → URL Configuration → **Redirect URLs**, or Supabase falls
-back to the project's Site URL and the invitee lands on the **main app** instead
-of this panel. For local use add `http://localhost:5174/set-password`; add the
-deployed origin when this panel is hosted. (`ADMIN_INVITE_REDIRECT_URL` overrides
-the client-supplied value if you set it as a function secret.)
+The invite calls `admin-invite` with an explicit
+`redirectTo = <panel origin>/reset-password` — never the global default. But
+Supabase **silently drops any `redirect_to` that isn't allow-listed** and falls
+back to the project's Site URL, so the invitee lands on the **main app** instead
+of this panel. This is not fixable in code.
+
+In Supabase → Auth → **URL Configuration → Redirect URLs**, add:
+
+- `http://localhost:5174/reset-password` — for local use
+- the deployed origin's `/reset-password` once this panel is hosted
+
+**Leave the Site URL pointed at the main app** — its own auth flows depend on it.
+This is an *additional* allowed redirect, not a replacement. (`http://localhost:5174/**`
+also works if you prefer a wildcard. `ADMIN_INVITE_REDIRECT_URL` overrides the
+client value if set as a function secret.)
 
 ### Verifying the invite flow
 
 ```bash
 scripts/seed-test-admins.sql          # throwaway logins
 node scripts/invite-tests.mjs         # authz + enum validation + promote branch (9 cases)
+node scripts/reset-flow-test.mjs      # /reset-password consumes a link session & sets a working password (6 checks)
 node scripts/invite-send-test.mjs     # the invite branch — SENDS A REAL EMAIL
 node scripts/invite-ui-test.mjs       # drives the real form in a browser
 scripts/invite-tests-cleanup.sql      # ALWAYS run: reverts promotions, deletes test users

@@ -8,7 +8,7 @@ import Shell from "@/components/Shell";
 import { canSee } from "@/lib/roles";
 
 import Login from "@/pages/Login";
-import SetPassword from "@/pages/SetPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Products from "@/pages/Products";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
@@ -39,8 +39,10 @@ export default function App() {
           <Toaster richColors position="top-right" />
           <Routes>
             <Route path="/login" element={<Login />} />
-            {/* Invite links land here. Outside RequireAdmin on purpose — see SetPassword. */}
-            <Route path="/set-password" element={<SetPassword />} />
+            {/* Invite / recovery links land here. Outside RequireAdmin on purpose —
+                see ResetPassword. /set-password is a backward-compatible alias. */}
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/set-password" element={<ResetPassword />} />
             <Route
               element={
                 <RequireAdmin>

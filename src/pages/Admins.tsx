@@ -148,10 +148,11 @@ export default function Admins() {
         body: {
           email,
           admin_role: role,
-          // Where the secure link lands. Must be allow-listed under
-          // Supabase → Auth → URL Configuration → Redirect URLs, or the link
-          // falls back to the project's Site URL (the main app, not here).
-          redirectTo: `${window.location.origin}/set-password`,
+          // Where the secure link lands — explicitly, never the global default
+          // (which is the main app's Site URL). Must ALSO be allow-listed under
+          // Supabase → Auth → URL Configuration → Redirect URLs, or Supabase
+          // silently drops it and falls back to that Site URL.
+          redirectTo: `${window.location.origin}/reset-password`,
         },
       });
       if (error) {

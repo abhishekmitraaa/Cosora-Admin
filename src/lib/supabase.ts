@@ -14,8 +14,21 @@ if (!url || !anonKey) {
 // Anon key only. Every request carries the signed-in admin's JWT, so the RLS and
 // the moderation triggers from textile-spark-net are what actually authorize each
 // write. There is deliberately no service-role key in this app.
+//
+// detectSessionInUrl + implicit flow are set EXPLICITLY, not left to defaults,
+// because the invite / recovery flow depends on them: a Supabase invite link
+// lands on /reset-password with the session in the URL hash
+// (#access_token=…&type=invite), and the client must parse that hash to
+// establish the session. Implicit flow (not PKCE) is required here — an invite
+// link is generated server-side, so the recipient's browser has no PKCE code
+// verifier to exchange; the token arrives directly in the hash instead.
 export const supabase = createClient<Database>(url, anonKey, {
-  auth: { persistSession: true, autoRefreshToken: true },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: "implicit",
+  },
 });
 
 /**
