@@ -117,6 +117,7 @@ Applied to the shared project (`supabase/migrations/`):
 | `20260717140100_role_gate_moderation_reasons` | Extends the Prompt-1 triggers so the *reason* columns are role-gated too (a vendor could otherwise stamp a fake `rejection_reason` on their own product) |
 | `20260717140200_ads_rejected_status` | Adds `'rejected'` to `advertisements_status_check` (it allowed only draft/active/paused/ended) |
 | `20260717150000_admin_role_values_rpc` | `admin_role_values()` — the real enum labels, so `admin-invite` validates a role against the live enum instead of a hardcoded copy that could drift |
+| `20260717160000_user_has_password_rpc` | `user_has_password(email)` — service-role-only `SECURITY DEFINER` check of `auth.users.encrypted_password`, so `admin-invite` can branch on whether an existing (OTP-only) account actually has a password |
 
 `vendor_profiles.account_status` already existed — Prompt 1 added it.
 
@@ -141,7 +142,7 @@ silent and expensive:
 |---|---|
 | 1 — Bootstrap, auth, role-gated shell | **Working**, verified in-browser across 3 roles |
 | 2 — Admin & role management | **Working**; grant/change/demote verified allowed for `super_admin`, refused (trigger `42501`) for all others |
-| 2b — Invite admin by email | **Working. Promote branch is production-ready; `/reset-password` link-landing proven end-to-end (a link-style session sets a working password and lands in the panel). The invite-email branch works but is throttled by Supabase's built-in mailer — see below. Redirect-URL allow-listing is a dashboard step you must do.** |
+| 2b — Invite admin by email | **Working, all three branches verified (14/14): new-user invite, existing-OTP-only (grant + recovery email — the branch that matters, real `mail.send` confirmed), and existing-with-password (silent promote). `/reset-password` link-landing proven end-to-end. Email throttled by Supabase's built-in mailer (custom SMTP needed for volume); the amber warning surfaces a failed send honestly. Redirect-URL allow-listing is a dashboard step you must do.** |
 | 3 — Product moderation queue | **Working**; approve/reject + required reason, live/rejected tabs |
 | 4 — Vendor accounts & verification | **Working for verification. Suspension writes the flag only — see below.** |
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
@@ -168,24 +169,44 @@ reach it. It establishes the session from the URL hash the link carries (explici
 success drops them into the panel. With no link session it shows a plain
 "this link isn't valid" state, never a dead form.
 
-Two outcomes, reported distinctly so the UI never implies an email that wasn't sent:
+### It branches on PASSWORD presence, not user existence
 
-| Situation | Outcome | Email sent? |
-|---|---|---|
-| Auth user already exists | `promoted` — role granted directly | **No** (they already sign in) |
-| No auth user yet | `invited` — user created + secure link emailed | Yes |
+The panel logs in with email + **password**, but every existing Cosora account
+today is **OTP-only** — `auth.users.encrypted_password IS NULL` (verified: the
+real signed-up accounts all have no password). So "already has an account" does
+NOT mean "can log into this panel". Branching on existence would strand every
+existing user: promoted to admin, but with no password and no link, unable to
+sign in.
+
+So the function branches on password presence, decided by the
+`user_has_password(email)` `SECURITY DEFINER` function (auth.users isn't
+client-readable; service-role only). Three branches, each reported distinctly so
+the UI's message always matches what actually happened:
+
+| Situation | `outcome` | Email | UI |
+|---|---|---|---|
+| No auth user at all | `invited` (`created: true`) | invite link sent (`/auth/v1/invite` creates + sends) | green |
+| Exists, **no password** (OTP-only — the common case) | `invited` (`created: false`) | set-password/recovery link sent (`/auth/v1/recover`) | green |
+| Exists, **has a password** | `promoted` | none — they can already sign in | blue |
+| Any "invited" where the email **failed** (e.g. rate limit) | `invited`, `emailSent: false` + `warning` | the admin is granted, but they can't log in until a link reaches them | **amber warning** |
 
 The role is validated against the live enum via `admin_role_values()` **before**
 any user is created; validating after would orphan an auth user on a bad role.
+For the OTP-only branch the admin grant is applied first (durable, reversible)
+and the email attempted second, so a transient rate limit can't block the
+promotion — but the UI shows the amber warning, never a false "emailed".
 
 ### Email sending: verified, but rate-limited
 
-Confirmed working end-to-end, not assumed — the auth log shows a real send:
+Confirmed working end-to-end, not assumed — the auth log shows real sends of
+**both** email types this feature uses:
 
 ```
-{"event":"mail.send","mail_from":"noreply@mail.app.supabase.io",
- "mail_to":"…+cosora-admin-invite@gmail.com","mail_type":"invite","level":"info"}
+{"event":"mail.send","mail_type":"invite",  "mail_to":"…+cosora-admin-invite@gmail.com","level":"info"}
+{"event":"mail.send","mail_type":"recovery","mail_to":"…+cosora-otp@gmail.com",         "level":"info"}
 ```
+
+(`invite` = new-user branch; `recovery` = existing-OTP-only branch.)
 
 **But this project has no custom SMTP.** It uses Supabase's built-in mailer
 (`noreply@mail.app.supabase.io`), which is strictly rate-limited and intended for
@@ -222,12 +243,19 @@ client value if set as a function secret.)
 
 ```bash
 scripts/seed-test-admins.sql          # throwaway logins
-node scripts/invite-tests.mjs         # authz + enum validation + promote branch (9 cases)
+node scripts/invite-branches-test.mjs # ALL THREE branches + authz + validation (14 checks); recovery email SENDS
+node scripts/invite-ui-branches.mjs   # browser: the 3 confirmations incl. the amber email-failed warning
 node scripts/reset-flow-test.mjs      # /reset-password consumes a link session & sets a working password (6 checks)
+node scripts/invite-tests.mjs         # (earlier) authz + enum validation + promote branch
 node scripts/invite-send-test.mjs     # the invite branch — SENDS A REAL EMAIL
-node scripts/invite-ui-test.mjs       # drives the real form in a browser
 scripts/invite-tests-cleanup.sql      # ALWAYS run: reverts promotions, deletes test users
 ```
+
+`invite-branches-test.mjs` targets two fixtures by fixed email — an OTP-only
+(no-password) non-admin and a with-password non-admin — which must be seeded first
+(create an `auth.users` row with `encrypted_password` NULL vs. a bcrypt hash; the
+emails are in the script header). `invite-tests-cleanup.sql` removes everything,
+including any `+cosora-*` invitees the tests create.
 
 `invite-send-test.mjs` defaults to a plus-addressed variant of the project
 owner's own inbox, so a test invite can only ever reach the person running it.

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Mail, UserCheck } from "lucide-react";
+import { Mail, TriangleAlert, UserCheck } from "lucide-react";
 import { supabase, assertWrote } from "@/lib/supabase";
 import { ALL_ROLES, ROLE_LABELS, type AdminRole } from "@/lib/roles";
 import { useAdminSession } from "@/hooks/useAdminSession";
@@ -9,7 +9,6 @@ import {
   Badge,
   Button,
   Card,
-  cn,
   Empty,
   Input,
   PageHeader,
@@ -32,7 +31,10 @@ interface InviteResult {
   outcome: "invited" | "promoted";
   email: string;
   admin_role: AdminRole;
-  emailSent: boolean;
+  created: boolean; // was a brand-new auth user created
+  hadPassword: boolean; // did the existing user already have a password
+  emailSent: boolean; // did the set-password email actually send
+  warning?: string; // present when granted but the email failed
   detail: string;
 }
 
@@ -293,43 +295,13 @@ export default function Admins() {
         </form>
 
         {/*
-          Two genuinely different outcomes, two different messages. Saying
-          "invite sent" after a plain promotion would have the new admin waiting
-          on an email that was never sent.
+          Four distinct outcomes, each with an honest message. The critical
+          distinction is whether a set-password email actually went out — saying
+          "invite sent" when it wasn't (a plain promotion, or a failed send)
+          would strand the new admin waiting on an email. `emailSent` drives the
+          copy, never `outcome` alone.
         */}
-        {inviteResult && (
-          <div
-            className={cn(
-              "mt-3 rounded-md border px-3 py-2 text-sm",
-              inviteResult.outcome === "invited"
-                ? "border-green-200 bg-green-50 text-green-900"
-                : "border-blue-200 bg-blue-50 text-blue-900",
-            )}
-          >
-            <div className="flex items-center gap-1.5 font-medium">
-              {inviteResult.outcome === "invited" ? (
-                <>
-                  <Mail size={14} /> Invite emailed to {inviteResult.email}
-                </>
-              ) : (
-                <>
-                  <UserCheck size={14} /> {inviteResult.email} already had an account — access granted
-                </>
-              )}
-              <Badge tone={inviteResult.outcome === "invited" ? "green" : "blue"}>
-                {ROLE_LABELS[inviteResult.admin_role]}
-              </Badge>
-            </div>
-            <p className="mt-1 text-xs opacity-90">{inviteResult.detail}</p>
-            {inviteResult.outcome === "invited" && (
-              <p className="mt-1 text-xs opacity-75">
-                They won't appear as signed-in until they open the link and set a password. The link
-                must return to this panel's URL — it has to be allow-listed in Supabase under Auth →
-                URL Configuration → Redirect URLs.
-              </p>
-            )}
-          </div>
-        )}
+        {inviteResult && <InviteConfirmation r={inviteResult} />}
       </Card>
 
       <Card>
@@ -383,6 +355,64 @@ export default function Admins() {
           )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Renders the confirmation for an invite/promote, keyed on what actually
+ * happened. `emailSent` — not `outcome` — decides whether we claim an email
+ * went out, so a failed send or a plain promotion is never dressed up as one.
+ */
+function InviteConfirmation({ r }: { r: InviteResult }) {
+  // Granted but the set-password email failed: the person is an admin who
+  // literally cannot log in yet. This must read as a problem, not a success.
+  if (r.outcome === "invited" && !r.emailSent) {
+    return (
+      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div className="flex items-center gap-1.5 font-medium">
+          <TriangleAlert size={14} /> Access granted to {r.email}, but the email did NOT send
+          <Badge tone="amber">{ROLE_LABELS[r.admin_role]}</Badge>
+        </div>
+        <p className="mt-1 text-xs opacity-90">{r.warning ?? r.detail}</p>
+        <p className="mt-1 text-xs opacity-75">
+          This account has no password, so they can't sign in until a set-password link reaches
+          them. Resend the invite once email works.
+        </p>
+      </div>
+    );
+  }
+
+  // Promoted only: existing account that already had a password. No email.
+  if (r.outcome === "promoted") {
+    return (
+      <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <div className="flex items-center gap-1.5 font-medium">
+          <UserCheck size={14} /> {r.email} already had a password — access granted, no email needed
+          <Badge tone="blue">{ROLE_LABELS[r.admin_role]}</Badge>
+        </div>
+        <p className="mt-1 text-xs opacity-90">{r.detail}</p>
+      </div>
+    );
+  }
+
+  // Invited: a set-password email went out — either to a brand-new account or to
+  // an existing OTP-only one (which needed it just as much).
+  return (
+    <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+      <div className="flex items-center gap-1.5 font-medium">
+        <Mail size={14} />
+        {r.created
+          ? `New account created — set-password link emailed to ${r.email}`
+          : `${r.email} had no password — access granted and a set-password link emailed`}
+        <Badge tone="green">{ROLE_LABELS[r.admin_role]}</Badge>
+      </div>
+      <p className="mt-1 text-xs opacity-90">{r.detail}</p>
+      <p className="mt-1 text-xs opacity-75">
+        They won't appear as signed-in until they open the link and set a password. The link must
+        return to this panel — its /reset-password URL has to be allow-listed in Supabase under
+        Auth &rarr; URL Configuration &rarr; Redirect URLs.
+      </p>
     </div>
   );
 }

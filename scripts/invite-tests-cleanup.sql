@@ -10,10 +10,11 @@ update public.profiles
    '11111111-1111-1111-1111-111111111111'   -- demo-buyer@cosora.dev
  );
 
--- 2. Test invitees created by the invite branch.
-delete from public.profiles where email like '%+cosora-admin-invite@%' or email like '%+cosora-ui-%';
-delete from auth.identities where provider_id like '%+cosora-admin-invite@%' or provider_id like '%+cosora-ui-%';
-delete from auth.users where email like '%+cosora-admin-invite@%' or email like '%+cosora-ui-%';
+-- 2. Test invitees + branch fixtures (all use +cosora-* plus-addresses or the
+--    cosora.test domain). Covers admin-invite / reset-flow / branch tests.
+delete from public.profiles where email like '%+cosora-%';
+delete from auth.identities where provider_id like '%+cosora-%';
+delete from auth.users where email like '%+cosora-%';
 
 -- 3. Throwaway admin logins.
 delete from public.profiles where email like 'rlstest-%';
