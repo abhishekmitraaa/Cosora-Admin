@@ -265,7 +265,7 @@ function AdCard({
           )}
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           {a.status === "active" && (
             <>
               <Button disabled={!writable || busy} onClick={() => onAct("paused")}>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Boxes,
@@ -7,6 +8,8 @@ import {
   BarChart3,
   ShieldCheck,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
@@ -32,14 +35,57 @@ function initials(name: string | null, email: string | null): string {
 export default function Shell() {
   const { identity, signOut } = useAdminSession();
   const location = useLocation();
+  const [open, setOpen] = useState(false);
   const role = identity?.role ?? null;
   const visible = NAV.filter((n) => canSee(role, n.section));
 
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  // Lock the page behind the drawer and allow Escape to dismiss it.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="flex min-h-screen bg-canvas">
-      <aside className="warp rail-scroll sticky top-0 flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-rail-line bg-rail text-rail-fg">
-        <div className="px-4 py-5">
+    <div className="min-h-screen bg-canvas lg:flex">
+      {/* Off-canvas backdrop (mobile / tablet only). */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 animate-fade-in bg-ink/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Rail: a slide-in drawer below lg, a sticky column at lg and up. */}
+      <aside
+        className={cn(
+          "warp rail-scroll fixed inset-y-0 left-0 z-50 flex w-[17rem] max-w-[85vw] flex-col overflow-y-auto",
+          "border-r border-rail-line bg-rail text-rail-fg shadow-pop transition-transform duration-300 ease-out",
+          "lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex items-center justify-between px-4 py-5">
           <Logo onDark />
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation"
+            className="grid h-8 w-8 place-items-center rounded-lg text-rail-muted transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <nav className="flex-1 px-3 pb-4">
@@ -53,7 +99,7 @@ export default function Shell() {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    "group relative flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-2.5 text-sm font-medium transition-colors",
+                    "group relative flex items-center gap-2.5 rounded-lg py-2.5 pl-3.5 pr-2.5 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-white/[0.08] text-white"
                       : "text-rail-muted hover:bg-white/[0.04] hover:text-white",
@@ -104,19 +150,33 @@ export default function Shell() {
           </div>
           <button
             onClick={() => void signOut()}
-            className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-rail-muted transition-colors hover:bg-white/[0.04] hover:text-white"
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-xs font-medium text-rail-muted transition-colors hover:bg-white/[0.04] hover:text-white"
           >
             <LogOut size={14} /> Sign out
           </button>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-x-hidden px-6 py-8 md:px-10 md:py-10">
-        {/* Keyed on the route so each section eases in rather than snapping. */}
-        <div key={location.pathname} className="animate-content-in">
-          <Outlet />
-        </div>
-      </main>
+      {/* Content column: a mobile top bar, then the routed page. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-surface/85 px-3 py-2.5 backdrop-blur lg:hidden">
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+            className="grid h-9 w-9 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+          >
+            <Menu size={18} />
+          </button>
+          <Logo />
+        </header>
+
+        <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
+          {/* Keyed on the route so each section eases in rather than snapping. */}
+          <div key={location.pathname} className="animate-content-in">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

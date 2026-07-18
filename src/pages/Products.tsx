@@ -213,9 +213,9 @@ function ProductCard({
   return (
     <Card>
       <div className="flex flex-wrap gap-4">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {images.length === 0 ? (
-            <div className="flex h-24 w-24 items-center justify-center rounded border border-dashed border-slate-300 text-xs text-slate-400">
+            <div className="flex h-20 w-20 items-center justify-center rounded border border-dashed border-slate-300 text-xs text-slate-400 sm:h-24 sm:w-24">
               No image
             </div>
           ) : (
@@ -224,7 +224,7 @@ function ProductCard({
                 key={img.url}
                 src={img.url}
                 alt=""
-                className="h-24 w-24 rounded border border-slate-200 object-cover"
+                className="h-20 w-20 rounded border border-slate-200 object-cover sm:h-24 sm:w-24"
               />
             ))
           )}
@@ -265,7 +265,7 @@ function ProductCard({
           )}
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           {p.status !== "live" && (
             <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
               Approve
