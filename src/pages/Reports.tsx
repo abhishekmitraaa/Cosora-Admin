@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Boxes, IndianRupee, Layers, Store, type LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Badge, Card, Empty, ErrorNote, PageHeader, Spinner, Table } from "@/components/ui";
 
@@ -180,10 +181,14 @@ export default function Reports() {
       <PageHeader title="Reports" subtitle="Read-only. Every figure is computed from live rows." />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Vendors" value={String(d.vendorCount)} />
-        <Stat label="Products" value={String(d.productsByStatus.reduce((s, x) => s + x.count, 0))} />
-        <Stat label="Revenue (all time)" value={`₹${totalRevenue.toLocaleString("en-IN")}`} />
-        <Stat label="Categories in use" value={String(d.categories.length)} />
+        <Stat icon={Store} label="Vendors" value={String(d.vendorCount)} />
+        <Stat
+          icon={Boxes}
+          label="Products"
+          value={String(d.productsByStatus.reduce((s, x) => s + x.count, 0))}
+        />
+        <Stat icon={IndianRupee} label="Revenue (all time)" value={`₹${totalRevenue.toLocaleString("en-IN")}`} />
+        <Stat icon={Layers} label="Categories in use" value={String(d.categories.length)} />
       </div>
 
       <Card className="mb-4">
@@ -307,7 +312,7 @@ export default function Reports() {
                 <td className="px-3 py-2 text-slate-600">{v.plan}</td>
                 <td className="px-3 py-2 text-slate-700">{v.boost}</td>
                 <td className="px-3 py-2">
-                  {v.active ? <Badge tone="green">active</Badge> : <Badge tone="red">expired</Badge>}
+                  {v.active ? <Badge tone="green" dot>active</Badge> : <Badge tone="red" dot>expired</Badge>}
                 </td>
               </tr>
             ))}
@@ -347,11 +352,18 @@ export default function Reports() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
-    <Card>
-      <div className="text-xs text-slate-400">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
+    <Card className="flex items-center gap-3.5">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-tint text-brand ring-1 ring-inset ring-brand/10">
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-medium text-ink-muted">{label}</div>
+        <div className="mt-0.5 truncate font-display text-[1.75rem] font-bold leading-none tracking-tight tabular-nums text-ink">
+          {value}
+        </div>
+      </div>
     </Card>
   );
 }

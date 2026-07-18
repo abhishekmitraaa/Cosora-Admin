@@ -112,7 +112,7 @@ export default function VendorDetail() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         {v.onboarding_complete ? <Badge tone="green">onboarding complete</Badge> : <Badge tone="amber">onboarding incomplete</Badge>}
-        {suspended ? <Badge tone="red">suspended</Badge> : <Badge tone="green">active</Badge>}
+        {suspended ? <Badge tone="red" dot>suspended</Badge> : <Badge tone="green" dot>active</Badge>}
         {s.any ? <Badge tone="blue">trust seal shown</Badge> : <Badge>no seal</Badge>}
       </div>
 

@@ -338,5 +338,9 @@ function StatusBadge({ status }: { status: string }) {
         : status === "refunded"
           ? "blue"
           : "amber";
-  return <Badge tone={tone as "green" | "red" | "blue" | "amber"}>{status}</Badge>;
+  return (
+    <Badge tone={tone as "green" | "red" | "blue" | "amber"} dot>
+      {status}
+    </Badge>
+  );
 }

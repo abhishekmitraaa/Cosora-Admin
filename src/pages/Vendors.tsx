@@ -106,9 +106,9 @@ export default function Vendors() {
                 </td>
                 <td className="px-3 py-2">
                   {v.account_status === "suspended" ? (
-                    <Badge tone="red">suspended</Badge>
+                    <Badge tone="red" dot>suspended</Badge>
                   ) : (
-                    <Badge tone="green">active</Badge>
+                    <Badge tone="green" dot>active</Badge>
                   )}
                 </td>
                 <td className="px-3 py-2">{s.any ? <Badge tone="blue">seal</Badge> : <Badge>none</Badge>}</td>

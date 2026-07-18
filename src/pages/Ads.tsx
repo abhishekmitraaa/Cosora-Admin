@@ -235,9 +235,9 @@ function AdCard({
         <div className="min-w-[260px] flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-slate-900">{a.title}</h3>
-            {a.status === "active" && <Badge tone="green">active</Badge>}
-            {a.status === "paused" && <Badge tone="amber">paused</Badge>}
-            {a.status === "rejected" && <Badge tone="red">rejected</Badge>}
+            {a.status === "active" && <Badge tone="green" dot>active</Badge>}
+            {a.status === "paused" && <Badge tone="amber" dot>paused</Badge>}
+            {a.status === "rejected" && <Badge tone="red" dot>rejected</Badge>}
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">

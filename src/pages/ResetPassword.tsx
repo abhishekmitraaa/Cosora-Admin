@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
-import { Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
+import { AuthLayout, Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
 
 /**
  * The route a Supabase invite / recovery link lands on. This is the piece that
@@ -79,19 +79,22 @@ export default function ResetPassword() {
 
   if (recoverable === false) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <Card className="max-w-md">
-          <h1 className="text-base font-semibold text-slate-900">This link isn't valid</h1>
-          <p className="mt-2 text-sm text-slate-600">
+      <AuthLayout>
+        <Card className="shadow-pop">
+          <h1 className="text-lg font-semibold tracking-tight text-ink">This link isn't valid</h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             Your invite or password-reset link is missing, expired, or already used. Ask a super
             admin to send a new invite, or{" "}
-            <button className="underline" onClick={() => navigate("/login")}>
+            <button
+              className="font-medium text-brand underline underline-offset-2 hover:text-brand-700"
+              onClick={() => navigate("/login")}
+            >
               sign in
             </button>{" "}
             if you've already set a password.
           </p>
         </Card>
-      </div>
+      </AuthLayout>
     );
   }
 
@@ -122,23 +125,23 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <h1 className="text-base font-semibold text-slate-900">Set your password</h1>
-        <p className="mt-1 text-sm text-slate-500">
+    <AuthLayout>
+      <Card className="shadow-pop">
+        <h1 className="text-lg font-semibold tracking-tight text-ink">Set your password</h1>
+        <p className="mt-1 text-sm leading-relaxed text-ink-muted">
           Welcome to Cosora Admin. Choose a password
           {email ? (
             <>
               {" "}
-              for <span className="font-medium text-slate-700">{email}</span>
+              for <span className="font-medium text-ink">{email}</span>
             </>
           ) : null}
           .
         </p>
 
-        <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <form onSubmit={onSubmit} className="mt-5 space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">New password</label>
+            <label className="mb-1.5 block text-xs font-medium text-ink-muted">New password</label>
             <Input
               type="password"
               value={password}
@@ -148,7 +151,7 @@ export default function ResetPassword() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Confirm password</label>
+            <label className="mb-1.5 block text-xs font-medium text-ink-muted">Confirm password</label>
             <Input
               type="password"
               value={confirm}
@@ -163,6 +166,6 @@ export default function ResetPassword() {
           </Button>
         </form>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }

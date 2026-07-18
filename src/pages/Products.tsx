@@ -233,9 +233,9 @@ function ProductCard({
         <div className="min-w-[240px] flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-slate-900">{p.name}</h3>
-            {p.status === "live" && <Badge tone="green">live</Badge>}
-            {p.status === "rejected" && <Badge tone="red">rejected</Badge>}
-            {p.status === "under_review" && <Badge tone="amber">under review</Badge>}
+            {p.status === "live" && <Badge tone="green" dot>live</Badge>}
+            {p.status === "rejected" && <Badge tone="red" dot>rejected</Badge>}
+            {p.status === "under_review" && <Badge tone="amber" dot>under review</Badge>}
           </div>
 
           <div className="mt-1 text-sm text-slate-700">

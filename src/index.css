@@ -2,5 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
+:root {
+  color-scheme: light;
+  --brand: #3a4a94;
+  --marigold: #e2a12c;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    letter-spacing: -0.004em;
+  }
+
+  /* Headings carry the display face; body stays IBM Plex Sans. */
+  h1,
+  h2,
+  h3 {
+    font-family: theme("fontFamily.display");
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  /* Digits line up in tables, stat tiles and money columns. */
+  .tabular,
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: rgba(226, 161, 44, 0.28);
+  }
+
+  /* Quiet, chosen scrollbars rather than the OS default. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c7cad6 transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cdd0dc;
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b4b8c8;
+    background-clip: content-box;
+  }
+  .rail-scroll {
+    scrollbar-color: #3a4573 transparent;
+  }
+  .rail-scroll::-webkit-scrollbar-thumb {
+    background: #364168;
+  }
+}
+
+@layer components {
+  /* Warp threads — the faint woven texture on the indigo rail. */
+  .warp {
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.032) 0 1px,
+      transparent 1px 7px
+    );
+  }
+
+  /* Selvedge — the signature two-thread stripe (indigo body, marigold ID line). */
+  .selvedge-tick {
+    background: linear-gradient(180deg, var(--brand) 0 56%, var(--marigold) 56% 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

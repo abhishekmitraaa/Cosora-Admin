@@ -70,12 +70,12 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
   });
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-        <Flag size={13} />
+    <div className="rounded-xl border border-line bg-canvas p-4">
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
+        <Flag size={13} className="text-ink-muted" />
         Flagged-items log
       </div>
-      <p className="mb-2 text-xs text-slate-500">
+      <p className="mb-3 text-xs leading-relaxed text-ink-muted">
         Internal tracking notes only — not a dispute or workflow tool. Notes are append-only and
         visible to all admins.
       </p>
@@ -98,14 +98,14 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
       </div>
 
       <div className="mt-3 space-y-2">
-        {flags.isLoading && <p className="text-xs text-slate-400">Loading notes…</p>}
+        {flags.isLoading && <p className="text-xs text-ink-faint">Loading notes…</p>}
         {!flags.isLoading && (flags.data ?? []).length === 0 && (
-          <p className="text-xs text-slate-400">No notes logged.</p>
+          <p className="text-xs text-ink-faint">No notes logged.</p>
         )}
         {(flags.data ?? []).map((f) => (
-          <div key={f.id} className="rounded border border-slate-200 bg-white p-2">
-            <p className="whitespace-pre-wrap text-sm text-slate-800">{f.note}</p>
-            <p className="mt-1 text-xs text-slate-400">
+          <div key={f.id} className="rounded-lg border border-line bg-surface p-2.5 shadow-xs">
+            <p className="whitespace-pre-wrap text-sm text-ink">{f.note}</p>
+            <p className="mt-1 text-xs text-ink-faint">
               {f.author?.full_name || f.author?.email || "Unknown admin"} ·{" "}
               {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
             </p>

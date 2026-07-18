@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
-import { Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
+import { AuthLayout, Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
 
 export default function Login() {
   const { session, loading } = useAdminSession();
@@ -26,14 +26,14 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <h1 className="text-base font-semibold text-slate-900">Cosora Admin</h1>
-        <p className="mt-1 text-sm text-slate-500">Sign in with your admin account.</p>
+    <AuthLayout footer="Internal tool — access is role-gated and enforced by the database.">
+      <Card className="shadow-pop">
+        <h1 className="text-lg font-semibold tracking-tight text-ink">Sign in</h1>
+        <p className="mt-1 text-sm text-ink-muted">Use your Cosora admin account to continue.</p>
 
-        <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <form onSubmit={onSubmit} className="mt-5 space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+            <label className="mb-1.5 block text-xs font-medium text-ink-muted">Email</label>
             <Input
               type="email"
               value={email}
@@ -43,7 +43,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Password</label>
+            <label className="mb-1.5 block text-xs font-medium text-ink-muted">Password</label>
             <Input
               type="password"
               value={password}
@@ -58,6 +58,6 @@ export default function Login() {
           </Button>
         </form>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }
