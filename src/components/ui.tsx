@@ -30,17 +30,17 @@ export function Logo({
   const tile = size === "sm" ? "h-8 w-8 text-[15px]" : "h-9 w-9 text-lg";
   return (
     <div className="flex items-center gap-2.5">
-      {/* Woven monogram: denim-indigo tile with a marigold selvedge thread. */}
+      {/* Woven monogram: near-black tile with a white selvedge thread. */}
       <div
         className={cn(
-          "relative grid shrink-0 place-items-center overflow-hidden rounded-xl font-display font-bold leading-none text-white shadow-sm",
+          "relative grid shrink-0 place-items-center overflow-hidden rounded-xl font-display font-bold leading-none text-white shadow-sm ring-1 ring-white/10",
           "bg-gradient-to-br from-brand to-brand-800",
           tile,
         )}
         aria-hidden
       >
         C
-        <span className="pointer-events-none absolute inset-x-1.5 bottom-[5px] h-[2px] rounded-full bg-marigold" />
+        <span className="pointer-events-none absolute inset-x-1.5 bottom-[5px] h-[2px] rounded-full bg-white/85" />
       </div>
       {wordmark && (
         <div className="leading-tight">
@@ -61,7 +61,7 @@ export function Logo({
   );
 }
 
-/** The signature selvedge stripe — indigo body, marigold ID thread. */
+/** The signature selvedge stripe — near-black body, grey ID thread. */
 export function Selvedge({ className }: { className?: string }) {
   return (
     <span aria-hidden className={cn("selvedge-tick inline-block w-[3px] shrink-0 rounded-full", className)} />

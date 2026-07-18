@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  --brand: #3a4a94;
-  --marigold: #e2a12c;
+  --ink: #1d1d20;
+  --seam: #b6b6ba;
 }
 
 @layer base {
@@ -36,33 +36,33 @@
   }
 
   ::selection {
-    background: rgba(226, 161, 44, 0.28);
+    background: rgba(20, 20, 22, 0.14);
   }
 
   /* Quiet, chosen scrollbars rather than the OS default. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #c7cad6 transparent;
+    scrollbar-color: #cfcfd2 transparent;
   }
   ::-webkit-scrollbar {
     width: 11px;
     height: 11px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cdd0dc;
+    background: #d2d2d5;
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #b4b8c8;
+    background: #b6b6ba;
     background-clip: content-box;
   }
   .rail-scroll {
-    scrollbar-color: #3a4573 transparent;
+    scrollbar-color: #3a3a3d transparent;
   }
   .rail-scroll::-webkit-scrollbar-thumb {
-    background: #364168;
+    background: #343437;
   }
 }
 
@@ -76,9 +76,9 @@
     );
   }
 
-  /* Selvedge — the signature two-thread stripe (indigo body, marigold ID line). */
+  /* Selvedge — the signature two-thread stripe (near-black body, grey ID line). */
   .selvedge-tick {
-    background: linear-gradient(180deg, var(--brand) 0 56%, var(--marigold) 56% 100%);
+    background: linear-gradient(180deg, var(--ink) 0 56%, var(--seam) 56% 100%);
   }
 }
 

@@ -22,39 +22,35 @@ export default {
         mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
-        // Near-neutral cool paper — chosen ground, not default grey.
-        canvas: "#f1f2f6",
+        // Monochrome ground — clean neutral greys, white surfaces.
+        canvas: "#f4f4f5",
         surface: "#ffffff",
-        line: { DEFAULT: "#e4e5ec", strong: "#d2d5df" },
-        ink: { DEFAULT: "#1a1d27", muted: "#585e70", faint: "#969bab" },
-        // Denim / natural-indigo dye — the anchor. Used for brand, active
-        // state, primary action and focus.
+        line: { DEFAULT: "#e6e6e8", strong: "#d4d4d7" },
+        ink: { DEFAULT: "#161618", muted: "#6a6a70", faint: "#a2a2a8" },
+        // Near-black — the anchor. Brand, active state, primary action, focus.
         brand: {
-          DEFAULT: "#3a4a94",
-          600: "#3a4a94",
-          700: "#2f3d7d",
-          800: "#26305f",
-          tint: "#eceef7",
+          DEFAULT: "#1d1d20",
+          600: "#1d1d20",
+          700: "#0a0a0b",
+          800: "#050506",
+          tint: "#efeff0",
           fg: "#ffffff",
         },
-        // Marigold / turmeric dye — the single signature pop. Decoration and
-        // identity only, never a status or a control.
-        marigold: { DEFAULT: "#e2a12c", 600: "#cf8f1c", light: "#f0bb5a" },
-        // The navigation rail — deep vat indigo.
+        // The navigation rail — near-black.
         rail: {
-          DEFAULT: "#1b2547",
-          2: "#222d54",
-          line: "#33406b",
-          muted: "#9aa2c4",
-          fg: "#eef0f8",
+          DEFAULT: "#111113",
+          2: "#1a1a1d",
+          line: "#2b2b2e",
+          muted: "#9a9aa0",
+          fg: "#f0f0f1",
         },
       },
       borderRadius: { xl: "0.75rem", "2xl": "1rem" },
       boxShadow: {
-        xs: "0 1px 2px rgba(20,24,45,0.05)",
-        card: "0 1px 2px rgba(20,24,45,0.04), 0 1px 3px rgba(20,24,45,0.06)",
-        "card-hover": "0 2px 6px rgba(20,24,45,0.06), 0 10px 24px rgba(20,24,45,0.10)",
-        pop: "0 20px 48px rgba(20,24,45,0.20), 0 6px 12px rgba(20,24,45,0.08)",
+        xs: "0 1px 2px rgba(17,17,20,0.05)",
+        card: "0 1px 2px rgba(17,17,20,0.04), 0 1px 3px rgba(17,17,20,0.06)",
+        "card-hover": "0 2px 6px rgba(17,17,20,0.06), 0 10px 24px rgba(17,17,20,0.10)",
+        pop: "0 20px 48px rgba(17,17,20,0.22), 0 6px 12px rgba(17,17,20,0.10)",
       },
       keyframes: {
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },

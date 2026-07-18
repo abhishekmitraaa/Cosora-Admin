@@ -26,9 +26,9 @@ import { Badge, Card, Empty, ErrorNote, PageHeader, Spinner, Table } from "@/com
  */
 
 // Single-series charts throughout, so there is no categorical palette to collide:
-// sequential blue for magnitude, and the reserved status palette (always paired
-// with a text label, never colour alone) for product state.
-const SERIES_BLUE = "#2a78d6";
+// monochrome graphite for magnitude, and the reserved status palette (always
+// paired with a text label, never colour alone) for product state.
+const SERIES_INK = "#26262a";
 const STATUS_COLOR: Record<string, string> = {
   live: "#0ca30c", // good
   under_review: "#fab219", // warning
@@ -247,7 +247,7 @@ export default function Reports() {
                   formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
                   labelFormatter={(v: string) => format(new Date(v), "d MMM yyyy")}
                 />
-                <Line type="monotone" dataKey="total" stroke={SERIES_BLUE} strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="total" stroke={SERIES_INK} strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -289,7 +289,7 @@ export default function Reports() {
                   width={130}
                 />
                 <Tooltip formatter={(v: number) => [String(v), "Products"]} cursor={{ fill: "#f1f5f9" }} />
-                <Bar dataKey="count" fill={SERIES_BLUE} radius={[0, 4, 4, 0]} barSize={14} />
+                <Bar dataKey="count" fill={SERIES_INK} radius={[0, 4, 4, 0]} barSize={14} />
               </BarChart>
             </ResponsiveContainer>
           </div>

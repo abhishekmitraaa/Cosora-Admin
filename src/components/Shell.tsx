@@ -62,10 +62,10 @@ export default function Shell() {
               >
                 {({ isActive }) => (
                   <>
-                    {/* Selvedge: the marigold ID thread marks the active seam. */}
+                    {/* Selvedge: the white ID thread marks the active seam. */}
                     <span
                       className={cn(
-                        "absolute left-0 top-1/2 w-[3px] -translate-y-1/2 rounded-full bg-marigold transition-all duration-200",
+                        "absolute left-0 top-1/2 w-[3px] -translate-y-1/2 rounded-full bg-white transition-all duration-200",
                         isActive ? "h-6 opacity-100" : "h-0 opacity-0",
                       )}
                       aria-hidden
@@ -74,7 +74,7 @@ export default function Shell() {
                       size={17}
                       className={cn(
                         "shrink-0 transition-colors",
-                        isActive ? "text-marigold" : "text-rail-muted group-hover:text-white",
+                        isActive ? "text-white" : "text-rail-muted group-hover:text-white",
                       )}
                     />
                     {label}
