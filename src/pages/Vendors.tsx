@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { fetchAccountStatuses } from "@/lib/accounts";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
@@ -14,6 +15,12 @@ interface VendorListRow {
   business_type: string | null;
   onboarding_complete: boolean;
   is_verified: boolean;
+  /**
+   * From `profiles`, NOT `vendor_profiles`. Migration 20260801095820 dropped
+   * `vendor_profiles.account_status` and moved suspension to
+   * `profiles.account_status`, because the same human toggles between buyer and
+   * vendor and a vendor-table flag cannot stop them messaging as a buyer.
+   */
   account_status: string;
   plan_id: string | null;
   plan_expires_at: string | null;
@@ -30,11 +37,18 @@ export default function Vendors() {
       const { data, error } = await supabase
         .from("vendor_profiles")
         .select(
-          "id, brand_name, city, business_type, onboarding_complete, is_verified, account_status, plan_id, plan_expires_at, ad_verified_until",
+          "id, brand_name, city, business_type, onboarding_complete, is_verified, plan_id, plan_expires_at, ad_verified_until",
         )
         .order("brand_name", { ascending: true });
       if (error) throw new Error(error.message);
-      return data ?? [];
+      const vendors = data ?? [];
+
+      // Suspension lives on `profiles`, keyed by the same uuid
+      // (vendor_profiles.id FKs profiles.id). Two FKs from vendor_profiles to
+      // profiles would make a PostgREST embed ambiguous, so this merges
+      // client-side — the same approach lib/vendors.ts already takes.
+      const statuses = await fetchAccountStatuses(vendors.map((v) => v.id));
+      return vendors.map((v) => ({ ...v, account_status: statuses.get(v.id) ?? "active" }));
     },
   });
 

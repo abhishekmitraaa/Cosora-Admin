@@ -102,9 +102,14 @@ export default function AccountStatus({
       const { error } = await supabase.rpc("set_account_status", {
         p_profile_id: profileId,
         p_new_status: status,
-        p_reason_id: reasonId,
+        // `p_reason_id uuid` accepts NULL in SQL (reinstating states no reason,
+        // and chat_block_reasons may be empty). `supabase gen types` models a
+        // function argument's TYPE but not its nullability, so it emits
+        // `string` for every uuid param — the cast asserts what the DDL says.
+        p_reason_id: reasonId as string,
         p_source: "admin_manual",
-        p_conversation_review_id: null,
+        // Omitted rather than passed as null: it has a SQL DEFAULT NULL, and
+        // the generated Args type marks it optional accordingly.
       });
       if (error) throw new Error(describeWriteError(error));
     },
@@ -141,6 +146,20 @@ export default function AccountStatus({
         <span className="font-mono text-[11px]">set_account_status()</span>, which records every
         change on the <span className="font-mono text-[11px]">account_suspensions</span> ledger.
       </p>
+
+      {/*
+        Scope, stated honestly. This is NOT the old "sets a flag only" banner —
+        suspension is really enforced now, just not everywhere. Narrow the claim
+        when the remaining surfaces are gated; do not broaden it before.
+      */}
+      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+        <span className="font-semibold">What suspending actually stops.</span> Chat and calling,
+        for real and server-side: <span className="font-mono text-[11px]">messages_insert</span>{" "}
+        requires the sender's account to be active, so a suspended account cannot send a message
+        even with the UI bypassed, and the call gate refuses in both directions. It does{" "}
+        <span className="font-medium">not</span> yet stop them posting RFQs, submitting quotes,
+        uploading products or running ads — those inserts are not gated on account status.
+      </div>
 
       {writable ? (
         <Button

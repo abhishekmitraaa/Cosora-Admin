@@ -20,6 +20,8 @@ const env = Object.fromEntries(
 
 const F = {
   vendor: "b92eaa10-4a83-42ff-b92a-feae098c9fa2",
+  buyer: "11111111-1111-1111-1111-111111111111", // Demo Buyer — suspended and reinstated through the RPC below
+
   product: "86388022-b84a-4c15-9a83-59df215c9c88",
   ad: "af63ca56-f89a-4e1c-b343-100af133d85e",
   subscription: "f761fbf0-d6bd-4be8-b996-d885884e17a5",
@@ -49,9 +51,32 @@ const cases = [
         .select("id"),
   ],
   ["vendor.is_verified", () => db.from("vendor_profiles").update({ is_verified: true }).eq("id", F.vendor).select("id")],
+  // NOT a vendor_profiles UPDATE any more — 20260801095820 dropped that column.
+  // Even a super_admin cannot write profiles.account_status directly
+  // (enforce_admin_grants raises on any direct change), so the allow-side case
+  // is the RPC. These two RPCs raise on refusal rather than matching zero rows,
+  // so `rows > 0` cannot judge them — handled by the `rpc: true` flag below.
   [
-    "vendor.suspend",
-    () => db.from("vendor_profiles").update({ account_status: "suspended" }).eq("id", F.vendor).select("id"),
+    "account.suspend via set_account_status()",
+    () =>
+      db.rpc("set_account_status", {
+        p_profile_id: F.buyer,
+        p_new_status: "suspended",
+        p_reason_id: null,
+        p_source: "admin_manual",
+      }),
+    { rpc: true },
+  ],
+  [
+    "account.reinstate via set_account_status()",
+    () =>
+      db.rpc("set_account_status", {
+        p_profile_id: F.buyer,
+        p_new_status: "active",
+        p_reason_id: null,
+        p_source: "admin_manual",
+      }),
+    { rpc: true },
   ],
   [
     "ad.reject (+reason)",
@@ -86,23 +111,35 @@ const cases = [
 
 const results = [];
 let failures = 0;
-for (const [name, run] of cases) {
+for (const [name, run, opts = {}] of cases) {
   const { data, error } = await run();
   const rows = Array.isArray(data) ? data.length : 0;
-  const ok = !error && rows > 0;
+  // Table writes are judged on ROWS RETURNED, because an RLS denial on UPDATE
+  // does not raise — it matches nothing and PostgREST reports success.
+  //
+  // A `returns void` RPC is the opposite: it returns no rows on SUCCESS and
+  // RAISES on refusal. Judging it by row count would fail every passing call,
+  // so those cases carry `{ rpc: true }` and are judged on the error alone.
+  const ok = opts.rpc ? !error : !error && rows > 0;
   if (!ok) failures++;
   results.push({
     action: name,
     expected: "ALLOW",
     actual: ok ? "ALLOW" : "DENY",
     verdict: ok ? "PASS" : "*** FAIL ***",
-    db_said: error ? `${error.code ?? ""} ${error.message}`.trim().slice(0, 80) : `${rows} row(s)`,
+    db_said: error
+      ? `${error.code ?? ""} ${error.message}`.trim().slice(0, 80)
+      : opts.rpc
+        ? "no error (void rpc)"
+        : `${rows} row(s)`,
   });
 }
 
 // Restore the fixtures to baseline.
 await db.from("products").update({ status: "under_review", rejection_reason: null }).eq("id", F.product);
-await db.from("vendor_profiles").update({ is_verified: false, account_status: "active" }).eq("id", F.vendor);
+await db.from("vendor_profiles").update({ is_verified: false }).eq("id", F.vendor);
+// account_status is restored by the reinstate case above, not here — it is not
+// a vendor_profiles column and cannot be set by a direct UPDATE at all.
 await db
   .from("advertisements")
   .update({ status: "active", moderation_reason: null, moderated_at: null, moderated_by: null })

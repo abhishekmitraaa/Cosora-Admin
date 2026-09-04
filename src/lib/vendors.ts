@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { fetchAccountStatuses } from "./accounts";
 
 /**
  * Vendor identity as shown next to moderated content.
@@ -15,6 +16,13 @@ export interface VendorSummary {
   brand_name: string | null;
   city: string | null;
   is_verified: boolean;
+  /**
+   * From `profiles`, not `vendor_profiles` — see lib/accounts.ts. Selecting it
+   * off `vendor_profiles` (as this did until 20260801095820 was accounted for)
+   * is a 400, and because this helper runs inside the SAME queryFn as the
+   * product/ad list, that 400 took the whole Products and Ads pages down, not
+   * just the vendor badge.
+   */
   account_status: string;
 }
 
@@ -22,11 +30,16 @@ export async function fetchVendorsByIds(ids: string[]): Promise<Map<string, Vend
   const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Map();
 
-  const { data, error } = await supabase
-    .from("vendor_profiles")
-    .select("id, brand_name, city, is_verified, account_status")
-    .in("id", unique);
+  const [{ data, error }, statuses] = await Promise.all([
+    supabase.from("vendor_profiles").select("id, brand_name, city, is_verified").in("id", unique),
+    fetchAccountStatuses(unique),
+  ]);
   if (error) throw new Error(error.message);
 
-  return new Map((data ?? []).map((v) => [v.id, v as VendorSummary]));
+  return new Map(
+    (data ?? []).map((v) => [
+      v.id,
+      { ...v, account_status: statuses.get(v.id) ?? "active" } as VendorSummary,
+    ]),
+  );
 }

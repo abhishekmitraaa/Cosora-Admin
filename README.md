@@ -91,15 +91,24 @@ nowhere else. Every other role sees none of them.
 vocabulary every suspension is recorded in, so support *picks* from it (active
 rows, via the reason picker) but only a `super_admin` decides what is on it.
 
-**Two different `account_status` columns exist and they are not the same thing:**
+**There is exactly one `account_status`, and it is on `profiles`:**
 
 | Column | Written by | Gated to | Audited |
 |---|---|---|---|
 | `profiles.account_status` | `set_account_status()` RPC only — a direct UPDATE is rejected by a BEFORE trigger | `super_admin`, `support` | yes, `account_suspensions` |
-| `vendor_profiles.account_status` | plain UPDATE (pre-existing, Prompt 1) | `super_admin`, `vendor_ops` | no |
 
-The vendor screen shows both, labelled, because suspending the account and
-flagging the vendor listing are different decisions with different role gates.
+There *used* to be a second one, `vendor_profiles.account_status`, written by a
+plain UPDATE and gated to `vendor_ops`. **It was DROPPED** by textile-spark-net's
+migration `20260801095820`, which moved suspension to `profiles`: the same human
+toggles between buyer and vendor, so a flag on the vendor row cannot stop them
+messaging as a buyer.
+
+This panel kept selecting and updating the dropped column for some time
+afterwards. A PostgREST select naming a column that does not exist is a hard 400,
+not a null — so Vendors, VendorDetail, **and** Products and Ads (both of which
+resolve vendor badges through `lib/vendors.ts`, in the same `queryFn` as their
+own list) failed to load outright. `lib/accounts.ts` is now the single reader,
+and `vendor_profiles` has one admin field left: `is_verified`.
 
 ---
 
@@ -150,7 +159,8 @@ Applied to the shared project (`supabase/migrations/`):
 | `20260717160000_user_has_password_rpc` | `user_has_password(email)` — service-role-only `SECURITY DEFINER` check of `auth.users.encrypted_password`, so `admin-invite` can branch on whether an existing (OTP-only) account actually has a password |
 | `20260802120000_resolve_conversation_review_rpc` | `resolve_conversation_review(p_review_id, p_resolution, p_reason_id)` — see below |
 
-`vendor_profiles.account_status` already existed — Prompt 1 added it.
+`vendor_profiles.account_status` was added by Prompt 1 and **dropped again** by
+textile-spark-net's `20260801095820`. Nothing in this panel may reference it.
 
 ### Why `resolve_conversation_review()` had to exist
 
@@ -197,7 +207,7 @@ silent and expensive:
 | 2 — Admin & role management | **Working**; grant/change/demote verified allowed for `super_admin`, refused (trigger `42501`) for all others |
 | 2b — Invite admin by email | **Working, all three branches verified (14/14): new-user invite, existing-OTP-only (grant + recovery email — the branch that matters, real `mail.send` confirmed), and existing-with-password (silent promote). `/reset-password` link-landing proven end-to-end. Email throttled by Supabase's built-in mailer (custom SMTP needed for volume); the amber warning surfaces a failed send honestly. Redirect-URL allow-listing is a dashboard step you must do.** |
 | 3 — Product moderation queue | **Working**; approve/reject + required reason, live/rejected tabs |
-| 4 — Vendor accounts & verification | **Working for verification. Suspension writes the flag only — see below.** |
+| 4 — Vendor accounts & verification | **Working.** Verification writes `vendor_profiles.is_verified`. Suspension is account-level (`profiles.account_status` via `set_account_status()`) and is **really enforced for chat and calling** — not yet for RFQs, quotes, listings or ads. See below. |
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
@@ -320,12 +330,26 @@ promote to exercise the existing-user branch.
 
 ### Known limitations — read before trusting the UI
 
-**Vendor suspension is a flag, not enforcement.** Setting `account_status =
-'suspended'` writes the row and nothing more. Nothing in `textile-spark-net`
-reads it yet, so a suspended vendor's products and ads stay visible to buyers and
-an open session keeps working. Delivering real suspension needs a follow-up in
-that repo (filter on `account_status` in the buyer-side product/ad queries, and
-reject the session). The UI says exactly this on the vendor screen.
+**Suspension is real, but it is not total.** Setting `profiles.account_status =
+'suspended'` (only ever through `set_account_status()`) is enforced server-side
+for two things, and they are the two that matter most:
+
+- **Messaging.** `messages_insert` requires the sender's `account_status` to be
+  `'active'`, so a suspended account cannot send a message even with the UI
+  bypassed entirely.
+- **Calling.** `callGate()` in textile-spark-net refuses in both directions
+  (caller suspended, target suspended) and the vendor's contact card — phone,
+  email, address, website — is hidden by the same rule.
+
+It does **not** yet stop a suspended account posting RFQs, submitting quotes,
+uploading products or videos, running ads, or writing reviews: those insert
+policies are not gated on account status. Widening that is a deliberate product
+decision — suspending someone over one chat incident should arguably not also
+kill a live, paid ad campaign — and is tracked as its own migration.
+
+The old claim here, that suspension "writes the row and nothing more", was
+written before the chat gate shipped and is no longer true. The vendor screen's
+banner says the same thing this paragraph does.
 
 **Refunds are real code that has never executed.** `admin-refund-payment` is
 deployed (`verify_jwt: true`) and calls Razorpay's live refund API. It has
@@ -393,9 +417,12 @@ status, assignee, or resolution exists. Labelled as such in the UI.
 
 ### Follow-ups required in `textile-spark-net`
 
-1. **Vendor suspension enforcement** (functional): read `vendor_profiles.account_status`
-   in the buyer-facing product/ad queries and hide suspended vendors' content;
-   kick or block an in-progress suspended session.
+1. **Broader suspension enforcement** (functional): `profiles.account_status`
+   (never `vendor_profiles.account_status` — that column no longer exists) is
+   already enforced for messaging and calling. Extending it to RFQ, quote,
+   product, video, ad and review inserts means ANDing an `account_is_active()`
+   predicate onto those `with_check` clauses. Own migration, independently
+   revertable.
 2. **Ad `rejected` status** (cosmetic): `src/lib/queries/ads.ts` types
    `AdStatus = "draft"|"active"|"paused"|"ended"` and `Advertisements.tsx` maps
    status → badge colour. A `rejected` ad renders with an unstyled badge until

@@ -67,9 +67,12 @@ export default function ChatReasons() {
 
   const add = useMutation({
     mutationFn: async (value: string) => {
+      // created_by is NOT NULL. Sending null produced a confusing 23502 from
+      // Postgres instead of saying the session was the problem.
+      if (!identity?.id) throw new Error("No admin session — sign in again before adding a reason.");
       const { error } = await supabase
         .from("chat_block_reasons")
-        .insert({ reason: value.trim(), active: true, created_by: identity?.id ?? null });
+        .insert({ reason: value.trim(), active: true, created_by: identity.id });
       if (error) throw new Error(describeWriteError(error));
     },
     onSuccess: () => {

@@ -39,7 +39,6 @@ interface VendorDetailRow {
   pan: string | null;
   cin: string | null;
   is_verified: boolean;
-  account_status: string;
   onboarding_complete: boolean;
   plan_id: string | null;
   plan_expires_at: string | null;
@@ -61,7 +60,7 @@ export default function VendorDetail() {
         .select(
           `id, brand_name, about, city, state, country, business_type, owner_name, owner_email,
            phone, website, address_line, area, postal_code, landmark, gstin, pan, cin,
-           is_verified, account_status, onboarding_complete, plan_id, plan_expires_at, ad_verified_until`,
+           is_verified, onboarding_complete, plan_id, plan_expires_at, ad_verified_until`,
         )
         .eq("id", id!)
         .maybeSingle();
@@ -71,13 +70,16 @@ export default function VendorDetail() {
   });
 
   /**
-   * Both the verification toggle and the suspension flag are `vendor_profiles`
-   * UPDATEs. The `enforce_vendor_profile_admin_fields` trigger raises 42501
-   * unless the caller is super_admin/vendor_ops, so a support session that
-   * reaches this write is refused by Postgres, not by the disabled button.
+   * Verification is the ONLY admin field left on `vendor_profiles`.
+   * `enforce_vendor_profile_admin_fields` raises 42501 unless the caller is
+   * super_admin/vendor_ops, so a support session that reaches this write is
+   * refused by Postgres, not by the disabled button.
+   *
+   * Suspension is NOT here. It lives on `profiles.account_status` and is written
+   * only by set_account_status() — see the <AccountStatus> card below.
    */
   const update = useMutation({
-    mutationFn: async (patch: { is_verified?: boolean; account_status?: string }) => {
+    mutationFn: async (patch: { is_verified?: boolean }) => {
       assertWrote(
         await supabase.from("vendor_profiles").update(patch).eq("id", id!).select("id"),
         "update vendor",
@@ -96,7 +98,6 @@ export default function VendorDetail() {
 
   const v = vendor.data;
   const s = sealSources(v.is_verified, v.plan_expires_at, v.ad_verified_until);
-  const suspended = v.account_status === "suspended";
 
   return (
     <div className="max-w-4xl">
@@ -113,7 +114,9 @@ export default function VendorDetail() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         {v.onboarding_complete ? <Badge tone="green">onboarding complete</Badge> : <Badge tone="amber">onboarding incomplete</Badge>}
-        {suspended ? <Badge tone="red" dot>suspended</Badge> : <Badge tone="green" dot>active</Badge>}
+        {/* Suspension state is NOT badged here. It is not a vendor_profiles fact
+            any more, and the <AccountStatus> card below reads and renders it
+            from profiles — one query, one badge, no chance of the two disagreeing. */}
         {s.any ? <Badge tone="blue">trust seal shown</Badge> : <Badge>no seal</Badge>}
       </div>
 
@@ -195,58 +198,20 @@ export default function VendorDetail() {
       </Card>
 
       {/*
-        THE ACCOUNT-LEVEL suspension: profiles.account_status, written only by
+        Suspension for this vendor. `profiles.account_status`, written only by
         set_account_status(), gated to support/super_admin, audited in
-        account_suspensions. This is the one that also covers buyers and that the
-        chat review queue drives.
+        account_suspensions.
 
-        It sits ABOVE the vendor_profiles flag below deliberately — this is the
-        one to reach for. The two are genuinely different columns with different
-        role gates, so they are shown separately and each says which it is.
+        There used to be a second control below this one writing
+        `vendor_profiles.account_status`. That column was DROPPED by migration
+        20260801095820 and this page kept selecting and updating it, so the whole
+        screen 400'd. It is gone: there is one suspension, it is account-level,
+        and this card is it. Buyers and vendors share it, because the same human
+        is both.
       */}
       <div className="mb-4">
         <AccountStatus profileId={v.id} name={v.brand_name || "this vendor"} kind="vendor" />
       </div>
-
-      {/* Suspension — scope-limited, and said so plainly. */}
-      <Card className="mb-4">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">
-          Vendor listing flag (separate from the account status above)
-        </h2>
-
-        {/*
-          Honesty guard: this write is real, but it is ONLY a flag. Nothing in
-          textile-spark-net reads account_status yet, so a suspended vendor's
-          products and ads remain visible to buyers and an open session keeps
-          working. Do not soften this copy without shipping the buyer-side change.
-        */}
-        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <span className="font-semibold">This sets a flag only, and it is not the account status.</span>{" "}
-          It writes <span className="font-mono text-[11px]">vendor_profiles.account_status</span> —
-          a different column from the{" "}
-          <span className="font-mono text-[11px]">profiles.account_status</span> above, with a
-          different role gate (vendor ops writes this one; support does not). It does{" "}
-          <span className="font-medium">not</span> yet hide their products or ads from buyers, and it
-          does not end an in-progress session — both require a follow-up change in textile-spark-net
-          that reads this flag. Until then, treat this as a record of the decision, not as
-          enforcement.
-        </div>
-
-        <Button
-          variant={suspended ? "outline" : "danger"}
-          disabled={!writable || update.isPending}
-          onClick={() => {
-            const next = suspended ? "active" : "suspended";
-            if (!confirm(`Set ${v.brand_name ?? "this vendor"} to ${next}?`)) return;
-            update.mutate(
-              { account_status: next },
-              { onSuccess: () => toast.success(`Account marked ${next}`) },
-            );
-          }}
-        >
-          {suspended ? "Reinstate account" : "Suspend account"}
-        </Button>
-      </Card>
 
       <FlagLog entityType="vendor" entityId={v.id} />
     </div>

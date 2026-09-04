@@ -32,6 +32,9 @@ const PASSWORD = "TestPass123!";
 
 const F = {
   vendor: "b92eaa10-4a83-42ff-b92a-feae098c9fa2",
+  // Demo Buyer. A non-admin profile, used as the target of writes that must be
+  // refused for every admin role.
+  buyer: "11111111-1111-1111-1111-111111111111",
   product: "86388022-b84a-4c15-9a83-59df215c9c88",
   ad: "af63ca56-f89a-4e1c-b343-100af133d85e",
   invoice: "7348313a-b39b-4115-8a92-bcd3bd82e5a2",
@@ -65,10 +68,19 @@ const ACTIONS = {
     run: (db) => db.from("vendor_profiles").update({ is_verified: true }).eq("id", F.vendor).select("id"),
     revert: (db) => db.from("vendor_profiles").update({ is_verified: false }).eq("id", F.vendor).select("id"),
   },
-  "vendor_profiles.account_status=suspended": {
-    allowed: "vendor_ops",
-    run: (db) => db.from("vendor_profiles").update({ account_status: "suspended" }).eq("id", F.vendor).select("id"),
-    revert: (db) => db.from("vendor_profiles").update({ account_status: "active" }).eq("id", F.vendor).select("id"),
+  // vendor_profiles.account_status was DROPPED by 20260801095820. The case that
+  // used to live here tested a column that no longer exists, which PostgREST
+  // answers with a 400 for EVERY role — indistinguishable from an RLS denial,
+  // so it read as a clean pass for five roles and a spurious failure for one.
+  //
+  // Its replacement is profiles.account_status, and the interesting property is
+  // the opposite one: NOBODY may write it directly, vendor_ops and super_admin
+  // included, because enforce_admin_grants() raises on any direct change. The
+  // only door is set_account_status(), covered in chat-moderation-matrix.mjs.
+  "profiles.account_status (direct write — must fail for everyone)": {
+    allowed: "__nobody__",
+    run: (db) => db.from("profiles").update({ account_status: "suspended" }).eq("id", F.buyer).select("id"),
+    revert: null, // never succeeds; nothing to undo
   },
   "advertisements.pause (+reason)": {
     allowed: "ads_moderator",
