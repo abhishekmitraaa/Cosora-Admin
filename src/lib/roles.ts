@@ -20,7 +20,21 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   support: "Support (read-only)",
 };
 
-export type Section = "products" | "vendors" | "ads" | "subscriptions" | "reports" | "admins";
+export type Section =
+  | "products"
+  | "vendors"
+  | "ads"
+  | "subscriptions"
+  | "reports"
+  | "admins"
+  // Chat moderation. These are the first sections where `support` is not
+  // read-only — reviewing chats IS the support role's job, so the DB grants it
+  // writes here that it has nowhere else.
+  | "chats"
+  | "chat-review"
+  | "chat-keywords"
+  | "chat-patterns"
+  | "chat-reasons";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -51,6 +65,14 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   subscriptions: ["super_admin", "finance_admin", "support"],
   reports: ALL_ROLES,
   admins: ["super_admin"],
+  chats: ["super_admin", "support"],
+  "chat-review": ["super_admin", "support"],
+  "chat-keywords": ["super_admin", "support"],
+  "chat-patterns": ["super_admin", "support"],
+  // Stricter than its four siblings on purpose: chat_block_reasons is the only
+  // chat table support may not even READ beyond the active rows it picks from,
+  // and only super_admin may add/edit/deactivate. Mirrors the SQL exactly.
+  "chat-reasons": ["super_admin"],
 };
 
 /**
@@ -66,6 +88,12 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   subscriptions: ["super_admin", "finance_admin"],
   reports: [],
   admins: ["super_admin"],
+  // The chats overview is oversight only — every action lives in the queue.
+  chats: [],
+  "chat-review": ["super_admin", "support"],
+  "chat-keywords": ["super_admin", "support"],
+  "chat-patterns": ["super_admin", "support"],
+  "chat-reasons": ["super_admin"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */
@@ -80,6 +108,19 @@ export function canWrite(role: AdminRole | null, section: Section): boolean {
 /** The flagged-items log is the one table support may write (admin_flags_insert). */
 export function canWriteFlags(role: AdminRole | null): boolean {
   return role !== null;
+}
+
+/**
+ * Suspending / reinstating a buyer or vendor ACCOUNT (profiles.account_status).
+ *
+ * Not a section — it appears inside pages whose own section has a different
+ * gate. VendorDetail is the case that matters: `vendor_ops` may write that page
+ * (verification, the legacy vendor_profiles flag) but may NOT touch the account
+ * status, because set_account_status() is gated to support/super_admin inside
+ * the function. This mirrors that predicate; the RPC is what enforces it.
+ */
+export function canSuspendAccounts(role: AdminRole | null): boolean {
+  return role === "super_admin" || role === "support";
 }
 
 /** Why a section is visible but its actions are not — shown in the read-only banner. */

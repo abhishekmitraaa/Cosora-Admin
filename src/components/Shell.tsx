@@ -1,27 +1,59 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  Boxes,
-  Store,
-  Megaphone,
-  CreditCard,
+  Ban,
   BarChart3,
-  ShieldCheck,
+  Boxes,
+  CreditCard,
   LogOut,
+  Megaphone,
   Menu,
+  MessagesSquare,
+  Regex,
+  ScrollText,
+  ShieldAlert,
+  ShieldCheck,
+  Store,
   X,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
 import { cn, Logo } from "./ui";
 
-const NAV: { to: string; section: Section; label: string; icon: typeof Boxes }[] = [
-  { to: "/products", section: "products", label: "Products", icon: Boxes },
-  { to: "/vendors", section: "vendors", label: "Vendors", icon: Store },
-  { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
-  { to: "/subscriptions", section: "subscriptions", label: "Subscriptions", icon: CreditCard },
-  { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
-  { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
+interface NavItem {
+  to: string;
+  section: Section;
+  label: string;
+  icon: typeof Boxes;
+}
+
+/**
+ * Two groups rather than one 11-item list. The eyebrow label is the same one
+ * the rail already used for "Workspace" — a heading, not a new nav pattern.
+ * A group whose items are all hidden by role renders nothing, heading included.
+ */
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "Workspace",
+    items: [
+      { to: "/products", section: "products", label: "Products", icon: Boxes },
+      { to: "/vendors", section: "vendors", label: "Vendors", icon: Store },
+      { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
+      { to: "/subscriptions", section: "subscriptions", label: "Subscriptions", icon: CreditCard },
+      { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
+      { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "Chat moderation",
+    items: [
+      { to: "/chats", section: "chats", label: "Chats", icon: MessagesSquare },
+      { to: "/chat-review", section: "chat-review", label: "Review queue", icon: ShieldAlert },
+      { to: "/chat-keywords", section: "chat-keywords", label: "Keyword blocklist", icon: Ban },
+      { to: "/chat-patterns", section: "chat-patterns", label: "Flag patterns", icon: Regex },
+      { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
+    ],
+  },
 ];
 
 function initials(name: string | null, email: string | null): string {
@@ -37,7 +69,10 @@ export default function Shell() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const role = identity?.role ?? null;
-  const visible = NAV.filter((n) => canSee(role, n.section));
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((n) => canSee(role, n.section)),
+  })).filter((g) => g.items.length > 0);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {
@@ -88,47 +123,51 @@ export default function Shell() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 pb-4">
-          <div className="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-rail-muted/70">
-            Workspace
-          </div>
-          <div className="space-y-0.5">
-            {visible.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    "group relative flex items-center gap-2.5 rounded-lg py-2.5 pl-3.5 pr-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-white/[0.08] text-white"
-                      : "text-rail-muted hover:bg-white/[0.04] hover:text-white",
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {/* Selvedge: the white ID thread marks the active seam. */}
-                    <span
-                      className={cn(
-                        "absolute left-0 top-1/2 w-[3px] -translate-y-1/2 rounded-full bg-white transition-all duration-200",
-                        isActive ? "h-6 opacity-100" : "h-0 opacity-0",
-                      )}
-                      aria-hidden
-                    />
-                    <Icon
-                      size={17}
-                      className={cn(
-                        "shrink-0 transition-colors",
-                        isActive ? "text-white" : "text-rail-muted group-hover:text-white",
-                      )}
-                    />
-                    {label}
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </div>
+        <nav className="flex-1 space-y-4 px-3 pb-4">
+          {groups.map((group) => (
+            <div key={group.title}>
+              <div className="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-rail-muted/70">
+                {group.title}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      cn(
+                        "group relative flex items-center gap-2.5 rounded-lg py-2.5 pl-3.5 pr-2.5 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-white/[0.08] text-white"
+                          : "text-rail-muted hover:bg-white/[0.04] hover:text-white",
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {/* Selvedge: the white ID thread marks the active seam. */}
+                        <span
+                          className={cn(
+                            "absolute left-0 top-1/2 w-[3px] -translate-y-1/2 rounded-full bg-white transition-all duration-200",
+                            isActive ? "h-6 opacity-100" : "h-0 opacity-0",
+                          )}
+                          aria-hidden
+                        />
+                        <Icon
+                          size={17}
+                          className={cn(
+                            "shrink-0 transition-colors",
+                            isActive ? "text-white" : "text-rail-muted group-hover:text-white",
+                          )}
+                        />
+                        {label}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-rail-line p-3">

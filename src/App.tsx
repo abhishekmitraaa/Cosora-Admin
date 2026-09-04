@@ -16,6 +16,12 @@ import Ads from "@/pages/Ads";
 import Subscriptions from "@/pages/Subscriptions";
 import Reports from "@/pages/Reports";
 import Admins from "@/pages/Admins";
+import Chats from "@/pages/Chats";
+import ChatThread from "@/pages/ChatThread";
+import ChatReview from "@/pages/ChatReview";
+import ChatKeywords from "@/pages/ChatKeywords";
+import ChatPatterns from "@/pages/ChatPatterns";
+import ChatReasons from "@/pages/ChatReasons";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -25,9 +31,21 @@ const queryClient = new QueryClient({
 function Landing() {
   const role = useAdminSession().identity?.role ?? null;
   const first =
-    (["products", "vendors", "ads", "subscriptions", "reports", "admins"] as const).find((s) =>
-      canSee(role, s),
-    ) ?? "reports";
+    (
+      [
+        "products",
+        "vendors",
+        "ads",
+        "subscriptions",
+        "chats",
+        "chat-review",
+        "chat-keywords",
+        "chat-patterns",
+        "chat-reasons",
+        "reports",
+        "admins",
+      ] as const
+    ).find((s) => canSee(role, s)) ?? "reports";
   return <Navigate to={`/${first}`} replace />;
 }
 
@@ -88,6 +106,54 @@ export default function App() {
                 element={
                   <RequireSection section="subscriptions">
                     <Subscriptions />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chats"
+                element={
+                  <RequireSection section="chats">
+                    <Chats />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chats/:id"
+                element={
+                  <RequireSection section="chats">
+                    <ChatThread />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chat-review"
+                element={
+                  <RequireSection section="chat-review">
+                    <ChatReview />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chat-keywords"
+                element={
+                  <RequireSection section="chat-keywords">
+                    <ChatKeywords />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chat-patterns"
+                element={
+                  <RequireSection section="chat-patterns">
+                    <ChatPatterns />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/chat-reasons"
+                element={
+                  <RequireSection section="chat-reasons">
+                    <ChatReasons />
                   </RequireSection>
                 }
               />

@@ -73,8 +73,33 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 | `finance_admin` | – | – | – | write | read | – |
 | `support` | read | read | read | read | read | – |
 
-`support` can additionally write the flagged-items log (`admin_flags`) — the only
-table it may write.
+`support` can additionally write the flagged-items log (`admin_flags`).
+
+### Chat moderation (Phase 3)
+
+These are the sections where `support` is **not** read-only — reviewing chats is
+the support role's job, so the database grants it writes here that it has
+nowhere else. Every other role sees none of them.
+
+| Role | Chats | Review queue | Keyword blocklist | Flag patterns | Block reasons |
+|---|---|---|---|---|---|
+| `super_admin` | read | write | write | write | **write** |
+| `support` | read | write | write | write | **–** |
+| everyone else | – | – | – | – | – |
+
+`chat_block_reasons` is deliberately stricter than its four siblings: it is the
+vocabulary every suspension is recorded in, so support *picks* from it (active
+rows, via the reason picker) but only a `super_admin` decides what is on it.
+
+**Two different `account_status` columns exist and they are not the same thing:**
+
+| Column | Written by | Gated to | Audited |
+|---|---|---|---|
+| `profiles.account_status` | `set_account_status()` RPC only — a direct UPDATE is rejected by a BEFORE trigger | `super_admin`, `support` | yes, `account_suspensions` |
+| `vendor_profiles.account_status` | plain UPDATE (pre-existing, Prompt 1) | `super_admin`, `vendor_ops` | no |
+
+The vendor screen shows both, labelled, because suspending the account and
+flagging the vendor listing are different decisions with different role gates.
 
 ---
 
@@ -93,6 +118,11 @@ node scripts/rls-matrix.mjs        # 60 cases
 
 # 3. The ALLOW side — super_admin can do everything, incl. role grants.
 node scripts/rls-superadmin.mjs    # 10 cases
+
+# 3b. Chat moderation: reads, writes and both RPCs across all six roles.
+#     Headline case — support is refused on chat_block_reasons and allowed
+#     everywhere else. Non-destructive (throwaway rows, nonexistent ids).
+node scripts/chat-moderation-matrix.mjs
 
 # 4. Browser smoke: nav + read-only banner + disabled actions per role.
 npm run build && npx vite preview --port 4174
@@ -118,8 +148,31 @@ Applied to the shared project (`supabase/migrations/`):
 | `20260717140200_ads_rejected_status` | Adds `'rejected'` to `advertisements_status_check` (it allowed only draft/active/paused/ended) |
 | `20260717150000_admin_role_values_rpc` | `admin_role_values()` — the real enum labels, so `admin-invite` validates a role against the live enum instead of a hardcoded copy that could drift |
 | `20260717160000_user_has_password_rpc` | `user_has_password(email)` — service-role-only `SECURITY DEFINER` check of `auth.users.encrypted_password`, so `admin-invite` can branch on whether an existing (OTP-only) account actually has a password |
+| `20260802120000_resolve_conversation_review_rpc` | `resolve_conversation_review(p_review_id, p_resolution, p_reason_id)` — see below |
 
 `vendor_profiles.account_status` already existed — Prompt 1 added it.
+
+### Why `resolve_conversation_review()` had to exist
+
+Everything else Phase 3 needs was already in the database (Phases 1/2 in
+`textile-spark-net`: `conversations.status`, `conversation_reviews`,
+`keyword_blocklist`, `flag_patterns`, `chat_block_reasons`,
+`account_suspensions`, `profiles.account_status`, `set_account_status()`).
+Closing a review was the one gap.
+
+`conversations.status` has **no admin-write RLS policy**. Phase 1 added a BEFORE
+trigger that *allows* an admin to change it, but a trigger cannot grant
+visibility — RLS decides which rows an UPDATE can match at all, and no policy
+lets an admin match a conversation they are not a participant of. A client-side
+`update conversations set status='active'` therefore matches **zero rows and
+returns success**, and the UI would report a resumed chat that is still locked.
+(The same silent-denial trap `assertWrote()` exists for.)
+
+Resolving a review is also two writes that must not half-apply — the review row,
+and for `resumed` the conversation row. So: one `SECURITY DEFINER` function,
+authorization checked inside it against the same `support`/`super_admin`
+predicate `set_account_status()` uses, and **every** failure path raises. Callers
+can rely on `if (error) throw` alone for this one, unlike table UPDATEs.
 
 ---
 
@@ -148,6 +201,7 @@ silent and expensive:
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
+| Phase 3 — Chat moderation (6 screens) | **Built; typecheck + build green, and all 15 live queries verified to parse against the real schema. Role gate confirmed by executing `roles.ts`. The DB-side gate is NOT yet verified with real logins — `scripts/chat-moderation-matrix.mjs` needs `20260802120000` applied and the test accounts re-seeded (see below).** |
 
 ## Inviting admins by email (`admin-invite`)
 
@@ -305,6 +359,37 @@ before. This screen is takedown-only, by design.
 author attached to a vendor/product/ad, for internal tracking. There is no
 order/transaction/complaint concept in Cosora for a dispute to attach to, so no
 status, assignee, or resolution exists. Labelled as such in the UI.
+
+**Chat moderation — read these before trusting the screens:**
+
+- **`20260802120000` must be applied before the review queue works.** Resume and
+  Keep locked call `resolve_conversation_review()`; until the migration is run
+  every action on that page fails with `PGRST202 function not found`. Nothing
+  half-applies — it just doesn't work.
+- **Blocking is two calls, not one transaction.** "Block buyer/vendor" calls
+  `set_account_status()` and *then* `resolve_conversation_review()`. Suspend-first
+  is deliberate: the reverse order fails silently in the way that matters — a
+  review marked `buyer_blocked` with nobody actually suspended looks handled and
+  leaves the queue. If the second call fails the UI says exactly that, and the
+  item stays visibly pending.
+- **There is no buyer profile page in this panel**, because buyers exist here
+  only as chat participants. The buyer's suspend/reinstate control therefore
+  lives on the chat thread view, next to the vendor's; the vendor gets the same
+  control on their own vendor page as well.
+- **Which participant is the buyer is inferred**, from whether they hold a
+  `vendor_profiles` row — nothing on `conversations` records it. When neither or
+  both do, the queue **disables** Block buyer / Block vendor and says why rather
+  than guessing. Blocking the wrong person is not recoverable.
+- **No realtime.** `conversations` is in the realtime publication, but this repo
+  has no subscriptions anywhere and building that for one list would be a new
+  pattern for its own sake. The chat lists refetch on window focus instead (a
+  per-query override — the global default is `refetchOnWindowFocus: false`).
+- **The chats list is capped at 200** most-recently-active conversations and the
+  thread view at 500 messages. Both say so on screen when the cap is hit; older
+  rows are not below, they are not loaded.
+- **Deleting a flag pattern is not deactivating it.** Existing
+  `conversation_reviews` rows point at it and a deleted one leaves them with no
+  label — the queue then shows "pattern since deleted". The UI says this.
 
 ### Follow-ups required in `textile-spark-net`
 

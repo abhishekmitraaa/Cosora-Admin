@@ -7,6 +7,7 @@ import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
+import AccountStatus from "@/components/AccountStatus";
 import FlagLog from "@/components/FlagLog";
 import {
   Badge,
@@ -193,9 +194,25 @@ export default function VendorDetail() {
         )}
       </Card>
 
+      {/*
+        THE ACCOUNT-LEVEL suspension: profiles.account_status, written only by
+        set_account_status(), gated to support/super_admin, audited in
+        account_suspensions. This is the one that also covers buyers and that the
+        chat review queue drives.
+
+        It sits ABOVE the vendor_profiles flag below deliberately — this is the
+        one to reach for. The two are genuinely different columns with different
+        role gates, so they are shown separately and each says which it is.
+      */}
+      <div className="mb-4">
+        <AccountStatus profileId={v.id} name={v.brand_name || "this vendor"} kind="vendor" />
+      </div>
+
       {/* Suspension — scope-limited, and said so plainly. */}
       <Card className="mb-4">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Account suspension</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-800">
+          Vendor listing flag (separate from the account status above)
+        </h2>
 
         {/*
           Honesty guard: this write is real, but it is ONLY a flag. Nothing in
@@ -204,12 +221,15 @@ export default function VendorDetail() {
           working. Do not soften this copy without shipping the buyer-side change.
         */}
         <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          <span className="font-semibold">This sets a flag only.</span> Suspending writes{" "}
-          <span className="font-mono text-[11px]">account_status = 'suspended'</span> to the vendor's
-          row. It does <span className="font-medium">not</span> yet hide their products or ads from
-          buyers, and it does not end an in-progress session — both require a follow-up change in
-          textile-spark-net that reads this flag. Until then, treat this as a record of the decision,
-          not as enforcement.
+          <span className="font-semibold">This sets a flag only, and it is not the account status.</span>{" "}
+          It writes <span className="font-mono text-[11px]">vendor_profiles.account_status</span> —
+          a different column from the{" "}
+          <span className="font-mono text-[11px]">profiles.account_status</span> above, with a
+          different role gate (vendor ops writes this one; support does not). It does{" "}
+          <span className="font-medium">not</span> yet hide their products or ads from buyers, and it
+          does not end an in-progress session — both require a follow-up change in textile-spark-net
+          that reads this flag. Until then, treat this as a record of the decision, not as
+          enforcement.
         </div>
 
         <Button
