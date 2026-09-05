@@ -2079,6 +2079,10 @@ export type Database = {
       }
       owns_product: { Args: { pid: string }; Returns: boolean }
       owns_rfq: { Args: { rid: string }; Returns: boolean }
+      regex_probe: {
+        Args: { p_pattern: string; p_sample: string }
+        Returns: Json
+      }
       reject_vendor_content: {
         Args: { reason?: string; target_id: string; target_table: string }
         Returns: undefined

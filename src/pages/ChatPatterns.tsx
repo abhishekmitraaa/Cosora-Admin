@@ -36,6 +36,10 @@ export default function ChatPatterns() {
   const writable = canWrite(role, "chat-patterns");
   const [pattern, setPattern] = useState("");
   const [label, setLabel] = useState("");
+  const [sample, setSample] = useState("");
+  const [probe, setProbe] = useState<{ valid: boolean; matches: boolean; error: string | null } | null>(
+    null,
+  );
 
   const patterns = useQuery({
     queryKey: ["flag-patterns"],
@@ -48,6 +52,35 @@ export default function ChatPatterns() {
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as PatternRow[];
     },
+  });
+
+  /**
+   * Test the pattern with the engine that will actually run it.
+   *
+   * NOT `new RegExp(pattern)`. Postgres is POSIX ARE and JavaScript is
+   * ECMA-262; they diverge exactly here. `\y` (the ARE word boundary) throws in
+   * JS in one position and is silently read as a literal "y" in another, and
+   * `` is a word boundary in JS but a BACKSPACE in ARE. A JS check would
+   * reject two of the three patterns this project ships and wave through a
+   * `` pattern that compiles, saves, and then never matches anything in
+   * production. Validating against the wrong language is worse than not
+   * validating, because it looks like it worked.
+   *
+   * regex_probe() is SECURITY DEFINER and role-gated to exactly the roles that
+   * may write this table, so it exposes nothing an admin could not already
+   * cause by saving the pattern.
+   */
+  const test = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("regex_probe", {
+        p_pattern: pattern,
+        p_sample: sample,
+      });
+      if (error) throw new Error(describeWriteError(error));
+      return data as unknown as { valid: boolean; matches: boolean; error: string | null };
+    },
+    onSuccess: setProbe,
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const add = useMutation({
@@ -63,6 +96,8 @@ export default function ChatPatterns() {
     onSuccess: () => {
       setPattern("");
       setLabel("");
+      setSample("");
+      setProbe(null);
       toast.success("Pattern added");
       void qc.invalidateQueries({ queryKey: ["flag-patterns"] });
     },
@@ -133,7 +168,7 @@ export default function ChatPatterns() {
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (pattern.trim() && label.trim()) add.mutate({ pattern, label });
+            if (pattern.trim() && label.trim() && probe?.matches) add.mutate({ pattern, label });
           }}
         >
           <div className="min-w-[16rem] flex-1">
@@ -143,7 +178,10 @@ export default function ChatPatterns() {
             <Input
               placeholder="e.g. (whats\s?app|telegram)"
               value={pattern}
-              onChange={(e) => setPattern(e.target.value)}
+              onChange={(e) => {
+                setPattern(e.target.value);
+                setProbe(null); // a result for the previous pattern is worse than none
+              }}
               className="font-mono text-xs"
             />
           </div>
@@ -160,11 +198,76 @@ export default function ChatPatterns() {
           <Button
             type="submit"
             variant="primary"
-            disabled={!writable || !pattern.trim() || !label.trim() || add.isPending}
+            disabled={
+              !writable || !pattern.trim() || !label.trim() || add.isPending || !probe?.matches
+            }
           >
             {add.isPending ? "Saving…" : "Add pattern"}
           </Button>
         </form>
+
+        {/*
+          Saving is BLOCKED until the pattern has been shown to match a sample.
+          The CHECK constraint only proves a pattern compiles; a pattern that
+          compiles and matches nothing is the failure this project actually hit,
+          and it is invisible — no error, no log, just a rule that never fires.
+        */}
+        <div className="mt-3 border-t border-line pt-3">
+          <label className="mb-1 block text-xs font-medium text-ink-muted">
+            Test it against a sample message (required before saving)
+          </label>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[18rem] flex-1">
+              <Input
+                placeholder="e.g. ping me on whatsapp"
+                value={sample}
+                onChange={(e) => {
+                  setSample(e.target.value);
+                  setProbe(null);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              disabled={!writable || !pattern.trim() || !sample.trim() || test.isPending}
+              onClick={() => test.mutate()}
+            >
+              {test.isPending ? "Testing…" : "Test"}
+            </Button>
+          </div>
+
+          {probe && (
+            <div
+              className={
+                "mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed " +
+                (probe.matches
+                  ? "bg-emerald-50 text-emerald-900"
+                  : "bg-amber-50 text-amber-900")
+              }
+            >
+              {!probe.valid ? (
+                <>
+                  <span className="font-semibold">Postgres rejected this pattern.</span>{" "}
+                  <span className="font-mono text-[11px]">{probe.error}</span>
+                </>
+              ) : probe.matches ? (
+                <>
+                  <span className="font-semibold">Matches.</span> This pattern would flag that
+                  message and lock the conversation.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold">Valid, but it does not match.</span> A pattern that
+                  compiles and never fires saves without complaint and then does nothing. If you
+                  used <span className="font-mono text-[11px]"></span> for a word boundary, that
+                  is the cause — Postgres regexes are POSIX, where{" "}
+                  <span className="font-mono text-[11px]"></span> is a backspace character. Use{" "}
+                  <span className="font-mono text-[11px]">\y</span> instead.
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </Card>
 
       {rows.length === 0 ? (

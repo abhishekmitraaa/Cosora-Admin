@@ -34,7 +34,11 @@ export type Section =
   | "chat-review"
   | "chat-keywords"
   | "chat-patterns"
-  | "chat-reasons";
+  | "chat-reasons"
+  // Account suspension, generalised. Not part of "vendors": buyers get
+  // suspended too, and the role gate is different (support/super_admin via
+  // set_account_status, NOT vendor_ops).
+  | "accounts";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -49,7 +53,7 @@ export type Section =
  * (20260717130000 / 20260717130100) and is enforced by Postgres on every write:
  *   - RLS policies gate WHICH ADMIN may write a row at all.
  *   - BEFORE triggers gate WHICH COLUMN may change (products.status,
- *     vendor_profiles.is_verified/account_status, profiles.is_admin/admin_role,
+ *     vendor_profiles.is_verified, profiles.is_admin/admin_role/account_status,
  *     advertisements.status, and the moderation reason columns).
  *
  * Consequently, no write path in this app relies on `canWrite` succeeding first.
@@ -69,10 +73,15 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   "chat-review": ["super_admin", "support"],
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
-  // Stricter than its four siblings on purpose: chat_block_reasons is the only
-  // chat table support may not even READ beyond the active rows it picks from,
-  // and only super_admin may add/edit/deactivate. Mirrors the SQL exactly.
-  "chat-reasons": ["super_admin"],
+  // Support READS this list — it has to, the reason picker is populated from it.
+  // What support may not do is CHANGE it; that split lives in SECTION_WRITE.
+  //
+  // This said ["super_admin"] and the comment claimed support "may not even
+  // READ" the table. chat_block_reasons_select is
+  // `admin_role() in ('support','super_admin')`, so that was simply wrong, and
+  // it hid the page from the role that uses its vocabulary daily.
+  "chat-reasons": ["super_admin", "support"],
+  accounts: ["super_admin", "support"],
 };
 
 /**
@@ -94,6 +103,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
+  // set_account_status() gates itself to these two, so vendor_ops sees the page
+  // (it is reachable from a vendor) but not the actions.
+  accounts: ["super_admin", "support"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

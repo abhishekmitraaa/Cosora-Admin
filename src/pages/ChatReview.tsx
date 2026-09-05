@@ -19,6 +19,7 @@ import {
   PageHeader,
   ReadOnlyBanner,
   Spinner,
+  Tabs,
 } from "@/components/ui";
 
 interface ReviewRow {
@@ -27,6 +28,11 @@ interface ReviewRow {
   reported_reason: string | null;
   created_at: string;
   conversation_id: string;
+  status: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  /** The admin's verdict vocabulary — distinct from reported_reason above. */
+  reason: { reason: string } | null;
   pattern: { label: string; pattern: string } | null;
   flagged: { id: string; body: string | null; kind: string; created_at: string; sender_id: string } | null;
   conversation: { id: string; status: string; user_a: string; user_b: string } | null;
@@ -34,39 +40,68 @@ interface ReviewRow {
 
 type Side = "buyer" | "vendor";
 
+/**
+ * Same shape as Products.tsx's TABS: the queue first, then the closed states as
+ * an audit trail. Without them a resolved review vanished the moment it was
+ * decided, so there was no way to answer "what did we do about this last time?"
+ * — and `conversation_reviews` keeps every verdict precisely so that question
+ * can be answered.
+ */
+type ReviewStatus = "pending" | "resumed" | "buyer_blocked" | "vendor_blocked" | "kept_locked";
+const TABS: { id: ReviewStatus; label: string }[] = [
+  { id: "pending", label: "Queue (pending)" },
+  { id: "resumed", label: "Resumed" },
+  { id: "buyer_blocked", label: "Buyer blocked" },
+  { id: "vendor_blocked", label: "Vendor blocked" },
+  { id: "kept_locked", label: "Kept locked" },
+];
+
 export default function ChatReview() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-review");
+  const [tab, setTab] = useState<ReviewStatus>("pending");
   const [blocking, setBlocking] = useState<{ review: ReviewRow; side: Side; profileId: string; name: string } | null>(
     null,
   );
 
   const queue = useQuery({
-    queryKey: ["chat-review"],
+    // `tab` is part of the key, so switching tabs refetches rather than
+    // rendering the previous tab's rows under the new heading.
+    queryKey: ["chat-review", tab],
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("conversation_reviews")
         .select(
-          `id, source, reported_reason, created_at, conversation_id,
+          `id, source, reported_reason, created_at, conversation_id, status,
+           reviewed_at, reviewed_by,
            pattern:flag_patterns(label, pattern),
+           reason:chat_block_reasons(reason),
            flagged:messages(id, body, kind, created_at, sender_id),
            conversation:conversations(id, status, user_a, user_b)`,
         )
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+        .eq("status", tab)
+        .order(tab === "pending" ? "created_at" : "reviewed_at", { ascending: false });
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as ReviewRow[];
+      // reviewed_by is included so the audit tabs can name the admin who
+      // decided. It is a profiles id like the participants, so one lookup
+      // covers both — fetchParticipants de-duplicates.
       const people = await fetchParticipants(
-        rows.flatMap((r) => (r.conversation ? [r.conversation.user_a, r.conversation.user_b] : [])),
+        rows.flatMap((r) => [
+          ...(r.conversation ? [r.conversation.user_a, r.conversation.user_b] : []),
+          ...(r.reviewed_by ? [r.reviewed_by] : []),
+        ]),
       );
       return { rows, people: people as Map<string, Participant> };
     },
   });
 
   function invalidate() {
+    // Prefix key, so resolving an item refreshes the tab it LEFT and the tab it
+    // arrived in, not just the one on screen.
     void qc.invalidateQueries({ queryKey: ["chat-review"] });
     void qc.invalidateQueries({ queryKey: ["chats"] });
     void qc.invalidateQueries({ queryKey: ["chat-thread"] });
@@ -163,26 +198,41 @@ export default function ChatReview() {
 
   const { rows, people } = queue.data!;
   const busy = resolve.isPending || block.isPending;
+  // Closed tabs are an audit view. The RPC would refuse a second verdict anyway
+  // (`and status = 'pending'` -> P0002), so hiding the buttons here is honesty
+  // about a rule the database already enforces, not the rule itself.
+  const pendingTab = tab === "pending";
 
   return (
     <div className="max-w-5xl">
       <PageHeader
         title="Review queue"
-        subtitle="Conversations held for review — by a flag pattern match or a user report. Every row here is a locked chat waiting on a decision."
+        subtitle="Conversations held for review — by a flag pattern match or a user report. Pending items are locked chats waiting on a decision; the other tabs are the record of what was decided."
       />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "chat-review")} />}
 
-      <Note className="mb-4">
-        <span className="font-medium text-ink">Resume</span> unlocks the chat and clears the review.{" "}
-        <span className="font-medium text-ink">Keep locked</span> closes the review but leaves the
-        chat locked — use it when the flag was right but nobody needs suspending.{" "}
-        <span className="font-medium text-ink">Block</span> suspends that participant's account
-        (recorded against this review on the audit ledger) and leaves the chat locked.
-      </Note>
+      <Tabs tabs={TABS} active={tab} onChange={setTab} />
+
+      {pendingTab ? (
+        <Note className="mb-4">
+          <span className="font-medium text-ink">Resume</span> unlocks the chat and closes the
+          review. <span className="font-medium text-ink">Keep locked</span> closes the review and
+          leaves the chat locked — use it for "seen, still deciding" so items do not sit in the
+          queue forever. <span className="font-medium text-ink">Block</span> suspends that
+          participant's account against this review on the audit ledger, and asks whether to reopen
+          the chat for the other party.
+        </Note>
+      ) : (
+        <Note className="mb-4">
+          Closed reviews, newest decision first. Read-only: a verdict is recorded once, and{" "}
+          <span className="font-mono text-[11px]">resolve_conversation_review()</span> refuses a
+          second one on the same row so two admins cannot overwrite each other.
+        </Note>
+      )}
 
       {rows.length === 0 ? (
-        <Empty>Nothing waiting for review.</Empty>
+        <Empty>{pendingTab ? "Nothing waiting for review." : "No reviews closed this way yet."}</Empty>
       ) : (
         <div className="space-y-3">
           {rows.map((r) => {
@@ -281,13 +331,39 @@ export default function ChatReview() {
                     </Link>
                   </div>
 
-                  {/* Actions. */}
+                  {/* Actions — pending only. Closed tabs show the verdict instead. */}
+                  {!pendingTab ? (
+                    <div className="w-full sm:w-44">
+                      <Badge tone={r.status === "resumed" ? "green" : "red"}>{r.status}</Badge>
+                      <p className="mt-2 text-[11px] leading-snug text-ink-muted">
+                        {r.reviewed_at
+                          ? `Decided ${format(new Date(r.reviewed_at), "d MMM yyyy, HH:mm")}`
+                          : "Decision time not recorded"}
+                        {r.reviewed_by && ` by ${participantLabel(people.get(r.reviewed_by), r.reviewed_by)}`}
+                      </p>
+                      {/*
+                        The ADMIN's verdict, from chat_block_reasons. Rendered
+                        separately from reported_reason above, and never in its
+                        place: seeing where a reporter and a reviewer disagreed
+                        is the entire point of keeping both.
+                      */}
+                      {r.reason && (
+                        <p className="mt-1.5 text-[11px] leading-snug text-ink">
+                          <span className="text-ink-faint">Verdict reason: </span>
+                          {r.reason.reason}
+                        </p>
+                      )}
+                      <p className="mt-2 text-[11px] text-ink-faint">
+                        Chat is currently {conv?.status ?? "unknown"}.
+                      </p>
+                    </div>
+                  ) : (
                   <div className="flex w-full flex-col gap-1.5 sm:w-44">
                     <Button
                       variant="primary"
                       disabled={!writable || busy}
                       onClick={() => {
-                        if (!confirm("Resume this chat? Both participants can message again.")) return;
+                        if (!confirm("Resume this chat? Both participants can message again, and the review closes as \"resumed\".")) return;
                         resolve.mutate(
                           { reviewId: r.id, verdict: "resumed" },
                           { onSuccess: () => toast.success("Chat resumed") },
@@ -344,6 +420,7 @@ export default function ChatReview() {
                       </p>
                     )}
                   </div>
+                  )}
                 </div>
               </Card>
             );

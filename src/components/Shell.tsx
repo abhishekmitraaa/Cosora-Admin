@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Store,
   X,
+  UserCog,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
@@ -40,6 +41,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/vendors", section: "vendors", label: "Vendors", icon: Store },
       { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
       { to: "/subscriptions", section: "subscriptions", label: "Subscriptions", icon: CreditCard },
+      { to: "/accounts", section: "accounts", label: "Accounts", icon: UserCog },
       { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
       { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
     ],

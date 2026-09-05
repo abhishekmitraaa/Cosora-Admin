@@ -7,7 +7,12 @@ import { supabase, describeWriteError } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { Button, Textarea } from "./ui";
 
-export type FlagEntity = "vendor" | "product" | "ad";
+/**
+ * Mirrors admin_flags_entity_type_check EXACTLY. The column is `text`, but it
+ * carries a CHECK constraint — adding a value here without widening that
+ * constraint gets a 23514 on insert. 'conversation' was added by 20260802140000.
+ */
+export type FlagEntity = "vendor" | "product" | "ad" | "conversation";
 
 interface FlagRow {
   id: string;

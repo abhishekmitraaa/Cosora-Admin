@@ -16,6 +16,7 @@ import Ads from "@/pages/Ads";
 import Subscriptions from "@/pages/Subscriptions";
 import Reports from "@/pages/Reports";
 import Admins from "@/pages/Admins";
+import Accounts from "@/pages/Accounts";
 import Chats from "@/pages/Chats";
 import ChatThread from "@/pages/ChatThread";
 import ChatReview from "@/pages/ChatReview";
@@ -37,6 +38,7 @@ function Landing() {
         "vendors",
         "ads",
         "subscriptions",
+        "accounts",
         "chats",
         "chat-review",
         "chat-keywords",
@@ -106,6 +108,14 @@ export default function App() {
                 element={
                   <RequireSection section="subscriptions">
                     <Subscriptions />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/accounts"
+                element={
+                  <RequireSection section="accounts">
+                    <Accounts />
                   </RequireSection>
                 }
               />

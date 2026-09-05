@@ -11,6 +11,7 @@ import {
   type Participant,
 } from "@/lib/chat";
 import AccountStatus from "@/components/AccountStatus";
+import FlagLog from "@/components/FlagLog";
 import { Badge, Card, Empty, ErrorNote, Note, PageHeader, Spinner } from "@/components/ui";
 
 interface MessageRow {
@@ -252,6 +253,19 @@ export default function ChatThread() {
             </Link>
           )}
         </div>
+      </div>
+
+      {/*
+        The flagged-items log, on the conversation itself.
+        
+        This is the only place an admin can write a durable internal note about
+        a chat. It is NOT a moderation verdict — that lives on
+        conversation_reviews and is written by resolve_conversation_review() —
+        and it is not visible to either participant. Use it for the context a
+        verdict cannot carry: "third report this month", "spoke to the vendor".
+      */}
+      <div className="mt-4">
+        <FlagLog entityType="conversation" entityId={c.id} />
       </div>
     </div>
   );

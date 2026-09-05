@@ -81,15 +81,28 @@ These are the sections where `support` is **not** read-only — reviewing chats 
 the support role's job, so the database grants it writes here that it has
 nowhere else. Every other role sees none of them.
 
-| Role | Chats | Review queue | Keyword blocklist | Flag patterns | Block reasons |
-|---|---|---|---|---|---|
-| `super_admin` | read | write | write | write | **write** |
-| `support` | read | write | write | write | **–** |
-| everyone else | – | – | – | – | – |
+| Role | Chats | Review queue | Keyword blocklist | Flag patterns | Block reasons | Accounts |
+|---|---|---|---|---|---|---|
+| `super_admin` | read | write | write | write | **write** | write |
+| `support` | read | write | write | write | **read** | write |
+| everyone else | – | – | – | – | – | – |
 
-`chat_block_reasons` is deliberately stricter than its four siblings: it is the
-vocabulary every suspension is recorded in, so support *picks* from it (active
-rows, via the reason picker) but only a `super_admin` decides what is on it.
+`chat_block_reasons` is the one split table: support **reads** it — it has to,
+the reason picker is populated from it — but only a `super_admin` adds, edits or
+deactivates an entry. `chat_block_reasons_select` grants
+`admin_role() in ('support','super_admin')`; only insert/update/delete are
+`super_admin`-only.
+
+(`roles.ts` previously hid the Block reasons page from `support` entirely, on
+the stated but incorrect grounds that support "may not even READ" the table.
+Corrected — the page renders read-only for support instead.)
+
+**Accounts** is suspension generalised off the vendor screen. Buyers get
+suspended too, and `profiles.account_status` is one flag for both roles, so an
+account with no chat history and no vendor profile used to be unreachable. All
+three entry points — the Accounts page, the vendor screen, and the review
+queue's block action — call the same `set_account_status()`; only `source`
+and `conversation_review_id` differ.
 
 **There is exactly one `account_status`, and it is on `profiles`:**
 
@@ -211,7 +224,7 @@ silent and expensive:
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
-| Phase 3 — Chat moderation (6 screens) | **Built; typecheck + build green, and all 15 live queries verified to parse against the real schema. Role gate confirmed by executing `roles.ts`. The DB-side gate is NOT yet verified with real logins — `scripts/chat-moderation-matrix.mjs` needs `20260802120000` applied and the test accounts re-seeded (see below).** |
+| Phase 3 — Chat moderation (7 screens) | **Working.** Review queue with pending + four audit tabs, thread transcript with the flagged-items log, keyword blocklist, flag patterns (with a live Postgres-side pattern test), block reasons, and Accounts. `resolve_conversation_review()` is applied and verified end to end against the live project (16/16). Support/super_admin only; verified with real logins by `scripts/chat-moderation-matrix.mjs`. |
 
 ## Inviting admins by email (`admin-invite`)
 
