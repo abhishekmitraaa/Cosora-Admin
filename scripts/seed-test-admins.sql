@@ -87,8 +87,12 @@ begin
     jsonb_build_object('sub', vid::text, 'email', 'rlstest-vendor@cosora.test', 'email_verified', true),
     'email', 'rlstest-vendor@cosora.test', now(), now(), now());
 
-  insert into public.vendor_profiles (id, brand_name, city, business_type, is_verified, account_status, onboarding_complete)
-  values (vid, 'RLS Test Brand', 'Testville', 'manufacturer', false, 'active', true);
+  -- No account_status. 20260801095820 DROPPED vendor_profiles.account_status and
+  -- moved suspension to profiles.account_status; this file kept inserting it and
+  -- therefore failed outright against the current schema. Suspension state for a
+  -- fixture is set with set_account_status(), never here.
+  insert into public.vendor_profiles (id, brand_name, city, business_type, is_verified, onboarding_complete)
+  values (vid, 'RLS Test Brand', 'Testville', 'manufacturer', false, true);
 
   insert into public.products (id, vendor_id, name, status, price_value, fabric, moq)
   values (pid, vid, 'RLS Test Product', 'under_review', 100, 'cotton', '10');
