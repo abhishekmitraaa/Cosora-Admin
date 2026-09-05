@@ -22,6 +22,11 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 
 export type Section =
   | "products"
+  // Video Closeups. Moderated by the same two roles as `products`, and enforced
+  // the same way — `trg_product_videos_moderation` mirrors
+  // `enforce_products_moderation` clause for clause. A sibling of "products",
+  // deliberately not a sub-tab of it: it is a different table with its own RLS.
+  | "videos"
   | "vendors"
   | "ads"
   | "subscriptions"
@@ -64,6 +69,7 @@ export type Section =
 /** Roles for which a section renders in the nav at all. */
 const SECTION_READ: Record<Section, AdminRole[]> = {
   products: ["super_admin", "product_moderator", "support"],
+  videos: ["super_admin", "product_moderator", "support"],
   vendors: ["super_admin", "vendor_ops", "support"],
   ads: ["super_admin", "ads_moderator", "support"],
   subscriptions: ["super_admin", "finance_admin", "support"],
@@ -92,6 +98,7 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
  */
 const SECTION_WRITE: Record<Section, AdminRole[]> = {
   products: ["super_admin", "product_moderator"],
+  videos: ["super_admin", "product_moderator"],
   vendors: ["super_admin", "vendor_ops"],
   ads: ["super_admin", "ads_moderator"],
   subscriptions: ["super_admin", "finance_admin"],

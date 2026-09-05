@@ -64,16 +64,24 @@ through `assertWrote()` in `src/lib/supabase.ts`, which treats *zero rows* as a
 denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 `WITH CHECK` violation does raise.)
 
-| Role | Products | Vendors | Ads | Subscriptions | Reports | Admins |
-|---|---|---|---|---|---|---|
-| `super_admin` | write | write | write | write | read | **write** |
-| `product_moderator` | write | – | – | – | read | – |
-| `vendor_ops` | – | write | – | – | read | – |
-| `ads_moderator` | – | – | write | – | read | – |
-| `finance_admin` | – | – | – | write | read | – |
-| `support` | read | read | read | read | read | – |
+| Role | Products | Videos | Vendors | Ads | Subscriptions | Reports | Admins |
+|---|---|---|---|---|---|---|---|
+| `super_admin` | write | write | write | write | write | read | **write** |
+| `product_moderator` | write | write | – | – | – | read | – |
+| `vendor_ops` | – | – | write | – | – | read | – |
+| `ads_moderator` | – | – | – | write | – | read | – |
+| `finance_admin` | – | – | – | – | write | read | – |
+| `support` | read | read | read | read | read | read | – |
 
 `support` can additionally write the flagged-items log (`admin_flags`).
+
+**Videos** (Video Closeups) is a sibling of Products, not a sub-tab: a different table
+(`product_videos`) with its own RLS policies and its own BEFORE trigger
+(`trg_product_videos_moderation`, which mirrors `enforce_products_moderation` clause for
+clause). The two roles are identical because the same people moderate both. Note the one
+thing the flagged-items log does **not** cover: `admin_flags_entity_type_check` allows
+`('vendor','product','ad','conversation')` and **not `'video'`**, so the Videos screen has
+no `<FlagLog />`. Adding one is a constraint migration, not a UI change.
 
 ### Chat moderation (Phase 3)
 
@@ -236,6 +244,7 @@ silent and expensive:
 | 2 — Admin & role management | **Working**; grant/change/demote verified allowed for `super_admin`, refused (trigger `42501`) for all others |
 | 2b — Invite admin by email | **Working, all three branches verified (14/14): new-user invite, existing-OTP-only (grant + recovery email — the branch that matters, real `mail.send` confirmed), and existing-with-password (silent promote). `/reset-password` link-landing proven end-to-end. Email throttled by Supabase's built-in mailer (custom SMTP needed for volume); the amber warning surfaces a failed send honestly. Redirect-URL allow-listing is a dashboard step you must do.** |
 | 3 — Product moderation queue | **Working**; approve/reject + required reason, live/rejected tabs |
+| 3b — Video Closeups moderation queue | **Working**, and it was the blocking gap: one real vendor video had sat `under_review` since 2026-08-04 because nothing in this panel could act on `product_videos`. `/videos`, same three tabs, in-panel playback (a moderator has to watch the clip), per-item approve/reject with a required reason, and a vendor-wide "Approve all pending" wired to `approve_vendor_content_bulk`. Verified in a real browser against the live project: approved the real pending video and confirmed it plays in the signed-out buyer feed (`readyState 4`, HTTP 206). Reject, the required-reason gate and the no-`video_url` case were exercised on a throwaway row that was then deleted. **2026-09-05 follow-up:** that approved video turned out not to match its own listing (footage unrelated to its tagged product/category) and was rejected with a reason via `reject_vendor_content`. Separately, approving never cleared a stale `rejection_reason` left by a prior rejection — `Products.tsx` and `Videos.tsx` both rendered the red rejection banner off `rejection_reason` alone, so a re-approved row could show as rejected while its badge said live. Both now also require `status === "rejected"` before rendering the banner (verified against a live row carrying a stale reason: banner correctly does not show). The source-of-truth fix — `approve_vendor_content`/`approve_vendor_content_bulk` clearing `rejection_reason` on approve — is applied: textile-spark-net's `20260905170000_approve_vendor_content_clears_rejection_reason.sql`, live as ledger version `20260905172020` (confirmed by reading `pg_get_functiondef` off the database: both `approve_vendor_content` and `approve_vendor_content_bulk` now set `rejection_reason = null`). An earlier revision of this line said "not yet applied" because Supabase MCP was down that session. Also fixed while in this area: the dev server 404'd on `/favicon.ico` — there was no `public/` dir and no icon declared at all — closed with an inlined `data:image/svg+xml;base64,...` favicon in `index.html` matching the real `<Logo>` monogram, no new file needed. |
 | 4 — Vendor accounts & verification | **Working.** Verification writes `vendor_profiles.is_verified`. Suspension is account-level (`profiles.account_status` via `set_account_status()`) and is **really enforced for chat and calling** — not yet for RFQs, quotes, listings or ads. See below. |
 | 5 — Ads post-publish takedown | **Working**; needs a small cosmetic follow-up in textile-spark-net (below) |
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |

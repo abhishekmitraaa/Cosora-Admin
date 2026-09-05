@@ -4,6 +4,7 @@ import {
   Ban,
   BarChart3,
   Boxes,
+  Clapperboard,
   CreditCard,
   LogOut,
   Megaphone,
@@ -38,6 +39,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { to: "/products", section: "products", label: "Products", icon: Boxes },
+      { to: "/videos", section: "videos", label: "Video Closeups", icon: Clapperboard },
       { to: "/vendors", section: "vendors", label: "Vendors", icon: Store },
       { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
       { to: "/subscriptions", section: "subscriptions", label: "Subscriptions", icon: CreditCard },

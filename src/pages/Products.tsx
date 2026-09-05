@@ -258,7 +258,7 @@ function ProductCard({
             {vendor?.account_status === "suspended" && <Badge tone="red">suspended</Badge>}
           </div>
 
-          {p.rejection_reason && (
+          {p.status === "rejected" && p.rejection_reason && (
             <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
               <span className="font-medium">Rejection reason:</span> {p.rejection_reason}
             </div>

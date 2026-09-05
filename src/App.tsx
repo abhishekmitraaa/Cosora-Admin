@@ -10,6 +10,7 @@ import { canSee } from "@/lib/roles";
 import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Products from "@/pages/Products";
+import Videos from "@/pages/Videos";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
 import Ads from "@/pages/Ads";
@@ -35,6 +36,7 @@ function Landing() {
     (
       [
         "products",
+        "videos",
         "vendors",
         "ads",
         "subscriptions",
@@ -76,6 +78,14 @@ export default function App() {
                 element={
                   <RequireSection section="products">
                     <Products />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/videos"
+                element={
+                  <RequireSection section="videos">
+                    <Videos />
                   </RequireSection>
                 }
               />
