@@ -13,8 +13,8 @@ export type Json =
  * This file was previously generated-plus-hand-maintained, and the hand-written
  * region went stale: it still typed `vendor_profiles.account_status`, a column
  * migration 20260801095820 had already DROPPED. TypeScript therefore accepted
- * the queries that were 400-ing at runtime on Vendors, VendorDetail, Products
- * and Ads. Regenerating is what caught it; keep it generated.
+ * queries that were 400-ing at runtime on Vendors, VendorDetail, Products and
+ * Ads. Regenerating is what caught it; keep it generated.
  */
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -755,6 +755,54 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          profile_id: string
+          read: boolean
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          profile_id: string
+          read?: boolean
+          title: string
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          profile_id?: string
+          read?: boolean
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2019,6 +2067,16 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_conversation_member: { Args: { cid: string }; Returns: boolean }
       next_invoice_number: { Args: never; Returns: string }
+      notify: {
+        Args: {
+          p_body?: string
+          p_conversation_id?: string
+          p_kind: string
+          p_profile_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       owns_product: { Args: { pid: string }; Returns: boolean }
       owns_rfq: { Args: { rid: string }; Returns: boolean }
       reject_vendor_content: {
@@ -2027,6 +2085,15 @@ export type Database = {
       }
       reply_to_review: {
         Args: { reply: string; review_id: string }
+        Returns: undefined
+      }
+      resolve_conversation_review: {
+        Args: {
+          p_reason_id?: string
+          p_resume?: boolean
+          p_review_id: string
+          p_verdict: string
+        }
         Returns: undefined
       }
       set_account_status: {

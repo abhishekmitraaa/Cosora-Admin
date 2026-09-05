@@ -80,11 +80,15 @@ export default function ChatReview() {
    * complete check here (no assertWrote needed).
    */
   const resolve = useMutation({
-    mutationFn: async ({ reviewId, resolution }: { reviewId: string; resolution: "resumed" | "kept_locked" }) => {
+    mutationFn: async ({ reviewId, verdict }: { reviewId: string; verdict: "resumed" | "kept_locked" }) => {
       const { error } = await supabase.rpc("resolve_conversation_review", {
         p_review_id: reviewId,
-        p_resolution: resolution,
-        p_reason_id: null,
+        p_verdict: verdict,
+        // Whether a verdict REOPENS the thread is explicit at every call site,
+        // never inherited. The RPC defaults to false, so "resumed" is the only
+        // verdict here that asks for it, and "kept_locked" cannot resume at all
+        // (the function refuses, regardless of what is passed).
+        p_resume: verdict === "resumed",
       });
       if (error) throw new Error(describeWriteError(error));
     },
@@ -111,11 +115,13 @@ export default function ChatReview() {
       side,
       profileId,
       reasonId,
+      resume,
     }: {
       review: ReviewRow;
       side: Side;
       profileId: string;
       reasonId: string;
+      resume: boolean;
     }) => {
       const { error: suspendError } = await supabase.rpc("set_account_status", {
         p_profile_id: profileId,
@@ -128,8 +134,14 @@ export default function ChatReview() {
 
       const { error: resolveError } = await supabase.rpc("resolve_conversation_review", {
         p_review_id: review.id,
-        p_resolution: side === "buyer" ? "buyer_blocked" : "vendor_blocked",
+        p_verdict: side === "buyer" ? "buyer_blocked" : "vendor_blocked",
         p_reason_id: reasonId,
+        // `resume` comes from the checkbox in the block dialog. Reopening is
+        // safe either way — messages_insert independently requires the SENDER's
+        // account to be active, so the party just suspended still cannot post —
+        // but it is the reviewer's call whether the OTHER party gets the thread
+        // back, so it is asked rather than assumed.
+        p_resume: resume,
       });
       if (resolveError) {
         throw new Error(
@@ -277,7 +289,7 @@ export default function ChatReview() {
                       onClick={() => {
                         if (!confirm("Resume this chat? Both participants can message again.")) return;
                         resolve.mutate(
-                          { reviewId: r.id, resolution: "resumed" },
+                          { reviewId: r.id, verdict: "resumed" },
                           { onSuccess: () => toast.success("Chat resumed") },
                         );
                       }}
@@ -316,7 +328,7 @@ export default function ChatReview() {
                       disabled={!writable || busy}
                       onClick={() =>
                         resolve.mutate(
-                          { reviewId: r.id, resolution: "kept_locked" },
+                          { reviewId: r.id, verdict: "kept_locked" },
                           { onSuccess: () => toast.success("Review closed — chat stays locked") },
                         )
                       }
@@ -345,13 +357,26 @@ export default function ChatReview() {
         confirmLabel={`Suspend ${blocking?.side ?? "account"}`}
         description={`Suspends ${blocking?.name ?? "this account"} and closes this review as ${
           blocking?.side === "buyer" ? "buyer_blocked" : "vendor_blocked"
-        }. The chat stays locked.`}
+        }.`}
         busy={block.isPending}
+        resumeOption={{
+          label: `Reopen the chat for the ${blocking?.side === "buyer" ? "vendor" : "buyer"}`,
+          hint:
+            "Safe either way: the suspended account cannot send regardless, because " +
+            "messages_insert checks the sender's own status. Leave this off if the whole " +
+            "thread should stay closed.",
+        }}
         onClose={() => setBlocking(null)}
-        onConfirm={(reasonId) =>
+        onConfirm={(reasonId, resume) =>
           blocking &&
           block.mutate(
-            { review: blocking.review, side: blocking.side, profileId: blocking.profileId, reasonId },
+            {
+              review: blocking.review,
+              side: blocking.side,
+              profileId: blocking.profileId,
+              reasonId,
+              resume,
+            },
             { onSuccess: () => toast.success(`${blocking.name} suspended · review closed`) },
           )
         }

@@ -21,6 +21,7 @@ export default function ReasonPicker({
   confirmLabel,
   description,
   busy,
+  resumeOption,
   onClose,
   onConfirm,
 }: {
@@ -29,10 +30,17 @@ export default function ReasonPicker({
   confirmLabel: string;
   description?: string;
   busy?: boolean;
+  /**
+   * When set, offers "reopen the chat for the other participant" alongside the
+   * reason, and passes the answer to onConfirm. Used by the review queue's block
+   * actions; omitted by the standalone suspend action, which has no thread.
+   */
+  resumeOption?: { label: string; hint: string; defaultChecked?: boolean };
   onClose: () => void;
-  onConfirm: (reasonId: string) => void;
+  onConfirm: (reasonId: string, resume: boolean) => void;
 }) {
   const [reasonId, setReasonId] = useState("");
+  const [resume, setResume] = useState(false);
 
   const reasons = useQuery({
     queryKey: ["chat-block-reasons", "active"],
@@ -43,8 +51,11 @@ export default function ReasonPicker({
   // Reset between openings so a reason picked for one account can't be
   // submitted against the next one by a stale default.
   useEffect(() => {
-    if (open) setReasonId("");
-  }, [open]);
+    if (open) {
+      setReasonId("");
+      setResume(resumeOption?.defaultChecked ?? false);
+    }
+  }, [open, resumeOption?.defaultChecked]);
 
   const options = reasons.data ?? [];
 
@@ -80,6 +91,21 @@ export default function ReasonPicker({
             Recorded on the account_suspensions ledger with your id and the time. It is the only
             record of why this happened.
           </p>
+
+          {resumeOption && (
+            <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={resume}
+                onChange={(e) => setResume(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
+              />
+              <span className="text-xs leading-relaxed">
+                <span className="font-medium text-ink">{resumeOption.label}</span>
+                <span className="mt-0.5 block text-ink-faint">{resumeOption.hint}</span>
+              </span>
+            </label>
+          )}
         </>
       )}
 
@@ -88,7 +114,7 @@ export default function ReasonPicker({
         <Button
           variant="danger"
           disabled={!reasonId || busy || options.length === 0}
-          onClick={() => onConfirm(reasonId)}
+          onClick={() => onConfirm(reasonId, resume)}
         >
           {busy ? "Working…" : confirmLabel}
         </Button>
