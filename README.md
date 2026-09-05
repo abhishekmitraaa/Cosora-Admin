@@ -141,10 +141,26 @@ node scripts/rls-matrix.mjs        # 60 cases
 # 3. The ALLOW side — super_admin can do everything, incl. role grants.
 node scripts/rls-superadmin.mjs    # 10 cases
 
-# 3b. Chat moderation: reads, writes and both RPCs across all six roles.
-#     Headline case — support is refused on chat_block_reasons and allowed
-#     everywhere else. Non-destructive (throwaway rows, nonexistent ids).
+# 3b. Chat moderation, WHO: reads, writes and both RPCs across all six roles.
+#     Headline case — support is refused WRITING chat_block_reasons while being
+#     allowed everywhere else (it may READ that table; roles.ts used to say
+#     otherwise). Non-destructive (throwaway rows, nonexistent ids).
 node scripts/chat-moderation-matrix.mjs
+
+# 3c. Chat moderation, WHAT: does the pipeline do what it claims. 16 cases.
+#     Blocklist rejects with no row and nothing queued; a flag pattern keeps the
+#     message, locks the thread and queues exactly one review; a participant
+#     cannot unlock; nobody — owner or admin — can UPDATE account_status
+#     directly; an invalid regex is refused, and a  regex is shown to compile
+#     while never matching; submit_report stores reported_reason verbatim and
+#     leaves reason_id null; kept_locked ignores p_resume, resumed honours it.
+#     Needs no seeded admins — it uses the three demo accounts.
+node scripts/chat-moderation-behaviour.mjs
+
+# 3d. The regression guard for the vendor_profiles.account_status removal.
+#     Read-only, no login needed. Run this first if Vendors, VendorDetail,
+#     Products or Ads fail to load.
+node scripts/vendor-columns-check.mjs
 
 # 4. Browser smoke: nav + read-only banner + disabled actions per role.
 npm run build && npx vite preview --port 4174
