@@ -6,7 +6,7 @@
  * Uses the Playwright install from the sibling textile-spark-net repo.
  * Run with the preview server up on :4174.
  */
-import { chromium } from "file:///c:/Users/Abhishek Mitra/OneDrive/Desktop/cosora lovable/textile-spark-net/node_modules/playwright/index.mjs";
+import { chromium } from "file:///c:/Users/Abhishek Mitra/OneDrive/Desktop/cosora testing/cosora lovable/textile-spark-net/node_modules/playwright/index.mjs";
 
 const BASE = "http://localhost:4174";
 
@@ -33,18 +33,25 @@ for (const [label, email] of [
 
   await loginAs(page, email);
 
+  // The rail groups its items and remembers which groups were collapsed, so
+  // expand everything before reading the list: a collapsed group is not a
+  // missing section, and this assertion is about role visibility.
+  await page.$$eval('aside nav button[aria-expanded="false"]', (bs) => bs.forEach((b) => b.click()));
+  await page.waitForTimeout(200);
   const nav = await page.$$eval("aside nav a", (as) => as.map((a) => a.textContent.trim()));
   const url = page.url();
 
   // Visit Products and see what this role is offered.
   await page.goto(BASE + "/products", { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
-  const banner = await page.$$eval(".bg-amber-50", (els) => els.map((e) => e.textContent.trim()).slice(0, 1));
+  const banner = await page.$$eval('[data-marker="readonly-banner"]', (els) =>
+    els.map((e) => e.textContent.trim()).slice(0, 1),
+  );
   const approve = await page.$$eval("button", (bs) =>
     bs.filter((b) => b.textContent.trim() === "Approve").map((b) => ({ disabled: b.disabled })),
   );
 
-  await page.screenshot({ path: `../screenshots/${label}-products.png`, fullPage: false });
+  await page.screenshot({ path: `screenshots/${label}-products.png`, fullPage: false });
 
   out.push({
     role: label,

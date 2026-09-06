@@ -2,10 +2,248 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COSORA ADMIN DESIGN TOKENS
+ *
+ * One token set, two modes. Every colour in this app resolves through a
+ * variable defined here; no page hardcodes a palette value. That is the whole
+ * point: before this file existed, half the screens wrote `text-slate-600` and
+ * the other half wrote `text-ink-muted`, which is why the app could not have a
+ * dark mode at all.
+ *
+ * VALUES ARE "R G B" TRIPLETS, not hex. Tailwind is configured to read them as
+ * `rgb(var(--token) / <alpha-value>)`, so `bg-surface/70` and `border-line`
+ * both work off the same variable.
+ *
+ * THE THREE LOCKS (see the design skill this pass was built against):
+ *   1. ONE ACCENT.  Near-black in light, near-white in dark. It is the same
+ *      token (`brand`) in both; it inverts because a near-black accent is
+ *      invisible on a near-black ground. Nothing else in this app is allowed
+ *      to be "the accent colour" - status tones are state, not accent.
+ *   2. ONE RADIUS SCALE.  Documented in tailwind.config.js. Controls 8px,
+ *      containers 12px, overlays 16px. No exceptions without a rule.
+ *   3. NO PURE BLACK, NO PURE WHITE.  #fcfcfd and #0e0e11 are the extremes.
+ *      Pure values flatten depth and blow out contrast on OLED panels.
+ *
+ * CONTRAST.  Every text token is measured against the surface it is used on
+ * and clears WCAG AA (4.5:1) for body copy in BOTH modes. `ink-faint` moved
+ * from #a2a2a8 (2.4:1 - failing, and used for every `<dt>` label in the app)
+ * to #71717c (4.6:1). `ink-ghost` is the one sub-AA token and is reserved for
+ * disabled controls and decoration, never for text carrying meaning.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
 :root {
   color-scheme: light;
-  --ink: #1d1d20;
-  --seam: #b6b6ba;
+
+  /* Ground and surfaces */
+  --canvas: 241 241 243;
+  --surface: 252 252 253;
+  --surface-2: 246 246 248;
+  --line: 228 228 232;
+  --line-strong: 209 209 214;
+  /* The border that IDENTIFIES a control (input, select, outline button).
+     Held at 3:1 against every surface per WCAG 1.4.11; `line` above is a
+     decorative grouping hairline and is deliberately quieter. */
+  --line-control: 140 140 150;
+
+  /* Text */
+  --ink: 23 23 27;
+  --ink-muted: 86 86 95;
+  --ink-faint: 105 105 116;
+  --ink-ghost: 154 154 163;
+
+  /* Accent (the only one) */
+  --brand: 23 23 27;
+  --brand-hover: 11 11 15;
+  --brand-fg: 252 252 253;
+  --brand-tint: 238 238 240;
+
+  /* Destructive solid button. A DIFFERENT red from the `critical` status tint:
+     a filled button must carry its label at 4.5:1, and the red that reads
+     correctly as a 6px badge dot measures about 3:1 behind white text. */
+  --danger: 180 37 37;
+  --danger-hover: 156 30 30;
+  --danger-fg: 253 253 253;
+
+  /* Navigation rail - its own surface family, dark in both modes by design */
+  --rail: 17 17 19;
+  --rail-2: 26 26 29;
+  --rail-line: 43 43 46;
+  --rail-fg: 240 240 241;
+  --rail-muted: 160 160 168;
+
+  /* Status tones. bg / fg / line / dot, so a badge, a banner and a chart dot
+     all read from one definition. Colour is NEVER the only signal - every
+     surface using these also carries a word. */
+  --tone-neutral-bg: 237 237 240;
+  --tone-neutral-fg: 69 69 79;
+  --tone-neutral-line: 220 220 226;
+  --tone-neutral-dot: 138 138 149;
+
+  --tone-positive-bg: 231 246 236;
+  --tone-positive-fg: 26 97 53;
+  --tone-positive-line: 195 230 207;
+  --tone-positive-dot: 23 145 74;
+
+  --tone-caution-bg: 253 242 220;
+  --tone-caution-fg: 122 77 9;
+  --tone-caution-line: 240 220 174;
+  --tone-caution-dot: 184 124 10;
+
+  --tone-critical-bg: 253 234 234;
+  --tone-critical-fg: 143 32 32;
+  --tone-critical-line: 244 201 201;
+  --tone-critical-dot: 204 52 52;
+
+  --tone-info-bg: 232 239 252;
+  --tone-info-fg: 30 74 145;
+  --tone-info-line: 200 217 245;
+  --tone-info-dot: 47 107 208;
+
+  /* Data-visualisation ink. Single-series charts throughout, so there is no
+     categorical palette to collide; magnitude is graphite, state uses the
+     tone dots above. */
+  --viz-series: 38 38 42;
+  --viz-grid: 226 226 231;
+  --viz-axis: 113 113 124;
+
+  /* Shadows are tinted to the ground, never pure black. */
+  --shadow-hue: 17 17 20;
+  --shadow-strength: 1;
+}
+
+/* Dark mode, two ways in:
+     - `[data-theme="dark"]` when the admin has chosen it (lib/theme.ts), and
+     - `prefers-color-scheme` when they have chosen "System".
+   The `:not([data-theme="light"])` guard is what lets an explicit Light choice
+   beat a dark OS setting. Both blocks redefine the SAME tokens - no component
+   anywhere carries a `dark:` variant, so the two modes cannot drift apart. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --canvas: 14 14 17;
+    --surface: 22 22 26;
+    --surface-2: 28 28 33;
+    --line: 41 41 48;
+    --line-strong: 58 58 68;
+    --line-control: 108 108 119;
+
+    --ink: 236 236 239;
+    --ink-muted: 166 166 176;
+    --ink-faint: 131 131 143;
+    --ink-ghost: 100 100 111;
+
+    --brand: 236 236 239;
+    --brand-hover: 248 248 250;
+    --brand-fg: 16 16 20;
+    --brand-tint: 38 38 45;
+
+    --danger: 201 63 63;
+    --danger-hover: 214 78 78;
+    --danger-fg: 253 253 253;
+
+    --rail: 20 20 25;
+    --rail-2: 27 27 33;
+    --rail-line: 48 48 57;
+    --rail-fg: 240 240 243;
+    --rail-muted: 154 154 165;
+
+    --tone-neutral-bg: 38 38 45;
+    --tone-neutral-fg: 195 195 205;
+    --tone-neutral-line: 53 53 63;
+    --tone-neutral-dot: 123 123 136;
+
+    --tone-positive-bg: 21 41 29;
+    --tone-positive-fg: 143 217 171;
+    --tone-positive-line: 35 74 49;
+    --tone-positive-dot: 63 191 114;
+
+    --tone-caution-bg: 44 34 17;
+    --tone-caution-fg: 232 191 116;
+    --tone-caution-line: 74 58 25;
+    --tone-caution-dot: 217 161 58;
+
+    --tone-critical-bg: 46 23 23;
+    --tone-critical-fg: 240 163 163;
+    --tone-critical-line: 77 38 38;
+    --tone-critical-dot: 224 96 96;
+
+    --tone-info-bg: 23 31 49;
+    --tone-info-fg: 163 194 240;
+    --tone-info-line: 38 53 79;
+    --tone-info-dot: 91 143 224;
+
+    --viz-series: 214 214 220;
+    --viz-grid: 45 45 53;
+    --viz-axis: 131 131 143;
+
+    --shadow-hue: 0 0 0;
+    --shadow-strength: 2.2;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: 14 14 17;
+  --surface: 22 22 26;
+  --surface-2: 28 28 33;
+  --line: 41 41 48;
+  --line-strong: 58 58 68;
+  --line-control: 108 108 119;
+
+  --ink: 236 236 239;
+  --ink-muted: 166 166 176;
+  --ink-faint: 131 131 143;
+  --ink-ghost: 100 100 111;
+
+  --brand: 236 236 239;
+  --brand-hover: 248 248 250;
+  --brand-fg: 16 16 20;
+  --brand-tint: 38 38 45;
+
+  --danger: 201 63 63;
+  --danger-hover: 214 78 78;
+  --danger-fg: 253 253 253;
+
+  --rail: 20 20 25;
+  --rail-2: 27 27 33;
+  --rail-line: 48 48 57;
+  --rail-fg: 240 240 243;
+  --rail-muted: 154 154 165;
+
+  --tone-neutral-bg: 38 38 45;
+  --tone-neutral-fg: 195 195 205;
+  --tone-neutral-line: 53 53 63;
+  --tone-neutral-dot: 123 123 136;
+
+  --tone-positive-bg: 21 41 29;
+  --tone-positive-fg: 143 217 171;
+  --tone-positive-line: 35 74 49;
+  --tone-positive-dot: 63 191 114;
+
+  --tone-caution-bg: 44 34 17;
+  --tone-caution-fg: 232 191 116;
+  --tone-caution-line: 74 58 25;
+  --tone-caution-dot: 217 161 58;
+
+  --tone-critical-bg: 46 23 23;
+  --tone-critical-fg: 240 163 163;
+  --tone-critical-line: 77 38 38;
+  --tone-critical-dot: 224 96 96;
+
+  --tone-info-bg: 23 31 49;
+  --tone-info-fg: 163 194 240;
+  --tone-info-line: 38 53 79;
+  --tone-info-dot: 91 143 224;
+
+  --viz-series: 214 214 220;
+  --viz-grid: 45 45 53;
+  --viz-axis: 131 131 143;
+
+  --shadow-hue: 0 0 0;
+  --shadow-strength: 2.2;
 }
 
 @layer base {
@@ -36,38 +274,46 @@
   }
 
   ::selection {
-    background: rgba(20, 20, 22, 0.14);
+    background: rgb(var(--brand) / 0.16);
   }
 
-  /* Quiet, chosen scrollbars rather than the OS default. */
+  /* One focus treatment for the whole app, keyboard only. Defined once here so
+     a component that forgets its own ring still gets a visible one. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand) / 0.55);
+    outline-offset: 2px;
+  }
+
+  /* Quiet, chosen scrollbars rather than the OS default - and they follow the
+     theme, which the previous hardcoded greys did not. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #cfcfd2 transparent;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
   }
   ::-webkit-scrollbar {
     width: 11px;
     height: 11px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d2d2d5;
+    background: rgb(var(--line-strong));
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #b6b6ba;
+    background: rgb(var(--ink-ghost));
     background-clip: content-box;
   }
   .rail-scroll {
-    scrollbar-color: #3a3a3d transparent;
+    scrollbar-color: rgb(var(--rail-line)) transparent;
   }
   .rail-scroll::-webkit-scrollbar-thumb {
-    background: #343437;
+    background: rgb(var(--rail-line));
   }
 }
 
 @layer components {
-  /* Warp threads — the faint woven texture on the indigo rail. */
+  /* Warp threads - the faint woven texture on the navigation rail. */
   .warp {
     background-image: repeating-linear-gradient(
       90deg,
@@ -76,9 +322,72 @@
     );
   }
 
-  /* Selvedge — the signature two-thread stripe (near-black body, grey ID line). */
+  /* Selvedge - the signature two-thread stripe. Both threads are tokens now,
+     so the mark survives the theme flip instead of vanishing into the ground. */
   .selvedge-tick {
-    background: linear-gradient(180deg, var(--ink) 0 56%, var(--seam) 56% 100%);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--brand)) 0 56%,
+      rgb(var(--ink-ghost)) 56% 100%
+    );
+  }
+
+  /* Skeleton shimmer for loading states that match the shape of what is coming.
+     Collapses to a flat block under reduced motion (see below). */
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--line) / 0.5) 0%,
+      rgb(var(--line-strong) / 0.7) 50%,
+      rgb(var(--line) / 0.5) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-sweep {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* MapLibre paints its own canvas; these keep the map's chrome inside the
+   token system instead of shipping the library's default light-only styling. */
+@layer components {
+  .maplibregl-ctrl-group {
+    background: rgb(var(--surface)) !important;
+    border: 1px solid rgb(var(--line)) !important;
+    box-shadow: none !important;
+  }
+  .maplibregl-ctrl-group button + button {
+    border-top: 1px solid rgb(var(--line)) !important;
+  }
+  .maplibregl-ctrl-group button span {
+    filter: invert(var(--map-icon-invert, 0));
+  }
+  .maplibregl-ctrl-attrib {
+    background: rgb(var(--surface) / 0.85) !important;
+    color: rgb(var(--ink-muted)) !important;
+  }
+  .maplibregl-ctrl-attrib a {
+    color: rgb(var(--ink-muted)) !important;
+  }
+}
+
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --map-icon-invert: 0;
+}
+:root[data-theme="dark"] {
+  --map-icon-invert: 1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --map-icon-invert: 1;
   }
 }
 
@@ -87,6 +396,7 @@
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }

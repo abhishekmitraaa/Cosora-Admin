@@ -29,10 +29,10 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
 
   if (!identity?.isAdmin) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6">
         <Card className="max-w-md text-center">
-          <h1 className="text-base font-semibold text-slate-900">Not an admin account</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <h1 className="font-display text-base font-bold text-ink">Not an admin account</h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             {identity?.email} is signed in but does not have admin access. Ask a super admin to
             grant it.
           </p>
@@ -54,10 +54,13 @@ export function RequireSection({ section, children }: { section: Section; childr
   if (!canSee(role, section)) {
     return (
       <Card className="max-w-lg">
-        <h1 className="text-base font-semibold text-slate-900">Section not available for your role</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Your admin role doesn't include the <span className="font-medium">{section}</span> section.
-          If you reached this by link, ask a super admin to change your role.
+        <h1 className="font-display text-base font-bold text-ink">
+          Section not available for your role
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          Your admin role does not include the{" "}
+          <span className="font-medium text-ink">{section}</span> section. If you reached this by a
+          link, ask a super admin to change your role.
         </p>
       </Card>
     );

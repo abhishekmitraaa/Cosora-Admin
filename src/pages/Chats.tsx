@@ -4,7 +4,20 @@ import { Link, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { fetchParticipants, participantLabel, resolveSides, type Participant } from "@/lib/chat";
-import { Badge, Card, Empty, ErrorNote, Input, Note, PageHeader, Spinner, Table, Tabs } from "@/components/ui";
+import {
+  Badge,
+  Empty,
+  ErrorNote,
+  Field,
+  Input,
+  Note,
+  Page,
+  PageHeader,
+  ROW_HOVER,
+  SkeletonList,
+  Table,
+  Tabs,
+} from "@/components/ui";
 
 interface ConversationRow {
   id: string;
@@ -24,6 +37,9 @@ const TABS: { id: Filter; label: string }[] = [
 ];
 
 const PAGE_LIMIT = 200;
+
+const SUBTITLE =
+  "Every buyer and vendor conversation on Cosora. Open one to read the thread; it is read-only here.";
 
 /**
  * `.or()` takes a comma-separated filter string, so a comma, paren or quote in
@@ -89,40 +105,48 @@ export default function Chats() {
     },
   });
 
-  if (chats.isLoading) return <Spinner />;
+  if (chats.isLoading) {
+    return (
+      <Page width="wide">
+        <PageHeader title="Chats" subtitle={SUBTITLE} />
+        <SkeletonList rows={1} height="h-96" />
+      </Page>
+    );
+  }
   if (chats.error) return <ErrorNote message={(chats.error as Error).message} />;
 
   const { rows, people } = chats.data!;
 
   return (
-    <div className="max-w-6xl">
-      <PageHeader
-        title="Chats"
-        subtitle="Every buyer–vendor conversation on Cosora. Open one to read the thread; it is read-only here."
-      />
+    <Page width="wide">
+      <PageHeader title="Chats" subtitle={SUBTITLE} />
 
-      <Card className="mb-4 border-line bg-canvas">
-        <p className="text-xs leading-relaxed text-ink-muted">
-          Admins can <span className="font-medium">read</span> conversations and messages — nothing
-          on this screen can send, edit or delete a message, and participants are not told an admin
-          opened their chat. A chat marked{" "}
-          <span className="font-medium">under review</span> is locked for its participants until the{" "}
-          <Link to="/chat-review" className="font-medium underline">
-            review queue
-          </Link>{" "}
-          resolves it.
-        </p>
-      </Card>
+      <Note className="mb-4">
+        Admins can <span className="font-medium text-ink">read</span> conversations and messages.
+        Nothing on this screen can send, edit or delete a message, and participants are not told an
+        admin opened their chat. A chat marked{" "}
+        <span className="font-medium text-ink">under review</span> is locked for its participants
+        until the{" "}
+        <Link to="/chat-review" className="font-medium underline">
+          review queue
+        </Link>{" "}
+        resolves it.
+      </Note>
 
       <div className="mb-4 max-w-sm">
-        <Input
-          placeholder="Search by participant name, email or id…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search.trim().length === 1 && (
-          <p className="mt-1 text-xs text-ink-faint">Type at least 2 characters.</p>
-        )}
+        <Field
+          label="Find a conversation"
+          htmlFor="chat-search"
+          hint={search.trim().length === 1 ? undefined : "Participant name, email address or profile id."}
+          error={search.trim().length === 1 ? "Type at least 2 characters." : null}
+        >
+          <Input
+            id="chat-search"
+            placeholder="anaya, buyer@example.com, or a uuid"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </Field>
       </div>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -142,7 +166,7 @@ export default function Chats() {
                 <tr
                   key={c.id}
                   onClick={() => navigate(`/chats/${c.id}`)}
-                  className="cursor-pointer transition-colors hover:bg-canvas"
+                  className={`cursor-pointer ${ROW_HOVER}`}
                 >
                   <td className="px-3 py-2">
                     <Link
@@ -159,21 +183,23 @@ export default function Chats() {
                           <span>· vendor: {participantLabel(sides.vendor, sides.vendorId!)}</span>
                         </>
                       ) : (
-                        <span>sides unresolved — neither or both hold a vendor profile</span>
+                        <span>sides unresolved: neither or both hold a vendor profile</span>
                       )}
-                      {a?.account_status === "suspended" && <Badge tone="red">A suspended</Badge>}
-                      {b?.account_status === "suspended" && <Badge tone="red">B suspended</Badge>}
+                      {a?.account_status === "suspended" && <Badge tone="critical">A suspended</Badge>}
+                      {b?.account_status === "suspended" && <Badge tone="critical">B suspended</Badge>}
                     </div>
                   </td>
                   <td className="px-3 py-2">
                     {c.status === "under_review" ? (
-                      <Badge tone="amber" dot>under review</Badge>
+                      <Badge tone="caution" dot>under review</Badge>
                     ) : (
-                      <Badge tone="green" dot>active</Badge>
+                      <Badge tone="positive" dot>active</Badge>
                     )}
                   </td>
                   <td className="max-w-[22rem] px-3 py-2 text-ink-muted">
-                    <span className="line-clamp-2">{c.last_message || "—"}</span>
+                    <span className="line-clamp-2">
+                      {c.last_message || <span className="text-ink-ghost">no messages</span>}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-faint">
                     {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: true })}
@@ -186,11 +212,11 @@ export default function Chats() {
           {rows.length === PAGE_LIMIT && (
             <Note className="mt-3">
               Showing the {PAGE_LIMIT} most recently active conversations. Narrow this with the
-              search box — older chats are not below, they are not loaded.
+              search box: older chats are not below, they are not loaded.
             </Note>
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

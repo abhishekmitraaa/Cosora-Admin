@@ -12,11 +12,16 @@ import FlagLog from "@/components/FlagLog";
 import {
   Badge,
   Button,
-  Card,
+  DataField,
   ErrorNote,
+  Notice,
+  Page,
   PageHeader,
+  Panel,
   ReadOnlyBanner,
-  Spinner,
+  SkeletonList,
+  Stack,
+  SubHeading,
 } from "@/components/ui";
 
 interface VendorDetailRow {
@@ -76,7 +81,7 @@ export default function VendorDetail() {
    * refused by Postgres, not by the disabled button.
    *
    * Suspension is NOT here. It lives on `profiles.account_status` and is written
-   * only by set_account_status() — see the <AccountStatus> card below.
+   * only by set_account_status() - see the <AccountStatus> card below.
    */
   const update = useMutation({
     mutationFn: async (patch: { is_verified?: boolean }) => {
@@ -92,7 +97,13 @@ export default function VendorDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (vendor.isLoading) return <Spinner />;
+  if (vendor.isLoading) {
+    return (
+      <Page>
+        <SkeletonList rows={3} height="h-40" />
+      </Page>
+    );
+  }
   if (vendor.error) return <ErrorNote message={(vendor.error as Error).message} />;
   if (!vendor.data) return <ErrorNote message="Vendor not found." />;
 
@@ -100,8 +111,11 @@ export default function VendorDetail() {
   const s = sealSources(v.is_verified, v.plan_expires_at, v.ad_verified_until);
 
   return (
-    <div className="max-w-4xl">
-      <Link to="/vendors" className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+    <Page>
+      <Link
+        to="/vendors"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink"
+      >
         <ArrowLeft size={14} /> All vendors
       </Link>
 
@@ -113,129 +127,125 @@ export default function VendorDetail() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "vendors")} />}
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {v.onboarding_complete ? <Badge tone="green">onboarding complete</Badge> : <Badge tone="amber">onboarding incomplete</Badge>}
+        {v.onboarding_complete ? (
+          <Badge tone="positive">onboarding complete</Badge>
+        ) : (
+          <Badge tone="caution">onboarding incomplete</Badge>
+        )}
         {/* Suspension state is NOT badged here. It is not a vendor_profiles fact
             any more, and the <AccountStatus> card below reads and renders it
-            from profiles — one query, one badge, no chance of the two disagreeing. */}
-        {s.any ? <Badge tone="blue">trust seal shown</Badge> : <Badge>no seal</Badge>}
+            from profiles - one query, one badge, no chance of the two disagreeing. */}
+        {s.any ? <Badge tone="info">trust seal shown</Badge> : <Badge>no seal</Badge>}
       </div>
 
-      {/* Business documents — the actual material for a manual verification call. */}
-      <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Business documents</h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          <Field label="GSTIN" value={v.gstin} mono />
-          <Field label="PAN" value={v.pan} mono />
-          <Field label="CIN" value={v.cin} mono />
-          <Field label="Business type" value={v.business_type} />
-          <Field label="Owner" value={v.owner_name} />
-          <Field label="Owner email" value={v.owner_email} />
-          <Field label="Phone" value={v.phone} />
-          <Field label="Website" value={v.website} />
-        </dl>
+      <Stack>
+        {/* Business documents - the actual material for a manual verification call. */}
+        <Panel title="Business documents">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+            <DataField label="GSTIN" value={v.gstin} mono />
+            <DataField label="PAN" value={v.pan} mono />
+            <DataField label="CIN" value={v.cin} mono />
+            <DataField label="Business type" value={v.business_type} />
+            <DataField label="Owner" value={v.owner_name} />
+            <DataField label="Owner email" value={v.owner_email} />
+            <DataField label="Phone" value={v.phone} />
+            <DataField label="Website" value={v.website} />
+          </dl>
 
-        <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Registered address
-        </h3>
-        <p className="text-sm text-slate-700">
-          {[v.address_line, v.area, v.landmark, v.city, v.state, v.postal_code, v.country]
-            .filter(Boolean)
-            .join(", ") || <span className="text-slate-400">No address on file</span>}
-        </p>
-      </Card>
+          <SubHeading className="mb-1.5 mt-5">Registered address</SubHeading>
+          <p className="text-sm text-ink">
+            {[v.address_line, v.area, v.landmark, v.city, v.state, v.postal_code, v.country]
+              .filter(Boolean)
+              .join(", ") || <span className="text-ink-ghost">No address on file</span>}
+          </p>
+        </Panel>
 
-      {/* Verification — explicitly framed as one of three seal sources. */}
-      <Card className="mb-4">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Manual verification</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          This toggles the admin <span className="font-mono text-[11px]">is_verified</span> flag only.
-          It's <span className="font-medium">additive</span> — it does not replace or remove a seal
-          granted by a subscription or an ad purchase.
-        </p>
-
-        <div className="mb-3 space-y-1 rounded border border-slate-200 bg-slate-50 p-2 text-xs">
-          <SealRow label="Admin flag (is_verified)" on={s.admin} detail={s.admin ? "granted" : "not set"} />
-          <SealRow
-            label="Paid subscription"
-            on={s.subscription}
-            detail={
-              v.plan_expires_at
-                ? `${v.plan_id ?? "plan"} — ${s.subscription ? "expires" : "expired"} ${format(new Date(v.plan_expires_at), "d MMM yyyy")}`
-                : "no plan"
-            }
-          />
-          <SealRow
-            label="Ad-purchased seal"
-            on={s.ad}
-            detail={
-              v.ad_verified_until
-                ? `${s.ad ? "until" : "expired"} ${format(new Date(v.ad_verified_until), "d MMM yyyy")}`
-                : "none"
-            }
-          />
-        </div>
-
-        <Button
-          variant={v.is_verified ? "outline" : "primary"}
-          disabled={!writable || update.isPending}
-          onClick={() =>
-            update.mutate(
-              { is_verified: !v.is_verified },
-              { onSuccess: () => toast.success(v.is_verified ? "Admin verification removed" : "Vendor verified") },
-            )
+        {/* Verification - explicitly framed as one of three seal sources. */}
+        <Panel
+          title="Manual verification"
+          description={
+            <>
+              This toggles the admin <span className="font-mono text-2xs">is_verified</span> flag only.
+              It is <span className="font-medium text-ink">additive</span>: it does not replace or
+              remove a seal granted by a subscription or an ad purchase.
+            </>
           }
         >
-          {v.is_verified ? "Remove admin verification" : "Mark as verified"}
-        </Button>
+          <div className="mb-4 divide-y divide-line rounded-xl border border-line bg-surface-2 px-3">
+            <SealRow label="Admin flag (is_verified)" on={s.admin} detail={s.admin ? "granted" : "not set"} />
+            <SealRow
+              label="Paid subscription"
+              on={s.subscription}
+              detail={
+                v.plan_expires_at
+                  ? `${v.plan_id ?? "plan"}, ${s.subscription ? "expires" : "expired"} ${format(new Date(v.plan_expires_at), "d MMM yyyy")}`
+                  : "no plan"
+              }
+            />
+            <SealRow
+              label="Ad-purchased seal"
+              on={s.ad}
+              detail={
+                v.ad_verified_until
+                  ? `${s.ad ? "until" : "expired"} ${format(new Date(v.ad_verified_until), "d MMM yyyy")}`
+                  : "none"
+              }
+            />
+          </div>
 
-        {v.is_verified && (s.subscription || s.ad) && (
-          <p className="mt-2 text-xs text-amber-700">
-            Removing the admin flag will not hide this vendor's seal — their{" "}
-            {s.subscription && s.ad ? "subscription and ad purchase" : s.subscription ? "active subscription" : "ad purchase"}{" "}
-            still grants it.
-          </p>
-        )}
-      </Card>
+          <Button
+            variant={v.is_verified ? "outline" : "primary"}
+            disabled={!writable || update.isPending}
+            onClick={() =>
+              update.mutate(
+                { is_verified: !v.is_verified },
+                { onSuccess: () => toast.success(v.is_verified ? "Admin verification removed" : "Vendor verified") },
+              )
+            }
+          >
+            {v.is_verified ? "Remove admin verification" : "Mark as verified"}
+          </Button>
 
-      {/*
-        Suspension for this vendor. `profiles.account_status`, written only by
-        set_account_status(), gated to support/super_admin, audited in
-        account_suspensions.
+          {v.is_verified && (s.subscription || s.ad) && (
+            <Notice tone="caution" className="mt-3 text-xs">
+              Removing the admin flag will not hide this vendor's seal. Their{" "}
+              {s.subscription && s.ad
+                ? "subscription and ad purchase"
+                : s.subscription
+                  ? "active subscription"
+                  : "ad purchase"}{" "}
+              still grants it.
+            </Notice>
+          )}
+        </Panel>
 
-        There used to be a second control below this one writing
-        `vendor_profiles.account_status`. That column was DROPPED by migration
-        20260801095820 and this page kept selecting and updating it, so the whole
-        screen 400'd. It is gone: there is one suspension, it is account-level,
-        and this card is it. Buyers and vendors share it, because the same human
-        is both.
-      */}
-      <div className="mb-4">
+        {/*
+          Suspension for this vendor. `profiles.account_status`, written only by
+          set_account_status(), gated to support/super_admin, audited in
+          account_suspensions.
+
+          There used to be a second control below this one writing
+          `vendor_profiles.account_status`. That column was DROPPED by migration
+          20260801095820 and this page kept selecting and updating it, so the whole
+          screen 400'd. It is gone: there is one suspension, it is account-level,
+          and this card is it. Buyers and vendors share it, because the same human
+          is both.
+        */}
         <AccountStatus profileId={v.id} name={v.brand_name || "this vendor"} kind="vendor" />
-      </div>
 
-      <FlagLog entityType="vendor" entityId={v.id} />
-    </div>
-  );
-}
-
-function Field({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className={`text-sm text-slate-800 ${mono ? "font-mono text-xs" : ""}`}>
-        {value || <span className="font-sans text-slate-400">—</span>}
-      </dd>
-    </div>
+        <FlagLog entityType="vendor" entityId={v.id} />
+      </Stack>
+    </Page>
   );
 }
 
 function SealRow({ label, on, detail }: { label: string; on: boolean; detail: string }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-slate-600">{label}</span>
+    <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+      <span className="text-ink-muted">{label}</span>
       <span className="flex items-center gap-2">
-        <span className="text-slate-400">{detail}</span>
-        {on ? <Badge tone="green">granting</Badge> : <Badge>no</Badge>}
+        <span className="text-ink-faint">{detail}</span>
+        {on ? <Badge tone="positive">granting</Badge> : <Badge>no</Badge>}
       </span>
     </div>
   );

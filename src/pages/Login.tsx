@@ -26,7 +26,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout footer="Internal tool — access is role-gated and enforced by the database.">
+    <AuthLayout footer="Internal tool. Access is role-gated and enforced by the database.">
       <Card className="shadow-pop">
         <h1 className="text-lg font-semibold tracking-tight text-ink">Sign in</h1>
         <p className="mt-1 text-sm text-ink-muted">Use your Cosora admin account to continue.</p>

@@ -16,9 +16,11 @@ import {
   Empty,
   ErrorNote,
   Note,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  SkeletonList,
+  StatusBadge,
   Tabs,
 } from "@/components/ui";
 
@@ -47,6 +49,9 @@ type Side = "buyer" | "vendor";
  * — and `conversation_reviews` keeps every verdict precisely so that question
  * can be answered.
  */
+const SUBTITLE =
+  "Conversations held for review, by a flag pattern match or a user report. Pending items are locked chats waiting on a decision; the other tabs are the record of what was decided.";
+
 type ReviewStatus = "pending" | "resumed" | "buyer_blocked" | "vendor_blocked" | "kept_locked";
 const TABS: { id: ReviewStatus; label: string }[] = [
   { id: "pending", label: "Queue (pending)" },
@@ -181,7 +186,7 @@ export default function ChatReview() {
       if (resolveError) {
         throw new Error(
           `The ${side}'s account WAS suspended, but this review could not be closed: ` +
-            `${describeWriteError(resolveError)} — it is still pending. Close it with "Keep locked" ` +
+            `${describeWriteError(resolveError)}. It is still pending. Close it with "Keep locked" ` +
             `so the queue matches what actually happened; do not block again.`,
         );
       }
@@ -193,7 +198,14 @@ export default function ChatReview() {
     onError: (e: Error) => toast.error(e.message, { duration: 15000 }),
   });
 
-  if (queue.isLoading) return <Spinner />;
+  if (queue.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Review queue" subtitle={SUBTITLE} />
+        <SkeletonList rows={3} height="h-44" />
+      </Page>
+    );
+  }
   if (queue.error) return <ErrorNote message={(queue.error as Error).message} />;
 
   const { rows, people } = queue.data!;
@@ -204,11 +216,8 @@ export default function ChatReview() {
   const pendingTab = tab === "pending";
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader
-        title="Review queue"
-        subtitle="Conversations held for review — by a flag pattern match or a user report. Pending items are locked chats waiting on a decision; the other tabs are the record of what was decided."
-      />
+    <Page>
+      <PageHeader title="Review queue" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "chat-review")} />}
 
@@ -217,16 +226,16 @@ export default function ChatReview() {
       {pendingTab ? (
         <Note className="mb-4">
           <span className="font-medium text-ink">Resume</span> unlocks the chat and closes the
-          review. <span className="font-medium text-ink">Keep locked</span> closes the review and
-          leaves the chat locked — use it for "seen, still deciding" so items do not sit in the
-          queue forever. <span className="font-medium text-ink">Block</span> suspends that
+          review. <span className="font-medium text-ink">Keep locked</span> closes the review and leaves
+          the chat locked, for the &ldquo;seen, still deciding&rdquo; case, so items do not sit in
+          the queue forever. <span className="font-medium text-ink">Block</span> suspends that
           participant's account against this review on the audit ledger, and asks whether to reopen
           the chat for the other party.
         </Note>
       ) : (
         <Note className="mb-4">
           Closed reviews, newest decision first. Read-only: a verdict is recorded once, and{" "}
-          <span className="font-mono text-[11px]">resolve_conversation_review()</span> refuses a
+          <span className="font-mono text-2xs">resolve_conversation_review()</span> refuses a
           second one on the same row so two admins cannot overwrite each other.
         </Note>
       )}
@@ -241,7 +250,7 @@ export default function ChatReview() {
             const sender = r.flagged ? people.get(r.flagged.sender_id) : undefined;
 
             return (
-              <Card key={r.id}>
+              <Card key={r.id} className="transition-shadow hover:shadow-card-hover">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-[16rem] flex-1">
                     {/* Why it is here. */}
@@ -252,7 +261,7 @@ export default function ChatReview() {
                           <span className="text-sm font-semibold text-ink">
                             {r.pattern?.label ?? "Matched a flag pattern (pattern since deleted)"}
                           </span>
-                          <Badge tone="amber">pattern match</Badge>
+                          <Badge tone="caution">pattern match</Badge>
                         </>
                       ) : (
                         <>
@@ -260,7 +269,7 @@ export default function ChatReview() {
                           <span className="text-sm font-semibold text-ink">
                             {r.reported_reason ?? "User reported"}
                           </span>
-                          <Badge tone="blue">user report</Badge>
+                          <Badge tone="info">user report</Badge>
                         </>
                       )}
                     </div>
@@ -297,8 +306,8 @@ export default function ChatReview() {
                     </div>
 
                     {/* The flagged message. */}
-                    <div className="rounded-lg border border-line bg-canvas px-3 py-2">
-                      <div className="mb-1 text-[11px] text-ink-faint">
+                    <div className="rounded-lg border border-line bg-surface-2 px-3 py-2">
+                      <div className="mb-1 text-2xs text-ink-faint">
                         {r.flagged
                           ? `${participantLabel(sender, r.flagged.sender_id)} · ${format(
                               new Date(r.flagged.created_at),
@@ -310,7 +319,7 @@ export default function ChatReview() {
                         {r.flagged?.body ?? (
                           <span className="text-ink-faint">
                             {r.flagged
-                              ? `No text — this is a "${r.flagged.kind}" message.`
+                              ? `No text. This is a "${r.flagged.kind}" message.`
                               : "The flagged message is not available (deleted, or this review has no message attached)."}
                           </span>
                         )}
@@ -318,7 +327,7 @@ export default function ChatReview() {
                     </div>
 
                     {r.source === "regex_flag" && r.pattern?.pattern && (
-                      <p className="mt-1.5 font-mono text-[11px] text-ink-faint">
+                      <p className="mt-1.5 font-mono text-2xs text-ink-faint">
                         matched: {r.pattern.pattern}
                       </p>
                     )}
@@ -334,8 +343,8 @@ export default function ChatReview() {
                   {/* Actions — pending only. Closed tabs show the verdict instead. */}
                   {!pendingTab ? (
                     <div className="w-full sm:w-44">
-                      <Badge tone={r.status === "resumed" ? "green" : "red"}>{r.status}</Badge>
-                      <p className="mt-2 text-[11px] leading-snug text-ink-muted">
+                      <StatusBadge status={r.status} dot={false} />
+                      <p className="mt-2 text-2xs leading-snug text-ink-muted">
                         {r.reviewed_at
                           ? `Decided ${format(new Date(r.reviewed_at), "d MMM yyyy, HH:mm")}`
                           : "Decision time not recorded"}
@@ -348,12 +357,12 @@ export default function ChatReview() {
                         is the entire point of keeping both.
                       */}
                       {r.reason && (
-                        <p className="mt-1.5 text-[11px] leading-snug text-ink">
+                        <p className="mt-1.5 text-2xs leading-snug text-ink">
                           <span className="text-ink-faint">Verdict reason: </span>
                           {r.reason.reason}
                         </p>
                       )}
-                      <p className="mt-2 text-[11px] text-ink-faint">
+                      <p className="mt-2 text-2xs text-ink-faint">
                         Chat is currently {conv?.status ?? "unknown"}.
                       </p>
                     </div>
@@ -405,7 +414,7 @@ export default function ChatReview() {
                       onClick={() =>
                         resolve.mutate(
                           { reviewId: r.id, verdict: "kept_locked" },
-                          { onSuccess: () => toast.success("Review closed — chat stays locked") },
+                          { onSuccess: () => toast.success("Review closed. The chat stays locked.") },
                         )
                       }
                     >
@@ -413,9 +422,9 @@ export default function ChatReview() {
                     </Button>
 
                     {conv && !sides?.resolved && (
-                      <p className="text-[11px] leading-snug text-amber-700">
+                      <p className="text-2xs leading-snug text-caution-fg">
                         Blocking is unavailable: neither or both participants hold a vendor profile,
-                        so which side is the buyer can't be established. Suspend the right account
+                        so which side is the buyer cannot be established. Suspend the right account
                         from the thread view instead.
                       </p>
                     )}
@@ -430,7 +439,7 @@ export default function ChatReview() {
 
       <ReasonPicker
         open={blocking !== null}
-        title={`Block ${blocking?.side ?? ""} — ${blocking?.name ?? ""}`}
+        title={`Block ${blocking?.side ?? ""}: ${blocking?.name ?? ""}`}
         confirmLabel={`Suspend ${blocking?.side ?? "account"}`}
         description={`Suspends ${blocking?.name ?? "this account"} and closes this review as ${
           blocking?.side === "buyer" ? "buyer_blocked" : "vendor_blocked"
@@ -458,6 +467,6 @@ export default function ChatReview() {
           )
         }
       />
-    </div>
+    </Page>
   );
 }

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
@@ -5,6 +6,7 @@ import { Toaster } from "sonner";
 import { AdminSessionProvider, useAdminSession } from "@/hooks/useAdminSession";
 import { RequireAdmin, RequireSection } from "@/components/Guard";
 import Shell from "@/components/Shell";
+import { SkeletonList } from "@/components/ui";
 import { canSee } from "@/lib/roles";
 
 import Login from "@/pages/Login";
@@ -24,6 +26,21 @@ import ChatReview from "@/pages/ChatReview";
 import ChatKeywords from "@/pages/ChatKeywords";
 import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
+// Phase-4 sections. Geography reads real vendor rows; the five below it render
+// from a development-only seed (src/lib/devSeed/) until Phase 2 creates their
+// tables, and Live Activity is an external link with no Cosora query at all.
+// Geography is the ONE lazily-loaded route. It pulls in maplibre-gl, which is
+// roughly a third of this app's JavaScript on its own, and three of the six
+// admin roles cannot even see the section. Making every other screen wait for a
+// map they will not open is the wrong trade; every other page stays eagerly
+// imported because they are small and admins move between them constantly.
+const Geography = lazy(() => import("@/pages/Geography"));
+import Content from "@/pages/Content";
+import Payments from "@/pages/Payments";
+import Certificates from "@/pages/Certificates";
+import Discounts from "@/pages/Discounts";
+import Customers from "@/pages/Customers";
+import LiveActivity from "@/pages/LiveActivity";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -35,6 +52,10 @@ function Landing() {
   const first =
     (
       [
+        // Ordered by how much of an admin's day each section is likely to be,
+        // so a role lands somewhere useful rather than on the first section
+        // that happens to be alphabetically early. Phase-4 sections sit after
+        // the established ones for the same reason.
         "products",
         "videos",
         "vendors",
@@ -46,7 +67,14 @@ function Landing() {
         "chat-keywords",
         "chat-patterns",
         "chat-reasons",
+        "payments",
+        "certificates",
+        "discounts",
+        "customers",
+        "geography",
+        "content",
         "reports",
+        "traction",
         "admins",
       ] as const
     ).find((s) => canSee(role, s)) ?? "reports";
@@ -174,6 +202,72 @@ export default function App() {
                 element={
                   <RequireSection section="chat-reasons">
                     <ChatReasons />
+                  </RequireSection>
+                }
+              />
+              {/* ── Phase-4 sections ──────────────────────────────────
+                  Same RequireSection guard as every established route, keyed to
+                  the sections added to roles.ts. The five dev-seed screens are
+                  routed and gated NOW so Phase 2 only has to swap their data
+                  source; the guard, the route and the nav entry are already in
+                  place. */}
+              <Route
+                path="/geography"
+                element={
+                  <RequireSection section="geography">
+                    {/* Shaped like the map it is about to replace, so the page
+                        does not jump when the chunk lands. */}
+                    <Suspense fallback={<SkeletonList rows={1} height="h-[28rem]" />}>
+                      <Geography />
+                    </Suspense>
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/content"
+                element={
+                  <RequireSection section="content">
+                    <Content />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/payments"
+                element={
+                  <RequireSection section="payments">
+                    <Payments />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/certificates"
+                element={
+                  <RequireSection section="certificates">
+                    <Certificates />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/discounts"
+                element={
+                  <RequireSection section="discounts">
+                    <Discounts />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/customers"
+                element={
+                  <RequireSection section="customers">
+                    <Customers />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/traction"
+                element={
+                  <RequireSection section="traction">
+                    <LiveActivity />
                   </RequireSection>
                 }
               />

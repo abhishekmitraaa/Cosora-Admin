@@ -8,6 +8,8 @@ import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import {
+  Attr,
+  AttrGrid,
   Badge,
   Button,
   Card,
@@ -15,9 +17,12 @@ import {
   ErrorNote,
   Modal,
   Note,
+  Notice,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  SkeletonList,
+  StatusBadge,
   Tabs,
   Textarea,
 } from "@/components/ui";
@@ -45,6 +50,9 @@ interface VideoRow {
   /** The tagged product, via product_videos.product_id. Nullable — a video need not tag one. */
   product: { name: string } | null;
 }
+
+const SUBTITLE =
+  "Moderate vendor-submitted product videos. Approving publishes to the buyer feed; rejecting requires a reason the vendor will read.";
 
 const TABS: { id: Status; label: string }[] = [
   { id: "under_review", label: "Queue (under review)" },
@@ -169,7 +177,7 @@ export default function Videos() {
     onSuccess: (moved) => {
       toast.success(
         moved === 0
-          ? "Nothing was pending for this vendor — no videos changed."
+          ? "Nothing was pending for this vendor. No videos changed."
           : `${moved} video${moved === 1 ? "" : "s"} approved. Any pending products and ` +
               "catalogues from this vendor went live in the same call.",
       );
@@ -202,17 +210,21 @@ export default function Videos() {
     );
   }
 
-  if (videos.isLoading) return <Spinner />;
+  if (videos.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Video Closeups" subtitle={SUBTITLE} />
+        <SkeletonList rows={3} height="h-36" />
+      </Page>
+    );
+  }
   if (videos.error) return <ErrorNote message={(videos.error as Error).message} />;
 
   const { rows, vendors } = videos.data!;
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader
-        title="Video Closeups"
-        subtitle="Moderate vendor-submitted product videos. Approving publishes to the buyer feed; rejecting requires a reason the vendor will read."
-      />
+    <Page>
+      <PageHeader title="Video Closeups" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "videos")} />}
 
@@ -260,7 +272,7 @@ export default function Videos() {
           budget shared with the buyer app. */}
       <Modal
         open={playing !== null}
-        title={playing ? `${playing.brand_line} — ${playing.category}` : ""}
+        title={playing ? `${playing.brand_line} · ${playing.category}` : ""}
         onClose={() => { setPlaying(null); setPlaybackFailed(false); }}
       >
         {playing?.video_url ? (
@@ -281,12 +293,12 @@ export default function Videos() {
               // for being blank.
               onError={() => setPlaybackFailed(true)}
               onLoadedData={() => setPlaybackFailed(false)}
-              className="max-h-[65vh] w-full rounded-lg bg-black"
+              className="max-h-[65vh] w-full rounded-lg bg-rail"
             />
             {playbackFailed && (
               <Note>
                 This file did not load. If it was just uploaded to Bunny it is probably still
-                encoding — wait a minute and reopen before judging it. If it stays blank, the
+                encoding, so wait a minute and reopen before judging it. If it stays blank, the
                 asset is missing at the provider and the row should be rejected.
               </Note>
             )}
@@ -303,7 +315,7 @@ export default function Videos() {
       >
         <p className="mb-2 text-sm text-ink-muted">
           A reason is required. It is stored on the video, shown in the Rejected tab, and the
-          vendor can read it — write it for them, not for us.
+          vendor can read it, so write it for them and not for us.
         </p>
         <Textarea
           rows={4}
@@ -330,9 +342,9 @@ export default function Videos() {
         onClose={() => setBulkFor(null)}
       >
         <p className="text-sm text-ink">
-          This does not stop at videos. <strong>Every</strong> item this vendor has waiting —
-          products, video closeups <em>and</em> catalogues — goes live in one call, including
-          items nobody has looked at on this screen.
+          This does not stop at videos. <strong>Every</strong> item this vendor has waiting
+          (products, video closeups <em>and</em> catalogues) goes live in one call, including items
+          nobody has looked at on this screen.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
           There is no bulk undo. Reversing it means rejecting each item individually.
@@ -348,7 +360,7 @@ export default function Videos() {
           </Button>
         </div>
       </Modal>
-    </div>
+    </Page>
   );
 }
 
@@ -390,7 +402,7 @@ function VideoCard({
           type="button"
           onClick={onPlay}
           aria-label={`Play "${v.brand_line}"`}
-          className="group relative h-28 w-20 shrink-0 overflow-hidden rounded border border-line bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
+          className="group relative h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-2"
         >
           {v.thumbnail_url ? (
             // Same encoding window as the player above: hide a failed poster
@@ -407,13 +419,13 @@ function VideoCard({
               No poster
             </span>
           )}
-          <span className="absolute inset-0 grid place-items-center bg-ink/30 opacity-80 transition-opacity group-hover:opacity-100">
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-ink shadow-xs">
+          <span className="absolute inset-0 grid place-items-center bg-rail/40 opacity-80 transition-opacity group-hover:opacity-100">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-surface text-ink shadow-xs">
               <Play size={14} className="ml-0.5 fill-current" />
             </span>
           </span>
           {v.duration_seconds != null && (
-            <span className="absolute bottom-1 right-1 rounded bg-ink/75 px-1 py-0.5 text-[10px] font-medium tabular-nums text-white">
+            <span className="absolute bottom-1 right-1 rounded-sm bg-rail/85 px-1 py-0.5 text-2xs font-medium tabular-nums text-rail-fg">
               {v.duration_seconds}s
             </span>
           )}
@@ -421,18 +433,16 @@ function VideoCard({
 
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-medium text-ink">{v.brand_line}</h3>
-            {v.status === "live" && <Badge tone="green" dot>live</Badge>}
-            {v.status === "rejected" && <Badge tone="red" dot>rejected</Badge>}
-            {v.status === "under_review" && <Badge tone="amber" dot>under review</Badge>}
-            {overCap && <Badge tone="red">over the {MAX_VIDEO_SECONDS}s cap</Badge>}
+            <h3 className="font-display text-section font-bold text-ink">{v.brand_line}</h3>
+            <StatusBadge status={v.status} />
+            {overCap && <Badge tone="critical">over the {MAX_VIDEO_SECONDS}s cap</Badge>}
           </div>
 
           <div className="mt-1 text-sm text-ink-muted">
             Submitted {formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}
           </div>
 
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-ink-muted sm:grid-cols-3">
+          <AttrGrid cols={3}>
             <Attr label="Category" value={v.category} />
             <Attr label="Product" value={v.product?.name} />
             <Attr
@@ -445,33 +455,33 @@ function VideoCard({
             />
             <Attr label="Price" value={v.price} />
             <Attr label="MOQ" value={v.moq} />
-          </dl>
+          </AttrGrid>
 
           {/* Vendor context: who submitted this, and are they already trusted. */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line/70 pt-2 text-xs text-ink-muted">
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-line pt-2.5 text-xs text-ink-muted">
             <span className="font-medium text-ink">{vendor?.brand_name ?? "Unknown vendor"}</span>
-            {vendor?.city && <span>· {vendor.city}</span>}
-            {vendor?.is_verified ? <Badge tone="blue">verified</Badge> : <Badge>unverified</Badge>}
-            {vendor?.account_status === "suspended" && <Badge tone="red">suspended</Badge>}
+            {vendor?.city && <span>{vendor.city}</span>}
+            {vendor?.is_verified ? <Badge tone="info">verified</Badge> : <Badge>unverified</Badge>}
+            {vendor?.account_status === "suspended" && <Badge tone="critical">suspended</Badge>}
           </div>
 
           {!v.video_url && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
-              <span className="font-medium">No video file on this row.</span> There is nothing to
-              review — the upload never finished, or its object path was lost.
+            <Notice tone="critical" className="mt-2.5 text-xs">
+              <span className="font-semibold">No video file on this row.</span> There is nothing to
+              review: the upload never finished, or its object path was lost.
               {v.status !== "rejected" &&
                 " Reject it rather than approving a row buyers would meet as a broken player."}
-            </div>
+            </Notice>
           )}
 
           {v.status === "rejected" && v.rejection_reason && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
-              <span className="font-medium">Rejection reason:</span> {v.rejection_reason}
-            </div>
+            <Notice tone="critical" className="mt-2.5 text-xs">
+              <span className="font-semibold">Rejection reason.</span> {v.rejection_reason}
+            </Notice>
           )}
         </div>
 
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full flex-col gap-1.5 sm:w-40">
           {v.status !== "live" && (
             <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
               Approve
@@ -482,27 +492,21 @@ function VideoCard({
               {v.status === "live" ? "Pull down" : "Reject"}
             </Button>
           )}
-          <Button onClick={onPlay}>Watch</Button>
+          <Button variant="ghost" onClick={onPlay}>
+            Watch
+          </Button>
           {onBulk && (
             <Button
+              variant="ghost"
               disabled={!writable || busy}
               onClick={onBulk}
               title="Approves this vendor's pending products, videos and catalogues"
             >
-              Approve all for vendor…
+              Approve all for vendor
             </Button>
           )}
         </div>
       </div>
     </Card>
-  );
-}
-
-function Attr({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <dt className="inline text-ink-faint">{label}: </dt>
-      <dd className="inline text-ink-muted">{value || "—"}</dd>
-    </div>
   );
 }

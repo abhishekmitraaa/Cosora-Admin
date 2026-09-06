@@ -8,14 +8,22 @@ import { useAdminSession } from "@/hooks/useAdminSession";
 import {
   Badge,
   Button,
-  Card,
   Empty,
+  Field,
   Input,
+  Notice,
+  Page,
   PageHeader,
+  Panel,
+  ROW_HOVER,
   Select,
-  Spinner,
+  SkeletonList,
+  Stack,
   Table,
 } from "@/components/ui";
+
+const SUBTITLE =
+  "Grant, change, and revoke admin access. Super admin only, and the database enforces that, not this page.";
 
 interface ProfileRow {
   id: string;
@@ -166,14 +174,14 @@ export default function Admins() {
         if (ctx && typeof ctx.json === "function") {
           try {
             const body = await ctx.json();
-            detail = [body.detail || body.error, body.hint].filter(Boolean).join(" — ") || detail;
+            detail = [body.detail || body.error, body.hint].filter(Boolean).join(" - ") || detail;
           } catch {
             /* keep the original message */
           }
         }
         throw new Error(detail);
       }
-      if (data?.error) throw new Error([data.detail || data.error, data.hint].filter(Boolean).join(" — "));
+      if (data?.error) throw new Error([data.detail || data.error, data.hint].filter(Boolean).join(" - "));
       return data as InviteResult;
     },
     onSuccess: (r) => {
@@ -188,36 +196,41 @@ export default function Admins() {
     },
   });
 
-  if (admins.isLoading) return <Spinner />;
+  if (admins.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Admins" subtitle={SUBTITLE} />
+        <SkeletonList rows={3} height="h-40" />
+      </Page>
+    );
+  }
 
   const superAdminCount = (admins.data ?? []).filter((a) => a.admin_role === "super_admin").length;
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader
-        title="Admins"
-        subtitle="Grant, change, and revoke admin access. Super admin only — the database enforces this, not this page."
-      />
+    <Page>
+      <PageHeader title="Admins" subtitle={SUBTITLE} />
 
-      <Card className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Current admins</h2>
+      <Stack>
+      <Panel title="Current admins">
         <Table head={["Name", "Email", "Role", "Actions"]}>
           {(admins.data ?? []).map((a) => {
             const isSelf = a.id === identity?.id;
             const isLastSuperAdmin = a.admin_role === "super_admin" && superAdminCount === 1;
             return (
-              <tr key={a.id}>
-                <td className="px-3 py-2">
-                  {a.full_name || <span className="text-slate-400">—</span>}
+              <tr key={a.id} className={ROW_HOVER}>
+                <td className="px-3 py-2 text-ink">
+                  {a.full_name || <span className="text-ink-ghost">no name</span>}
                   {isSelf && (
                     <span className="ml-1.5">
-                      <Badge tone="blue">you</Badge>
+                      <Badge tone="info">you</Badge>
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-slate-600">{a.email}</td>
+                <td className="px-3 py-2 text-ink-muted">{a.email}</td>
                 <td className="px-3 py-2">
                   <Select
+                    aria-label={`Role for ${a.email ?? "this admin"}`}
                     value={a.admin_role ?? ""}
                     disabled={isSelf || setRole.isPending}
                     onChange={(e) => setRole.mutate({ id: a.id, role: e.target.value as AdminRole })}
@@ -233,6 +246,7 @@ export default function Admins() {
                 <td className="px-3 py-2">
                   <Button
                     variant="danger"
+                    size="sm"
                     disabled={isSelf || isLastSuperAdmin || demote.isPending}
                     onClick={() => {
                       if (confirm(`Remove admin access for ${a.email}?`)) demote.mutate(a.id);
@@ -251,44 +265,54 @@ export default function Admins() {
           happily let a super_admin demote themselves or drop the last one. Said
           plainly so nobody mistakes this for an enforced invariant.
         */}
-        <p className="mt-3 text-xs text-slate-500">
-          You can't change your own role or the last remaining super admin from this screen. That's a
-          UI guard against locking everyone out, not a database rule — both are still possible via
-          SQL with the service role.
+        <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+          You cannot change your own role, or the last remaining super admin, from this screen. That
+          is a UI guard against locking everyone out, not a database rule: both are still possible
+          via SQL with the service role.
         </p>
-      </Card>
+      </Panel>
 
-      <Card className="mb-6">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Invite an admin by email</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          Works for anyone, including people who have never used Cosora. If they already have an
-          account they're granted the role directly; if not, they get a secure link to set their own
-          password. <span className="font-medium">No password is ever emailed.</span>
-        </p>
-
+      <Panel
+        title="Invite an admin by email"
+        description={
+          <>
+            Works for anyone, including people who have never used Cosora. If they already have an
+            account they are granted the role directly; if not, they get a secure link to set their
+            own password. <span className="font-medium text-ink">No password is ever emailed.</span>
+          </>
+        }
+      >
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             setInviteResult(null);
             invite.mutate({ email: inviteEmail.trim(), role: inviteRole });
           }}
         >
-          <Input
-            type="email"
-            required
-            placeholder="person@company.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            className="max-w-xs"
-          />
-          <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as AdminRole)}>
-            {ALL_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </Select>
+          <Field label="Email address" htmlFor="invite-email" className="w-full max-w-xs">
+            <Input
+              id="invite-email"
+              type="email"
+              required
+              placeholder="person@company.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+          </Field>
+          <Field label="Role" htmlFor="invite-role">
+            <Select
+              id="invite-role"
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as AdminRole)}
+            >
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Button type="submit" variant="primary" disabled={!inviteEmail.trim() || invite.isPending}>
             {invite.isPending ? "Sending…" : "Invite"}
           </Button>
@@ -302,47 +326,60 @@ export default function Admins() {
           copy, never `outcome` alone.
         */}
         {inviteResult && <InviteConfirmation r={inviteResult} />}
-      </Card>
+      </Panel>
 
-      <Card>
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Grant admin access</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          Search an account that already exists, then promote it with a role. (Inviting by email
-          above does this too — this is the browse-and-pick route.)
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            placeholder="Search by email (min 3 characters)…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
-          <Select value={promoteRole} onChange={(e) => setPromoteRole(e.target.value as AdminRole)}>
-            {ALL_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
-              </option>
-            ))}
-          </Select>
+      <Panel
+        title="Grant admin access"
+        description="Search an account that already exists, then promote it with a role. Inviting by email above does this too; this is the browse-and-pick route."
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <Field
+            label="Search existing accounts"
+            htmlFor="promote-search"
+            hint="At least 3 characters."
+            className="w-full max-w-xs"
+          >
+            <Input
+              id="promote-search"
+              placeholder="name@company.com"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </Field>
+          <Field label="Role to grant" htmlFor="promote-role">
+            <Select
+              id="promote-role"
+              value={promoteRole}
+              onChange={(e) => setPromoteRole(e.target.value as AdminRole)}
+            >
+              {ALL_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4">
           {search.trim().length < 3 ? (
-            <p className="text-xs text-slate-400">Type at least 3 characters to search.</p>
+            <p className="text-xs text-ink-faint">Type at least 3 characters to search.</p>
           ) : candidates.isLoading ? (
-            <Spinner label="Searching…" />
+            <SkeletonList rows={2} height="h-10" />
           ) : (candidates.data ?? []).length === 0 ? (
-            <Empty>No non-admin account matches "{search}".</Empty>
+            <Empty>No non-admin account matches &ldquo;{search}&rdquo;.</Empty>
           ) : (
             <Table head={["Name", "Email", ""]}>
               {(candidates.data ?? []).map((c) => (
-                <tr key={c.id}>
-                  <td className="px-3 py-2">{c.full_name || <span className="text-slate-400">—</span>}</td>
-                  <td className="px-3 py-2 text-slate-600">{c.email}</td>
+                <tr key={c.id} className={ROW_HOVER}>
+                  <td className="px-3 py-2 text-ink">
+                    {c.full_name || <span className="text-ink-ghost">no name</span>}
+                  </td>
+                  <td className="px-3 py-2 text-ink-muted">{c.email}</td>
                   <td className="px-3 py-2 text-right">
                     <Button
                       variant="primary"
+                      size="sm"
                       disabled={promote.isPending}
                       onClick={() => promote.mutate({ id: c.id, role: promoteRole })}
                     >
@@ -354,8 +391,9 @@ export default function Admins() {
             </Table>
           )}
         </div>
-      </Card>
-    </div>
+      </Panel>
+      </Stack>
+    </Page>
   );
 }
 
@@ -369,50 +407,67 @@ function InviteConfirmation({ r }: { r: InviteResult }) {
   // literally cannot log in yet. This must read as a problem, not a success.
   if (r.outcome === "invited" && !r.emailSent) {
     return (
-      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-        <div className="flex items-center gap-1.5 font-medium">
-          <TriangleAlert size={14} /> Access granted to {r.email}, but the email did NOT send
-          <Badge tone="amber">{ROLE_LABELS[r.admin_role]}</Badge>
-        </div>
-        <p className="mt-1 text-xs opacity-90">{r.warning ?? r.detail}</p>
-        <p className="mt-1 text-xs opacity-75">
-          This account has no password, so they can't sign in until a set-password link reaches
+      <Notice
+        tone="caution"
+        className="mt-4"
+        icon={<TriangleAlert size={14} />}
+        title={
+          <span className="flex flex-wrap items-center gap-1.5">
+            Access granted to {r.email}, but the email did NOT send
+            <Badge tone="caution">{ROLE_LABELS[r.admin_role]}</Badge>
+          </span>
+        }
+      >
+        <p className="mt-1 text-xs">{r.warning ?? r.detail}</p>
+        <p className="mt-1 text-xs opacity-80">
+          This account has no password, so they cannot sign in until a set-password link reaches
           them. Resend the invite once email works.
         </p>
-      </div>
+      </Notice>
     );
   }
 
   // Promoted only: existing account that already had a password. No email.
   if (r.outcome === "promoted") {
     return (
-      <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-        <div className="flex items-center gap-1.5 font-medium">
-          <UserCheck size={14} /> {r.email} already had a password — access granted, no email needed
-          <Badge tone="blue">{ROLE_LABELS[r.admin_role]}</Badge>
-        </div>
-        <p className="mt-1 text-xs opacity-90">{r.detail}</p>
-      </div>
+      <Notice
+        tone="info"
+        className="mt-4"
+        icon={<UserCheck size={14} />}
+        title={
+          <span className="flex flex-wrap items-center gap-1.5">
+            {r.email} already had a password. Access granted, no email needed.
+            <Badge tone="info">{ROLE_LABELS[r.admin_role]}</Badge>
+          </span>
+        }
+      >
+        <p className="mt-1 text-xs">{r.detail}</p>
+      </Notice>
     );
   }
 
   // Invited: a set-password email went out — either to a brand-new account or to
   // an existing OTP-only one (which needed it just as much).
   return (
-    <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
-      <div className="flex items-center gap-1.5 font-medium">
-        <Mail size={14} />
-        {r.created
-          ? `New account created — set-password link emailed to ${r.email}`
-          : `${r.email} had no password — access granted and a set-password link emailed`}
-        <Badge tone="green">{ROLE_LABELS[r.admin_role]}</Badge>
-      </div>
-      <p className="mt-1 text-xs opacity-90">{r.detail}</p>
-      <p className="mt-1 text-xs opacity-75">
-        They won't appear as signed-in until they open the link and set a password. The link must
-        return to this panel — its /reset-password URL has to be allow-listed in Supabase under
+    <Notice
+      tone="positive"
+      className="mt-4"
+      icon={<Mail size={14} />}
+      title={
+        <span className="flex flex-wrap items-center gap-1.5">
+          {r.created
+            ? `New account created. Set-password link emailed to ${r.email}.`
+            : `${r.email} had no password. Access granted and a set-password link emailed.`}
+          <Badge tone="positive">{ROLE_LABELS[r.admin_role]}</Badge>
+        </span>
+      }
+    >
+      <p className="mt-1 text-xs">{r.detail}</p>
+      <p className="mt-1 text-xs opacity-80">
+        They will not appear as signed in until they open the link and set a password. The link must
+        return to this panel, so its /reset-password URL has to be allow-listed in Supabase under
         Auth &rarr; URL Configuration &rarr; Redirect URLs.
       </p>
-    </div>
+    </Notice>
   );
 }

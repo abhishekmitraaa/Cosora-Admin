@@ -8,13 +8,17 @@ import { useRole } from "@/hooks/useAdminSession";
 import {
   Badge,
   Button,
-  Card,
   Empty,
   ErrorNote,
+  Page,
   PageHeader,
+  Panel,
   ReadOnlyBanner,
+  ROW_HOVER,
   Select,
-  Spinner,
+  SkeletonList,
+  Stack,
+  StatusBadge,
   Table,
 } from "@/components/ui";
 
@@ -57,6 +61,8 @@ interface PlanRow {
   monthly_price: number;
   yearly_price: number;
 }
+
+const SUBTITLE = "Plans, invoices and refunds.";
 
 export default function Subscriptions() {
   const role = useRole();
@@ -125,7 +131,7 @@ export default function Subscriptions() {
   });
 
   /**
-   * Refunds go through the admin-refund-payment edge function — never a direct
+   * Refunds go through the admin-refund-payment edge function, never a direct
    * table write. The function calls Razorpay first and only records the refund
    * if the gateway returns a refund id, so nothing is ever marked refunded on
    * this screen without the money actually moving.
@@ -164,7 +170,14 @@ export default function Subscriptions() {
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
 
-  if (subs.isLoading || invoices.isLoading) return <Spinner />;
+  if (subs.isLoading || invoices.isLoading) {
+    return (
+      <Page width="wide">
+        <PageHeader title="Subscriptions & billing" subtitle={SUBTITLE} />
+        <SkeletonList rows={2} height="h-64" />
+      </Page>
+    );
+  }
   if (subs.error) return <ErrorNote message={(subs.error as Error).message} />;
   if (invoices.error) return <ErrorNote message={(invoices.error as Error).message} />;
 
@@ -172,175 +185,169 @@ export default function Subscriptions() {
   const invRows = invoices.data ?? [];
 
   return (
-    <div className="max-w-6xl">
-      <PageHeader title="Subscriptions & billing" subtitle="Plans, invoices and refunds." />
+    <Page width="wide">
+      <PageHeader title="Subscriptions & billing" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "subscriptions")} />}
 
-      <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Subscriptions</h2>
-        {subRows.length === 0 ? (
-          <Empty>No vendor subscriptions.</Empty>
-        ) : (
-          <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Auto-renew", "Actions"]}>
-            {subRows.map((s) => (
-              <tr key={s.id}>
-                <td className="px-3 py-2 font-medium text-slate-900">
-                  {s.vendor?.brand_name ?? "Unknown vendor"}
-                </td>
-                <td className="px-3 py-2">
-                  <Select
-                    value={s.plan_id}
-                    disabled={!writable || updateSub.isPending}
-                    onChange={(e) =>
-                      updateSub.mutate(
-                        { id: s.id, patch: { plan_id: e.target.value } },
-                        { onSuccess: () => toast.success("Plan changed") },
-                      )
-                    }
-                  >
-                    {(plans.data ?? []).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                </td>
-                <td className="px-3 py-2 text-slate-600">{s.billing_cycle}</td>
-                <td className="px-3 py-2">
-                  <StatusBadge status={s.status} />
-                </td>
-                <td className="px-3 py-2 text-xs text-slate-600">
-                  {s.current_period_start && s.current_period_end ? (
-                    <>
-                      {format(new Date(s.current_period_start), "d MMM yyyy")} –{" "}
-                      {format(new Date(s.current_period_end), "d MMM yyyy")}
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="px-3 py-2 text-xs text-slate-600">{s.auto_renew ? "yes" : "no"}</td>
-                <td className="px-3 py-2">
-                  <Button
-                    variant="danger"
-                    disabled={!writable || s.status === "canceled" || updateSub.isPending}
-                    onClick={() => {
-                      if (!confirm(`Cancel the subscription for ${s.vendor?.brand_name ?? "this vendor"}?`)) return;
-                      updateSub.mutate(
-                        { id: s.id, patch: { status: "canceled", auto_renew: false } },
-                        { onSuccess: () => toast.success("Subscription canceled") },
-                      );
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Invoices</h2>
-        {/*
-          Refund honesty: the button is only enabled where a real gateway payment
-          exists. Seeded/simulated invoices have no razorpay_payment_id and there
-          is nothing to reverse — the edge function refuses them too.
-        */}
-        <p className="mb-3 text-xs text-slate-500">
-          Refunds call Razorpay's API server-side and are only recorded if the gateway confirms them.
-          Invoices without a <span className="font-mono text-[11px]">razorpay_payment_id</span> were
-          not paid through the gateway and cannot be refunded.
-        </p>
-
-        {invRows.length === 0 ? (
-          <Empty>No invoices.</Empty>
-        ) : (
-          <Table head={["Invoice", "Vendor", "Plan", "Amount", "Period", "Status", "Refund", ""]}>
-            {invRows.map((inv) => {
-              const total = inv.amount + (inv.gst_amount ?? 0);
-              const refundable = Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !inv.razorpay_refund_id;
-              return (
-                <tr key={inv.id}>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-700">
-                    {inv.invoice_number ?? inv.id.slice(0, 8)}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">{inv.vendor?.brand_name ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-600">{inv.plan_id ?? "—"}</td>
-                  <td className="px-3 py-2 text-slate-700">
-                    ₹{total}
-                    {inv.gst_amount ? (
-                      <span className="block text-[11px] text-slate-400">
-                        ₹{inv.amount} + ₹{inv.gst_amount} GST
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    {inv.billing_period_start && inv.billing_period_end
-                      ? `${format(new Date(inv.billing_period_start), "d MMM")} – ${format(new Date(inv.billing_period_end), "d MMM yyyy")}`
-                      : format(new Date(inv.created_at), "d MMM yyyy")}
+      <Stack>
+        <Panel title="Subscriptions">
+          {subRows.length === 0 ? (
+            <Empty>No vendor subscriptions.</Empty>
+          ) : (
+            <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Auto-renew", "Actions"]}>
+              {subRows.map((s) => (
+                <tr key={s.id} className={ROW_HOVER}>
+                  <td className="px-3 py-2 font-medium text-ink">
+                    {s.vendor?.brand_name ?? "Unknown vendor"}
                   </td>
                   <td className="px-3 py-2">
-                    <StatusBadge status={inv.status} />
+                    <Select
+                      aria-label={`Plan for ${s.vendor?.brand_name ?? "this vendor"}`}
+                      value={s.plan_id}
+                      disabled={!writable || updateSub.isPending}
+                      onChange={(e) =>
+                        updateSub.mutate(
+                          { id: s.id, patch: { plan_id: e.target.value } },
+                          { onSuccess: () => toast.success("Plan changed") },
+                        )
+                      }
+                    >
+                      {(plans.data ?? []).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
                   </td>
-                  <td className="px-3 py-2 text-xs">
-                    {inv.razorpay_refund_id ? (
-                      <span>
-                        <Badge tone={inv.refund_status === "processed" ? "green" : "amber"}>
-                          {inv.refund_status}
-                        </Badge>
-                        <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
-                          {inv.razorpay_refund_id}
-                        </span>
-                      </span>
-                    ) : inv.refund_status === "failed" ? (
-                      <Badge tone="red">failed</Badge>
+                  <td className="px-3 py-2 text-ink-muted">{s.billing_cycle}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={s.status} />
+                  </td>
+                  <td className="px-3 py-2 text-xs tabular-nums text-ink-muted">
+                    {s.current_period_start && s.current_period_end ? (
+                      <>
+                        {format(new Date(s.current_period_start), "d MMM yyyy")} to{" "}
+                        {format(new Date(s.current_period_end), "d MMM yyyy")}
+                      </>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-ink-ghost">not set</span>
                     )}
                   </td>
+                  <td className="px-3 py-2 text-xs text-ink-muted">{s.auto_renew ? "yes" : "no"}</td>
                   <td className="px-3 py-2">
                     <Button
                       variant="danger"
-                      disabled={!writable || !refundable || refund.isPending}
-                      title={
-                        !inv.razorpay_payment_id
-                          ? "No gateway payment on this invoice — nothing to refund"
-                          : undefined
-                      }
+                      size="sm"
+                      disabled={!writable || s.status === "canceled" || updateSub.isPending}
                       onClick={() => {
-                        if (!confirm(`Refund ₹${total} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
-                          return;
-                        refund.mutate(inv.id);
+                        if (!confirm(`Cancel the subscription for ${s.vendor?.brand_name ?? "this vendor"}?`)) return;
+                        updateSub.mutate(
+                          { id: s.id, patch: { status: "canceled", auto_renew: false } },
+                          { onSuccess: () => toast.success("Subscription canceled") },
+                        );
                       }}
                     >
-                      Refund
+                      Cancel
                     </Button>
                   </td>
                 </tr>
-              );
-            })}
-          </Table>
-        )}
-      </Card>
-    </div>
-  );
-}
+              ))}
+            </Table>
+          )}
+        </Panel>
 
-function StatusBadge({ status }: { status: string }) {
-  const tone =
-    status === "active" || status === "paid"
-      ? "green"
-      : status === "canceled" || status === "failed"
-        ? "red"
-        : status === "refunded"
-          ? "blue"
-          : "amber";
-  return (
-    <Badge tone={tone as "green" | "red" | "blue" | "amber"} dot>
-      {status}
-    </Badge>
+        {/*
+          Refund honesty: the button is only enabled where a real gateway payment
+          exists. Seeded/simulated invoices have no razorpay_payment_id and there
+          is nothing to reverse - the edge function refuses them too.
+        */}
+        <Panel
+          title="Invoices"
+          description={
+            <>
+              Refunds call Razorpay's API server-side and are only recorded if the gateway confirms
+              them. Invoices without a <span className="font-mono text-2xs">razorpay_payment_id</span>{" "}
+              were not paid through the gateway and cannot be refunded.
+            </>
+          }
+        >
+          {invRows.length === 0 ? (
+            <Empty>No invoices.</Empty>
+          ) : (
+            <Table head={["Invoice", "Vendor", "Plan", "Amount", "Period", "Status", "Refund", ""]}>
+              {invRows.map((inv) => {
+                const total = inv.amount + (inv.gst_amount ?? 0);
+                const refundable = Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !inv.razorpay_refund_id;
+                return (
+                  <tr key={inv.id} className={ROW_HOVER}>
+                    <td className="px-3 py-2 font-mono text-xs text-ink-muted">
+                      {inv.invoice_number ?? inv.id.slice(0, 8)}
+                    </td>
+                    <td className="px-3 py-2 text-ink">
+                      {inv.vendor?.brand_name ?? <span className="text-ink-ghost">unknown</span>}
+                    </td>
+                    <td className="px-3 py-2 text-ink-muted">
+                      {inv.plan_id ?? <span className="text-ink-ghost">none</span>}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-ink">
+                      ₹{total}
+                      {inv.gst_amount ? (
+                        <span className="block text-2xs text-ink-faint">
+                          ₹{inv.amount} + ₹{inv.gst_amount} GST
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs tabular-nums text-ink-muted">
+                      {inv.billing_period_start && inv.billing_period_end
+                        ? `${format(new Date(inv.billing_period_start), "d MMM")} to ${format(new Date(inv.billing_period_end), "d MMM yyyy")}`
+                        : format(new Date(inv.created_at), "d MMM yyyy")}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={inv.status} />
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {inv.razorpay_refund_id ? (
+                        <span>
+                          <Badge tone={inv.refund_status === "processed" ? "positive" : "caution"}>
+                            {inv.refund_status}
+                          </Badge>
+                          <span className="mt-0.5 block font-mono text-2xs text-ink-faint">
+                            {inv.razorpay_refund_id}
+                          </span>
+                        </span>
+                      ) : inv.refund_status === "failed" ? (
+                        <Badge tone="critical">failed</Badge>
+                      ) : (
+                        <span className="text-ink-ghost">none</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={!writable || !refundable || refund.isPending}
+                        title={
+                          !inv.razorpay_payment_id
+                            ? "No gateway payment on this invoice, so there is nothing to refund"
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (!confirm(`Refund ₹${total} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
+                            return;
+                          refund.mutate(inv.id);
+                        }}
+                      >
+                        Refund
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </Table>
+          )}
+        </Panel>
+      </Stack>
+    </Page>
   );
 }

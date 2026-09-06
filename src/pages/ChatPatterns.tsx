@@ -11,13 +11,20 @@ import {
   Card,
   Empty,
   ErrorNote,
+  Field,
   Input,
   Note,
+  Notice,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  ROW_HOVER,
+  SkeletonList,
   Table,
 } from "@/components/ui";
+
+const SUBTITLE =
+  "Regular expressions that hold a conversation for review when a message matches. The label is what reviewers see in the queue.";
 
 interface PatternRow {
   id: string;
@@ -133,30 +140,32 @@ export default function ChatPatterns() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (patterns.isLoading) return <Spinner />;
+  if (patterns.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Flag patterns" subtitle={SUBTITLE} />
+        <SkeletonList rows={1} height="h-64" />
+      </Page>
+    );
+  }
   if (patterns.error) return <ErrorNote message={(patterns.error as Error).message} />;
 
   const rows = patterns.data ?? [];
 
   return (
-    <div className="max-w-4xl">
-      <PageHeader
-        title="Flag patterns"
-        subtitle="Regular expressions that hold a conversation for review when a message matches. The label is what reviewers see in the queue."
-      />
+    <Page>
+      <PageHeader title="Flag patterns" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "chat-patterns")} />}
 
       <Note className="mb-4">
         <span className="font-medium text-ink">These are POSIX regular expressions, not keywords.</span>{" "}
-        <span className="font-mono text-[11px]">.</span>,{" "}
-        <span className="font-mono text-[11px]">*</span>,{" "}
-        <span className="font-mono text-[11px]">+</span>,{" "}
-        <span className="font-mono text-[11px]">|</span>,{" "}
-        <span className="font-mono text-[11px]">( )</span> and{" "}
-        <span className="font-mono text-[11px]">[ ]</span> are operators — escape them with a
+        <span className="font-mono text-2xs">.</span>, <span className="font-mono text-2xs">*</span>,{" "}
+        <span className="font-mono text-2xs">+</span>, <span className="font-mono text-2xs">|</span>,{" "}
+        <span className="font-mono text-2xs">( )</span> and{" "}
+        <span className="font-mono text-2xs">[ ]</span> are operators, so escape them with a
         backslash to match them literally. Postgres validates the expression when you save, and
-        rejects anything it can't compile. For plain terms use the{" "}
+        rejects anything it cannot compile. For plain terms use the{" "}
         <span className="font-medium text-ink">Keyword blocklist</span> instead.
         <br />
         Deleting a pattern is not the same as deactivating it: existing review rows point at it, and
@@ -171,12 +180,14 @@ export default function ChatPatterns() {
             if (pattern.trim() && label.trim() && probe?.matches) add.mutate({ pattern, label });
           }}
         >
-          <div className="min-w-[16rem] flex-1">
-            <label className="mb-1 block text-xs font-medium text-ink-muted">
-              Pattern (regular expression)
-            </label>
+          <Field
+            label="Pattern (regular expression)"
+            htmlFor="pattern-input"
+            className="min-w-[16rem] flex-1"
+          >
             <Input
-              placeholder="e.g. (whats\s?app|telegram)"
+              id="pattern-input"
+              placeholder="(whats\s?app|telegram)"
               value={pattern}
               onChange={(e) => {
                 setPattern(e.target.value);
@@ -184,17 +195,19 @@ export default function ChatPatterns() {
               }}
               className="font-mono text-xs"
             />
-          </div>
-          <div className="min-w-[12rem] flex-1">
-            <label className="mb-1 block text-xs font-medium text-ink-muted">
-              Label (shown to reviewers)
-            </label>
+          </Field>
+          <Field
+            label="Label (shown to reviewers)"
+            htmlFor="pattern-label"
+            className="min-w-[12rem] flex-1"
+          >
             <Input
-              placeholder="e.g. Off-platform contact"
+              id="pattern-label"
+              placeholder="Off-platform contact"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
             />
-          </div>
+          </Field>
           <Button
             type="submit"
             variant="primary"
@@ -212,21 +225,23 @@ export default function ChatPatterns() {
           compiles and matches nothing is the failure this project actually hit,
           and it is invisible — no error, no log, just a rule that never fires.
         */}
-        <div className="mt-3 border-t border-line pt-3">
-          <label className="mb-1 block text-xs font-medium text-ink-muted">
-            Test it against a sample message (required before saving)
-          </label>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[18rem] flex-1">
+        <div className="mt-4 border-t border-line pt-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field
+              label="Test it against a sample message (required before saving)"
+              htmlFor="pattern-sample"
+              className="min-w-[18rem] flex-1"
+            >
               <Input
-                placeholder="e.g. ping me on whatsapp"
+                id="pattern-sample"
+                placeholder="ping me on whatsapp"
                 value={sample}
                 onChange={(e) => {
                   setSample(e.target.value);
                   setProbe(null);
                 }}
               />
-            </div>
+            </Field>
             <Button
               type="button"
               disabled={!writable || !pattern.trim() || !sample.trim() || test.isPending}
@@ -237,18 +252,11 @@ export default function ChatPatterns() {
           </div>
 
           {probe && (
-            <div
-              className={
-                "mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed " +
-                (probe.matches
-                  ? "bg-emerald-50 text-emerald-900"
-                  : "bg-amber-50 text-amber-900")
-              }
-            >
+            <Notice tone={probe.matches ? "positive" : "caution"} className="mt-3 text-xs">
               {!probe.valid ? (
                 <>
                   <span className="font-semibold">Postgres rejected this pattern.</span>{" "}
-                  <span className="font-mono text-[11px]">{probe.error}</span>
+                  <span className="font-mono text-2xs">{probe.error}</span>
                 </>
               ) : probe.matches ? (
                 <>
@@ -259,13 +267,13 @@ export default function ChatPatterns() {
                 <>
                   <span className="font-semibold">Valid, but it does not match.</span> A pattern that
                   compiles and never fires saves without complaint and then does nothing. If you
-                  used <span className="font-mono text-[11px]"></span> for a word boundary, that
-                  is the cause — Postgres regexes are POSIX, where{" "}
-                  <span className="font-mono text-[11px]"></span> is a backspace character. Use{" "}
-                  <span className="font-mono text-[11px]">\y</span> instead.
+                  used <span className="font-mono text-2xs">{"\\b"}</span> for a word boundary,
+                  that is the cause: Postgres regexes are POSIX, where{" "}
+                  <span className="font-mono text-2xs">{"\\b"}</span> is a backspace character.
+                  Use <span className="font-mono text-2xs">{"\\y"}</span> instead.
                 </>
               )}
-            </div>
+            </Notice>
           )}
         </div>
       </Card>
@@ -275,23 +283,26 @@ export default function ChatPatterns() {
       ) : (
         <Table head={["Label", "Pattern", "State", "Added by", "Added", ""]}>
           {rows.map((p) => (
-            <tr key={p.id} className={p.active ? "" : "opacity-60"}>
+            <tr key={p.id} className={p.active ? ROW_HOVER : `opacity-60 ${ROW_HOVER}`}>
               <td className="px-3 py-2 font-medium text-ink">{p.label}</td>
               <td className="px-3 py-2">
                 <code className="break-all font-mono text-xs text-ink-muted">{p.pattern}</code>
               </td>
               <td className="px-3 py-2">
-                {p.active ? <Badge tone="green" dot>active</Badge> : <Badge dot>inactive</Badge>}
+                {p.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
               </td>
               <td className="px-3 py-2 text-ink-muted">
-                {p.adder?.full_name || p.adder?.email || <span className="text-ink-faint">—</span>}
+                {p.adder?.full_name || p.adder?.email || (
+                  <span className="text-ink-ghost">unknown</span>
+                )}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-faint">
+              <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">
                 {format(new Date(p.created_at), "d MMM yyyy")}
               </td>
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-1.5">
                   <Button
+                    size="sm"
                     disabled={!writable || update.isPending}
                     onClick={() =>
                       update.mutate(
@@ -307,6 +318,7 @@ export default function ChatPatterns() {
                   </Button>
                   <Button
                     variant="danger"
+                    size="sm"
                     disabled={!writable || remove.isPending}
                     onClick={() => {
                       if (confirm(`Delete the pattern "${p.label}"? Deactivating is usually what you want.`)) {
@@ -322,6 +334,6 @@ export default function ChatPatterns() {
           ))}
         </Table>
       )}
-    </div>
+    </Page>
   );
 }

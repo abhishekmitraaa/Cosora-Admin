@@ -6,7 +6,7 @@ import { supabase, describeWriteError } from "@/lib/supabase";
 import { canSuspendAccounts, ROLE_LABELS } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import ReasonPicker from "./ReasonPicker";
-import { Badge, Button, Card, ErrorNote, Note, Spinner } from "./ui";
+import { Badge, Button, Card, ErrorNote, Note, Notice, SubHeading, Spinner } from "./ui";
 
 interface SuspensionRow {
   id: string;
@@ -134,17 +134,17 @@ export default function AccountStatus({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">Account status</h2>
         {suspended ? (
-          <Badge tone="red" dot>suspended</Badge>
+          <Badge tone="critical" dot>suspended</Badge>
         ) : (
-          <Badge tone="green" dot>active</Badge>
+          <Badge tone="positive" dot>active</Badge>
         )}
       </div>
 
       <p className="mb-3 text-xs leading-relaxed text-ink-muted">
-        This is <span className="font-mono text-[11px]">profiles.account_status</span> — the flag
-        buyer and vendor accounts share. It can only be changed through{" "}
-        <span className="font-mono text-[11px]">set_account_status()</span>, which records every
-        change on the <span className="font-mono text-[11px]">account_suspensions</span> ledger.
+        This is <span className="font-mono text-2xs">profiles.account_status</span>, the flag buyer
+        and vendor accounts share. It can only be changed through{" "}
+        <span className="font-mono text-2xs">set_account_status()</span>, which records every change
+        on the <span className="font-mono text-2xs">account_suspensions</span> ledger.
       </p>
 
       {/*
@@ -152,14 +152,14 @@ export default function AccountStatus({
         suspension is really enforced now, just not everywhere. Narrow the claim
         when the remaining surfaces are gated; do not broaden it before.
       */}
-      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
-        <span className="font-semibold">What suspending actually stops.</span> Chat and calling,
-        for real and server-side: <span className="font-mono text-[11px]">messages_insert</span>{" "}
-        requires the sender's account to be active, so a suspended account cannot send a message
-        even with the UI bypassed, and the call gate refuses in both directions. It does{" "}
-        <span className="font-medium">not</span> yet stop them posting RFQs, submitting quotes,
-        uploading products or running ads — those inserts are not gated on account status.
-      </div>
+      <Notice tone="caution" title="What suspending actually stops" className="mb-3 text-xs">
+        Chat and calling, for real and server-side:{" "}
+        <span className="font-mono text-2xs">messages_insert</span> requires the sender's account to
+        be active, so a suspended account cannot send a message even with the UI bypassed, and the
+        call gate refuses in both directions. It does <span className="font-semibold">not</span> yet
+        stop them posting RFQs, submitting quotes, uploading products or running ads: those inserts
+        are not gated on account status.
+      </Notice>
 
       {writable ? (
         <Button
@@ -181,19 +181,17 @@ export default function AccountStatus({
         </Button>
       ) : (
         <Note>
-          Suspending or reinstating an account requires the Super admin or Support role — you are
+          Suspending or reinstating an account requires the Super admin or Support role. You are
           signed in as {role ? ROLE_LABELS[role] : "no role"}, and{" "}
-          <span className="font-mono text-[11px]">set_account_status()</span> would refuse the call.
-          The suspension history is hidden for the same reason, so an empty list here is never
-          mistaken for "never suspended".
+          <span className="font-mono text-2xs">set_account_status()</span> would refuse the call. The
+          suspension history is hidden for the same reason, so an empty list here is never mistaken
+          for &ldquo;never suspended&rdquo;.
         </Note>
       )}
 
       {writable && (
         <div className="mt-4 border-t border-line pt-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            Suspension ledger
-          </h3>
+          <SubHeading className="mb-2">Suspension ledger</SubHeading>
           {history.isLoading ? (
             <p className="text-xs text-ink-faint">Loading…</p>
           ) : history.error ? (
@@ -203,11 +201,11 @@ export default function AccountStatus({
           ) : (
             <ul className="space-y-2">
               {history.data!.rows.map((s) => (
-                <li key={s.id} className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs">
+                <li key={s.id} className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-medium text-ink">{s.reason?.reason ?? "No reason recorded"}</span>
-                    {s.active ? <Badge tone="red">in force</Badge> : <Badge>lifted</Badge>}
-                    <Badge tone="slate">{s.source}</Badge>
+                    {s.active ? <Badge tone="critical">in force</Badge> : <Badge>lifted</Badge>}
+                    <Badge tone="neutral">{s.source}</Badge>
                   </div>
                   <div className="mt-1 text-ink-muted">
                     Suspended {format(new Date(s.suspended_at), "d MMM yyyy, HH:mm")}

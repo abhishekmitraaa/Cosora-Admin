@@ -7,15 +7,20 @@ import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import FlagLog from "@/components/FlagLog";
 import {
+  Attr,
+  AttrGrid,
   Badge,
   Button,
   Card,
   Empty,
   ErrorNote,
   Modal,
+  Notice,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  SkeletonList,
+  StatusBadge,
   Tabs,
   Textarea,
 } from "@/components/ui";
@@ -38,6 +43,9 @@ interface ProductRow {
   category: { name: string } | null;
   images: { url: string; position: number }[];
 }
+
+const SUBTITLE =
+  "Moderate vendor-submitted products. Approving publishes to buyers; rejecting requires a reason.";
 
 const TABS: { id: Status; label: string }[] = [
   { id: "under_review", label: "Queue (under review)" },
@@ -123,17 +131,23 @@ export default function Products() {
     );
   }
 
-  if (products.isLoading) return <Spinner />;
+  // A skeleton in the shape of the card list, rather than a spinner on an
+  // empty page: the layout does not jump when the rows land.
+  if (products.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Products" subtitle={SUBTITLE} />
+        <SkeletonList rows={3} height="h-32" />
+      </Page>
+    );
+  }
   if (products.error) return <ErrorNote message={(products.error as Error).message} />;
 
   const { rows, vendors } = products.data!;
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader
-        title="Products"
-        subtitle="Moderate vendor-submitted products. Approving publishes to buyers; rejecting requires a reason."
-      />
+    <Page>
+      <PageHeader title="Products" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "products")} />}
 
@@ -171,7 +185,7 @@ export default function Products() {
         title={`Reject "${rejecting?.name ?? ""}"`}
         onClose={() => setRejecting(null)}
       >
-        <p className="mb-2 text-sm text-slate-600">
+        <p className="mb-2 text-sm text-ink-muted">
           A reason is required. It's stored on the product and visible in the Rejected tab.
         </p>
         <Textarea
@@ -188,7 +202,7 @@ export default function Products() {
           </Button>
         </div>
       </Modal>
-    </div>
+    </Page>
   );
 }
 
@@ -211,11 +225,11 @@ function ProductCard({
   const images = [...(p.images ?? [])].sort((a, b) => a.position - b.position);
 
   return (
-    <Card>
+    <Card className="transition-shadow hover:shadow-card-hover">
       <div className="flex flex-wrap gap-4">
         <div className="flex flex-wrap gap-1.5">
           {images.length === 0 ? (
-            <div className="flex h-20 w-20 items-center justify-center rounded border border-dashed border-slate-300 text-xs text-slate-400 sm:h-24 sm:w-24">
+            <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-line-strong text-xs text-ink-faint sm:h-24 sm:w-24">
               No image
             </div>
           ) : (
@@ -224,48 +238,46 @@ function ProductCard({
                 key={img.url}
                 src={img.url}
                 alt=""
-                className="h-20 w-20 rounded border border-slate-200 object-cover sm:h-24 sm:w-24"
+                className="h-20 w-20 rounded-lg border border-line object-cover sm:h-24 sm:w-24"
               />
             ))
           )}
         </div>
 
         <div className="min-w-[240px] flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-slate-900">{p.name}</h3>
-            {p.status === "live" && <Badge tone="green" dot>live</Badge>}
-            {p.status === "rejected" && <Badge tone="red" dot>rejected</Badge>}
-            {p.status === "under_review" && <Badge tone="amber" dot>under review</Badge>}
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-section font-bold text-ink">{p.name}</h3>
+            <StatusBadge status={p.status} />
           </div>
 
-          <div className="mt-1 text-sm text-slate-700">
+          <div className="mt-1 text-sm tabular-nums text-ink-muted">
             {p.price_value != null ? `${p.currency}${p.price_value}` : "No price set"}
           </div>
 
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-3">
+          <AttrGrid cols={3}>
             <Attr label="Category" value={p.category?.name} />
             <Attr label="Fabric" value={p.fabric} />
             <Attr label="MOQ" value={p.moq} />
             <Attr label="GSM" value={p.gsm} />
             <Attr label="Colour" value={p.colour} />
-          </dl>
+          </AttrGrid>
 
           {/* Vendor context: who submitted this, and are they already trusted. */}
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2 text-xs text-slate-600">
-            <span className="font-medium text-slate-800">{vendor?.brand_name ?? "Unknown vendor"}</span>
-            {vendor?.city && <span>· {vendor.city}</span>}
-            {vendor?.is_verified ? <Badge tone="blue">verified</Badge> : <Badge>unverified</Badge>}
-            {vendor?.account_status === "suspended" && <Badge tone="red">suspended</Badge>}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-line pt-2.5 text-xs text-ink-muted">
+            <span className="font-medium text-ink">{vendor?.brand_name ?? "Unknown vendor"}</span>
+            {vendor?.city && <span>{vendor.city}</span>}
+            {vendor?.is_verified ? <Badge tone="info">verified</Badge> : <Badge>unverified</Badge>}
+            {vendor?.account_status === "suspended" && <Badge tone="critical">suspended</Badge>}
           </div>
 
           {p.status === "rejected" && p.rejection_reason && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
-              <span className="font-medium">Rejection reason:</span> {p.rejection_reason}
-            </div>
+            <Notice tone="critical" className="mt-2.5 text-xs">
+              <span className="font-semibold">Rejection reason.</span> {p.rejection_reason}
+            </Notice>
           )}
         </div>
 
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full flex-col gap-1.5 sm:w-36">
           {p.status !== "live" && (
             <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
               Approve
@@ -276,7 +288,9 @@ function ProductCard({
               {p.status === "live" ? "Pull down" : "Reject"}
             </Button>
           )}
-          <Button onClick={() => setShowLog((s) => !s)}>{showLog ? "Hide log" : "Flag / log"}</Button>
+          <Button variant="ghost" onClick={() => setShowLog((s) => !s)}>
+            {showLog ? "Hide log" : "Flag / log"}
+          </Button>
         </div>
       </div>
 
@@ -286,14 +300,5 @@ function ProductCard({
         </div>
       )}
     </Card>
-  );
-}
-
-function Attr({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <dt className="inline text-slate-400">{label}: </dt>
-      <dd className="inline text-slate-700">{value || "—"}</dd>
-    </div>
   );
 }

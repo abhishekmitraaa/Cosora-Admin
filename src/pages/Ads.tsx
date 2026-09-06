@@ -7,16 +7,23 @@ import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useAdminSession, useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import FlagLog from "@/components/FlagLog";
+import AdsMonitoring from "@/components/AdsMonitoring";
 import {
+  Attr,
+  AttrGrid,
   Badge,
   Button,
   Card,
   Empty,
   ErrorNote,
   Modal,
+  Note,
+  Notice,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  SkeletonList,
+  StatusBadge,
   Tabs,
   Textarea,
 } from "@/components/ui";
@@ -45,11 +52,25 @@ const TABS: { id: AdStatus; label: string }[] = [
   { id: "rejected", label: "Rejected" },
 ];
 
+/**
+ * Two views of the same section, not two sections.
+ *
+ * Monitoring is aggregate and read-only; moderation is per-campaign and writes.
+ * They share the `ads` role gate exactly, because they read the same table -
+ * nothing was added to roles.ts for this. The switch is a segmented control
+ * above the page rather than a nav entry, so the rail does not grow an item
+ * that leads to the same place.
+ */
+type View = "moderation" | "monitoring";
+
+const SUBTITLE = "Post-publish moderation. Take down a live campaign and record why.";
+
 export default function Ads() {
   const role = useRole();
   const { identity } = useAdminSession();
   const qc = useQueryClient();
   const writable = canWrite(role, "ads");
+  const [view, setView] = useState<View>("moderation");
   const [tab, setTab] = useState<AdStatus>("active");
   const [action, setAction] = useState<{ ad: AdRow; next: "paused" | "rejected" } | null>(null);
   const [reason, setReason] = useState("");
@@ -121,17 +142,38 @@ export default function Ads() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (ads.isLoading) return <Spinner />;
+  const header = (
+    <PageHeader
+      title="Ads"
+      subtitle={view === "moderation" ? SUBTITLE : "Delivery and revenue across every campaign."}
+      actions={<ViewSwitch value={view} onChange={setView} />}
+    />
+  );
+
+  if (view === "monitoring") {
+    return (
+      <Page width="wide">
+        {header}
+        <AdsMonitoring />
+      </Page>
+    );
+  }
+
+  if (ads.isLoading) {
+    return (
+      <Page>
+        {header}
+        <SkeletonList rows={3} height="h-40" />
+      </Page>
+    );
+  }
   if (ads.error) return <ErrorNote message={(ads.error as Error).message} />;
 
   const { rows, vendors } = ads.data!;
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader
-        title="Ads"
-        subtitle="Post-publish moderation. Take down a live campaign and record why."
-      />
+    <Page>
+      {header}
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "ads")} />}
 
@@ -140,19 +182,17 @@ export default function Ads() {
         oversight: money has already changed hands by the time an ad exists, so
         there is no pre-publish approval step and none was added here.
       */}
-      <Card className="mb-4 border-slate-200 bg-slate-50">
-        <p className="text-xs text-slate-600">
-          <span className="font-semibold">No pre-publish gate.</span> Ads still auto-publish on
-          payment, exactly as before — this screen is a takedown tool for campaigns that are already
-          live. <span className="font-medium">Pausing</span> stops serving immediately, but the
-          vendor can resume it themselves from their dashboard.{" "}
-          <span className="font-medium">Rejecting</span> also stops serving and the vendor{" "}
-          <span className="font-medium">cannot</span> reactivate it (the{" "}
-          <span className="font-mono text-[11px]">guard_ad_activation</span> trigger only allows
-          reactivation from <span className="font-mono text-[11px]">paused</span>). Use reject for
-          anything that must stay down.
-        </p>
-      </Card>
+      <Note className="mb-4">
+        <span className="font-semibold text-ink">No pre-publish gate.</span> Ads still auto-publish on
+        payment, exactly as before. This screen is a takedown tool for campaigns that are already
+        live. <span className="font-medium text-ink">Pausing</span> stops serving immediately, but the
+        vendor can resume it themselves from their dashboard.{" "}
+        <span className="font-medium text-ink">Rejecting</span> also stops serving and the vendor{" "}
+        <span className="font-medium text-ink">cannot</span> reactivate it (the{" "}
+        <span className="font-mono text-2xs">guard_ad_activation</span> trigger only allows
+        reactivation from <span className="font-mono text-2xs">paused</span>). Use reject for anything
+        that must stay down.
+      </Note>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -182,7 +222,7 @@ export default function Ads() {
         title={action?.next === "paused" ? `Pause "${action?.ad.title}"` : `Reject "${action?.ad.title}"`}
         onClose={() => setAction(null)}
       >
-        <p className="mb-2 text-sm text-slate-600">
+        <p className="mb-3 text-sm text-ink-muted">
           {action?.next === "paused"
             ? "Pausing stops serving now. The vendor can resume this campaign themselves."
             : "Rejecting stops serving now. The vendor cannot reactivate it."}{" "}
@@ -195,7 +235,7 @@ export default function Ads() {
           placeholder="Why is this campaign being taken down?"
           onChange={(e) => setReason(e.target.value)}
         />
-        <div className="mt-3 flex justify-end gap-2">
+        <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => setAction(null)}>Cancel</Button>
           <Button
             variant="danger"
@@ -208,6 +248,33 @@ export default function Ads() {
           </Button>
         </div>
       </Modal>
+    </Page>
+  );
+}
+
+/** Segmented control. Same shape as the theme toggle, so it reads as a switch. */
+function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => void }) {
+  const options: { id: View; label: string }[] = [
+    { id: "moderation", label: "Moderation" },
+    { id: "monitoring", label: "Monitoring" },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Ads view" className="flex gap-0.5 rounded-lg border border-line bg-surface-2 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          role="radio"
+          aria-checked={value === o.id}
+          onClick={() => onChange(o.id)}
+          className={
+            value === o.id
+              ? "rounded-md bg-surface px-3 py-1 text-xs font-medium text-ink shadow-xs"
+              : "rounded-md px-3 py-1 text-xs font-medium text-ink-faint transition-colors hover:text-ink"
+          }
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -230,42 +297,45 @@ function AdCard({
   const [showLog, setShowLog] = useState(false);
 
   return (
-    <Card>
+    <Card className="transition-shadow hover:shadow-card-hover">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[260px] flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-slate-900">{a.title}</h3>
-            {a.status === "active" && <Badge tone="green" dot>active</Badge>}
-            {a.status === "paused" && <Badge tone="amber" dot>paused</Badge>}
-            {a.status === "rejected" && <Badge tone="red" dot>rejected</Badge>}
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-section font-bold text-ink">{a.title}</h3>
+            <StatusBadge status={a.status} />
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-            <span className="font-medium text-slate-800">{vendor?.brand_name ?? "Unknown vendor"}</span>
-            {vendor?.city && <span>· {vendor.city}</span>}
-            {vendor?.account_status === "suspended" && <Badge tone="red">vendor suspended</Badge>}
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+            <span className="font-medium text-ink">{vendor?.brand_name ?? "Unknown vendor"}</span>
+            {vendor?.city && <span>{vendor.city}</span>}
+            {vendor?.account_status === "suspended" && (
+              <Badge tone="critical">vendor suspended</Badge>
+            )}
           </div>
 
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-4">
+          <AttrGrid cols={4}>
             <Attr label="Placement" value={a.placement} />
             <Attr label="Daily budget" value={a.daily_budget != null ? `₹${a.daily_budget}` : null} />
-            <Attr label="Impressions" value={String(a.impressions)} />
-            <Attr label="Clicks" value={String(a.clicks)} />
+            <Attr label="Impressions" value={a.impressions.toLocaleString("en-IN")} />
+            <Attr label="Clicks" value={a.clicks.toLocaleString("en-IN")} />
             <Attr label="Starts" value={a.starts_at ? format(new Date(a.starts_at), "d MMM yyyy") : null} />
             <Attr label="Ends" value={a.ends_at ? format(new Date(a.ends_at), "d MMM yyyy") : null} />
-          </dl>
+          </AttrGrid>
 
           {a.moderation_reason && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">
-              <span className="font-medium">Takedown reason:</span> {a.moderation_reason}
+            <Notice tone="critical" className="mt-2.5 text-xs">
+              <span className="font-semibold">Takedown reason.</span> {a.moderation_reason}
               {a.moderated_at && (
-                <span className="text-red-600"> · {format(new Date(a.moderated_at), "d MMM yyyy, HH:mm")}</span>
+                <span className="opacity-80">
+                  {" "}
+                  ({format(new Date(a.moderated_at), "d MMM yyyy, HH:mm")})
+                </span>
               )}
-            </div>
+            </Notice>
           )}
         </div>
 
-        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+        <div className="flex w-full flex-col gap-1.5 sm:w-40">
           {a.status === "active" && (
             <>
               <Button disabled={!writable || busy} onClick={() => onAct("paused")}>
@@ -291,7 +361,9 @@ function AdCard({
               Restore to active
             </Button>
           )}
-          <Button onClick={() => setShowLog((s) => !s)}>{showLog ? "Hide log" : "Flag / log"}</Button>
+          <Button variant="ghost" onClick={() => setShowLog((s) => !s)}>
+            {showLog ? "Hide log" : "Flag / log"}
+          </Button>
         </div>
       </div>
 
@@ -301,14 +373,5 @@ function AdCard({
         </div>
       )}
     </Card>
-  );
-}
-
-function Attr({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <dt className="inline text-slate-400">{label}: </dt>
-      <dd className="inline text-slate-700">{value || "—"}</dd>
-    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { fetchActiveBlockReasons } from "@/lib/chat";
-import { Button, ErrorNote, Modal, Select, Spinner } from "./ui";
+import { Button, Checkbox, ErrorNote, Field, Modal, Notice, Select, Spinner } from "./ui";
 
 /**
  * The one reason picker, shared by the review queue's block actions and the
@@ -68,43 +68,44 @@ export default function ReasonPicker({
       ) : reasons.error ? (
         <ErrorNote message={(reasons.error as Error).message} />
       ) : options.length === 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
+        <Notice tone="caution">
           There are no active block reasons, so no suspension can be recorded. A super admin has to
           add one on the{" "}
           <Link to="/chat-reasons" className="font-medium underline">
             Block reasons
           </Link>{" "}
           page first.
-        </div>
+        </Notice>
       ) : (
         <>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">Reason</label>
-          <Select value={reasonId} onChange={(e) => setReasonId(e.target.value)} autoFocus>
-            <option value="">Select a reason…</option>
-            {options.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.reason}
-              </option>
-            ))}
-          </Select>
-          <p className="mt-2 text-xs text-ink-faint">
-            Recorded on the account_suspensions ledger with your id and the time. It is the only
-            record of why this happened.
-          </p>
+          <Field
+            label="Reason"
+            htmlFor="block-reason"
+            hint="Recorded on the account_suspensions ledger with your id and the time. It is the only record of why this happened."
+          >
+            <Select
+              id="block-reason"
+              value={reasonId}
+              onChange={(e) => setReasonId(e.target.value)}
+              autoFocus
+            >
+              <option value="">Select a reason…</option>
+              {options.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.reason}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
           {resumeOption && (
-            <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas px-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={resume}
-                onChange={(e) => setResume(e.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-current"
-              />
-              <span className="text-xs leading-relaxed">
-                <span className="font-medium text-ink">{resumeOption.label}</span>
-                <span className="mt-0.5 block text-ink-faint">{resumeOption.hint}</span>
-              </span>
-            </label>
+            <Checkbox
+              className="mt-3"
+              checked={resume}
+              onChange={(e) => setResume(e.target.checked)}
+              label={resumeOption.label}
+              hint={resumeOption.hint}
+            />
           )}
         </>
       )}

@@ -75,6 +75,27 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 
 `support` can additionally write the flagged-items log (`admin_flags`).
 
+The Phase-4 sections sit alongside these, and the difference in what is behind
+them matters. `geography` reads the same `vendor_profiles` rows the Vendors table
+lists, so its gate mirrors that one exactly and the database is already enforcing
+it. The five dev-seed sections have no table yet, so `roles.ts` is UX in a
+stronger sense there than anywhere else in this file: **there is nothing behind
+those gates enforcing anything.** See "Phase-4 sections" below.
+
+| Role | Geography | Content | Payments | Certificates | Discounts | Customers | Live Activity |
+|---|---|---|---|---|---|---|---|
+| `super_admin` | read | **write** | **write** | **write** | **write** | read | read |
+| `product_moderator` | – | – | – | – | – | – | read |
+| `vendor_ops` | read | – | – | – | – | – | read |
+| `ads_moderator` | – | – | – | – | – | – | read |
+| `finance_admin` | – | – | **write** | – | **write** | read | read |
+| `support` | read | – | read | – | – | read | read |
+
+Ads → Monitoring is not a section: it is a second view inside `ads` and inherits
+that gate unchanged. `certificates` should also be readable and writable by
+`delivery_team`; that role does not exist in the `admin_role_type` enum yet, and
+`roles.ts` says where to add it.
+
 **Videos** (Video Closeups) is a sibling of Products, not a sub-tab: a different table
 (`product_videos`) with its own RLS policies and its own BEFORE trigger
 (`trg_product_videos_moderation`, which mirrors `enforce_products_moderation` clause for
@@ -133,6 +154,264 @@ and `vendor_profiles` has one admin field left: `is_verified`.
 
 ---
 
+## Phase-4 sections
+
+Eight additions. Two read real rows, five render a development-only fixture, and
+one is a link to somebody else's product.
+
+| Section | Data | `SECTION_READ` | `SECTION_WRITE` |
+|---|---|---|---|
+| Ads → Monitoring | **real** | *(inherits `ads`)* | *(inherits `ads`)* |
+| `geography` | **real** | `super_admin`, `vendor_ops`, `support` | none |
+| `content` | dev-seed | `super_admin` | `super_admin` |
+| `payments` | dev-seed | `super_admin`, `finance_admin`, `support` | `super_admin`, `finance_admin` |
+| `certificates` | dev-seed | `super_admin` *(see below)* | `super_admin` *(see below)* |
+| `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
+| `customers` | dev-seed | `super_admin`, `support`, `finance_admin` | none |
+| `traction` | external link | all roles | none |
+
+**Read the gates on the dev-seed rows differently from the rest of this file.**
+`roles.ts` is UX everywhere, and the database is the real gate — but for those
+five sections there is no database behind them yet, so there is nothing enforcing
+anything. Do not read a gate there as evidence a write is protected. Phase 2
+creates the tables and their RLS at the same time.
+
+### Ads monitoring: what this schema can and cannot tell you
+
+`src/lib/adsAnalytics.ts` carries the long version. Two of the three figures the
+brief asked for do not exist:
+
+- **There is no running spend, and it cannot be derived from delivery.** Cosora
+  ads are not auction-priced. `razorpay-create-order` charges
+  `AD_PRICE[placement] × days × items` up front, a flat rupee rate per placement
+  per day. There is no CPM, no CPC and no per-impression cost anywhere in the
+  codebase, so `impressions × rate` is not a spend figure, it is a made-up one.
+  An impression costs the vendor nothing: they already paid for the slot.
+
+  `advertisements.daily_budget` **looks like a cap and is not one.** It is
+  written once by `razorpay-verify-payment` as `prepaidTotal / days`, a *display*
+  figure derived from money that already moved. Nothing decrements it, no trigger
+  checks it, and delivery does not stop when it is "used up" — `active_ads`
+  filters on status alone.
+
+  So "booked today" on that screen is **revenue** from paid `ad_orders`
+  (remember: `ad_orders.amount` is **paise**), and the bars are a **schedule
+  burn-down** of a prepaid campaign. Both are labelled as exactly that on screen,
+  with the reason stated above the fold.
+
+- **There is no conversions column.** `advertisements` has `impressions` and
+  `clicks` and nothing else, and no table links a campaign to an RFQ, a quote or
+  an order. A "clicks with zero conversions" ratio is not computable. The flags
+  report served-and-never-clicked and served-and-effectively-ignored instead, and
+  the panel says plainly that those are not conversion metrics.
+
+- **`ad_orders` cannot be joined to `advertisements`.** The order carries a
+  `spec` JSON; the rows it produced carry no order id. Revenue is therefore
+  reported at platform level only, never per campaign.
+
+CTR of a campaign with zero impressions is `null`, not `0%` — a campaign never
+served and a campaign served ten thousand times and ignored are opposite
+problems, and unmeasured vendors sort *last* rather than beside genuinely poor
+ones.
+
+### Geography: how a vendor gets a coordinate
+
+MapLibre GL 5 with OpenStreetMap raster tiles and no API key. (Google's Maps
+JavaScript Heatmap Layer is deprecated and unavailable, so it was not an option
+regardless of preference. Set `VITE_MAP_STYLE_URL` to use a keyed vector style
+instead; nothing else changes.)
+
+`vendor_profiles` stores `city` and `state` as free text and has no latitude,
+longitude or PIN centroid, and there is no geocoder wired into this project. So
+`src/lib/geo.ts` resolves the text against a static gazetteer of India's textile
+clusters and metros, in three tiers, **and the tier is reported**:
+
+| Tier | Meaning |
+|---|---|
+| `city` | The city matched. The point is where the city is. |
+| `state` | Only the state matched, so the vendor sits on the **state centroid**. Marked `approximate` on screen: a cluster in open scrub is this fallback, not a finding. |
+| unplaced | Neither matched. Counted and listed by name, **never dropped** — "we could not read the address" must not look like "nobody is there". |
+
+Adding a missing town is two lines in `geo.ts`. The unplaced table is the signal
+for which.
+
+This is the only lazily-loaded route in the app: maplibre is roughly a third of
+the JavaScript and three of six roles cannot see the section.
+
+### Dev-seed data: the rule and the trap
+
+Following `textile-spark-net/src/lib/notificationsStore.ts` and the project's
+"no mock data in production" rule, each store in `src/lib/devSeed/` is seeded in
+a development build and `[]` in a production one, and every seeded screen carries
+a `<DevSeedBanner>` so nothing is mistaken for a real Cosora figure.
+
+**The gate must be at the declaration site.** With the check only inside the
+shared `createDevStore`, Rollup inlined three of the five call sites and kept the
+other two, and the banner and discount fixtures shipped in the production bundle.
+`devSeed(SEED)` folds to `[]` at build time and the array beside it is dropped.
+After any change there:
+
+```bash
+npm run build
+grep -c "TIRUPPUR500\|banner-seed-1\|txn-seed-01\|cert-seed-01\|cust-seed-01" dist/assets/*.js   # must be 0
+```
+
+### Certificates is built on an unconfirmed decision
+
+⚠ **Pending Andy's confirmation.** The screen assumes the verification
+certificate is a *physical printed article that gets couriered*: the print step,
+the courier, the tracking number, the delivery address and the returned tab all
+follow from that. If it is a digital badge, the tabs collapse to issued/revoked
+and most of the screen comes out. Said on the screen itself, not just here.
+
+What exists today is only the purchase: `verifiedCertificate` is a real ₹199 ad
+placement and buying it grants a time-bound seal via `ad_verified_until`. No
+certificate row, status, address snapshot or tracking number is modelled
+anywhere.
+
+**`delivery_team` does not exist in the `admin_role_type` enum**, so the section
+is gated to `super_admin` alone. Naming a role nobody can hold would be worse
+than the narrow gate. `roles.ts` carries the note on exactly where to add it in
+both maps once Phase 2 creates it.
+
+### Payments: the Live strip does not animate
+
+There is no Realtime subscription anywhere in this repo and no table behind the
+screen, so a ticking animation would be theatre an admin would reasonably read as
+money arriving right now. The strip renders the most recent rows once, and its
+status chip says "not live yet, no subscription attached".
+
+It takes its rows as a prop and does no fetching of its own, so Phase 2 attaches
+a Supabase Realtime channel to its **parent** and the component is unchanged.
+
+`reports` keeps its KPI view untouched. The ledger is seeded rather than derived
+from `subscription_invoices` + `ad_orders` because those are two tables with two
+currency units (rupees vs paise) and two status vocabularies; deriving it
+client-side would mean this screen silently disagreeing with Reports the first
+time either changed. Phase 2 wants one `transactions` table in **one** unit.
+
+### Live Activity is a link, not a feature
+
+Microsoft Clarity, and only one analytics tool: two scripts on the buyer site
+means two consent banners, two sets of numbers that disagree in meetings, and
+twice the page weight on the mobile connections this marketplace actually runs
+on. Clarity over PostHog because it is free with no event cap (a video feed
+generates a lot of events) and session recordings are the core product, which is
+what "where in the RFQ form do vendors give up" actually needs. PostHog is the
+better answer if the need turns out to be funnels and cohorts; switching is one
+URL plus the snippet on the buyer site.
+
+**No iframe.** Clarity sends `X-Frame-Options: SAMEORIGIN` and sits behind a
+separate Microsoft login, so an embed renders an empty box or a sign-in screen —
+worse than an honest link. There is no visitor tracking, no new table and no
+query in this repo for it.
+
+Set `VITE_CLARITY_PROJECT_ID` here and add the Clarity snippet to
+textile-spark-net's `index.html`. Until both are done the page says so and the
+links go to the Clarity project list.
+
+---
+
+## The design system
+
+One token set, two modes, and no page defines a colour.
+
+`src/index.css` holds every colour as a CSS variable containing an `R G B`
+triplet; `tailwind.config.js` reads them through
+`rgb(var(--token) / <alpha-value>)` so `bg-surface/70` still works. Dark mode is
+that same set redefined once, under both `[data-theme="dark"]` and
+`prefers-color-scheme`, so no component carries a `dark:` variant and the two
+modes cannot drift apart.
+
+Before this, half the screens wrote `text-slate-600` and the other half wrote
+`text-ink-muted`. That is the whole reason the app could not have a dark mode,
+and `scripts/copy-audit.mjs` now fails on any raw Tailwind palette colour.
+
+### The rules
+
+| Lock | Rule |
+|---|---|
+| **One accent** | Near-black in light, near-white in dark. The same `brand` token: a near-black accent is invisible on a near-black ground. Status tones are *state*, never accent, and never decoration. |
+| **One radius scale** | 4 dots / 6 badges / 8 controls / 12 containers / 16 overlays. Documented in `tailwind.config.js`. No pill buttons. |
+| **One type scale** | 11 / 12 / 14 / 15 / 16 / 24 / 28, named `2xs`, `xs`, `sm`, `section`, `base`, `title`, `metric`. Arbitrary sizes fail the copy audit. |
+| **No pure black or white** | `#fcfcfd` and `#0e0e11` are the extremes. Pure values flatten depth. |
+| **WCAG AA everywhere** | Measured, not claimed. See below. |
+
+### Theme control
+
+Light / Dark / **System**, in the rail footer. Three states, not two: an admin
+who has never touched it follows their OS, and one who explicitly picked Light
+keeps Light on a machine that goes dark at 18:00. "System" *removes* the
+attribute rather than setting one, so the media query decides and no listener is
+needed. `initTheme()` runs in `main.tsx` before React renders, so a dark-mode
+admin never sees a frame of light chrome.
+
+Recharts and MapLibre take colours as strings and cannot read a class, so they
+call `tokenColor()` (`src/lib/theme.ts`), which reads the live computed value of
+the same variable. That is deliberate: hardcoding a second palette for charts is
+exactly how the light and dark modes drift apart.
+
+### Contrast is measured
+
+```bash
+npm run build && npx vite preview --port 4174
+node scripts/theme-contrast-check.mjs   # 91 checks, both modes
+```
+
+It walks every token in both modes (failing on any the dark block forgot, which
+otherwise silently inherits the light value), then computes the real ratio for
+every foreground/background pair the app actually uses. It found four genuine
+failures on its first run, all fixed rather than waived:
+
+- `ink-faint` was **4.27:1** on the page ground, and it is the colour of every
+  `<dt>` label in the app.
+- The caution status dot was **2.87:1**, under the 3:1 WCAG asks of a non-text
+  indicator.
+- Input and outline-button borders were **1.3:1**. `line` / `line-strong` are
+  decorative grouping hairlines and are allowed to be quiet, so `line-control`
+  was added at 3:1 for borders that *identify* a control (WCAG 1.4.11); card
+  edges kept the light one.
+- The destructive button's red could not carry white text at 4.5:1, so `danger`
+  is its own token pair rather than the `critical` status tint.
+
+`ink-ghost` is the one sub-AA token and is reserved for disabled controls and
+"not set" fallbacks. It is never used for text carrying meaning.
+
+### Copy and token audit
+
+```bash
+node scripts/copy-audit.mjs
+```
+
+Fails on an em-dash or en-dash in user-visible text, a raw Tailwind palette
+colour, or an arbitrary font size. It strips comments properly first, so the
+reasoning this codebase is written around can use whatever punctuation it likes.
+
+### The component kit
+
+`src/components/ui.tsx` is the only place a surface is defined. If a page needs
+a colour the tokens do not cover, the token set is what is missing.
+
+`Page` `Stack` `Panel` `Card` `Field` `Input` `Select` `Textarea` `Checkbox`
+`Button` `Badge` `StatusBadge` `Notice` `Note` `ReadOnlyBanner` `DevSeedBanner`
+`Empty` `SkeletonList` `Modal` `Table` `Tabs` `Attr` `AttrGrid` `DataField`
+`Stat` `Meter` `PageHeader` `SubHeading` `ThemeToggle` `Logo` `AuthLayout`
+
+`StatusBadge` maps every status string this app renders to one tone, so "paid"
+is the same green on the invoice table and the payments ledger. Products, Ads
+and Videos each used to ship a private `Attr` and the three had already
+diverged.
+
+### Navigation
+
+Five collapsible groups (Moderation, People, Commerce, Insight, Settings)
+rather than a twenty-item scroll. **Every route and every label is unchanged** -
+only the grouping is new. The group holding the current route is always
+expanded; the rest remember their state in `localStorage`. A group whose items
+are all hidden by role renders nothing, heading included.
+
+---
+
 ## Verifying the gates
 
 Two scripts drive the **real database with real logins** (anon key + password, so
@@ -173,6 +452,17 @@ node scripts/vendor-columns-check.mjs
 # 4. Browser smoke: nav + read-only banner + disabled actions per role.
 npm run build && npx vite preview --port 4174
 node scripts/smoke.mjs
+
+# 4b. The design system. Needs the preview server from step 4 up.
+#     Walks every token in BOTH modes (a token the dark block forgot does not
+#     throw, it silently inherits the light value) and computes the real WCAG
+#     ratio for every fg/bg pair the app uses. 91 checks.
+node scripts/theme-contrast-check.mjs
+
+# 4c. Source-level copy audit. No server needed. Fails on an em-dash in
+#     user-visible text, a raw Tailwind palette colour, or an arbitrary font
+#     size. Strips comments first, so the reasoning in this codebase is exempt.
+node scripts/copy-audit.mjs
 
 # 5. ALWAYS clean up — these are admin logins with a known password.
 scripts/drop-test-admins.sql
@@ -250,6 +540,7 @@ silent and expensive:
 | 6 — Subscriptions & billing | **Plan change / cancel working. Refunds cannot execute on this project — Razorpay keys are not set.** |
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
 | Phase 3 — Chat moderation (7 screens) | **Working.** Review queue with pending + four audit tabs, thread transcript with the flagged-items log, keyword blocklist, flag patterns (with a live Postgres-side pattern test), block reasons, and Accounts. `resolve_conversation_review()` is applied and verified end to end against the live project (16/16). Support/super_admin only; verified with real logins by `scripts/chat-moderation-matrix.mjs`. |
+| Phase 4 — Design system + eight new sections | **UI complete.** Every existing screen redesigned onto one token set with a real dark mode, and **zero behaviour change**, verified by extracting all 340 data-layer statements across the 26 touched files before and after and comparing them (identical, bar one em-dash inside an error string). `scripts/theme-contrast-check.mjs` passes 91 checks in both modes after fixing four real WCAG failures it found; `scripts/copy-audit.mjs` passes. **Real data, working now:** Ads → Monitoring and Geography. **UI only, on a development fixture until Phase 2 creates their tables:** Site content, Payments, Certificates, Discounts, Customers — all gated, routed and navigable now, and empty in a production build (verified by grepping the bundle). **Live Activity** is an external Clarity link and needs `VITE_CLARITY_PROJECT_ID` plus the snippet on the buyer site. **Certificates is built pending Andy's confirmation** that the certificate is physical. Not yet exercised with a real login: no admin credentials were available this session, so the role gates on the new sections are asserted from `roles.ts` rather than driven in a browser — run `scripts/smoke.mjs` after seeding throwaway admins to close that. |
 
 ## Inviting admins by email (`admin-invite`)
 

@@ -11,12 +11,27 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Boxes, IndianRupee, Layers, Store, type LucideIcon } from "lucide-react";
+import { Boxes, IndianRupee, Layers, Store } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { Badge, Card, Empty, ErrorNote, PageHeader, Spinner, Table } from "@/components/ui";
+import { tokenColor, useResolvedTheme } from "@/lib/theme";
+import {
+  Badge,
+  Empty,
+  ErrorNote,
+  Note,
+  Page,
+  PageHeader,
+  Panel,
+  ROW_HOVER,
+  SkeletonList,
+  Spinner,
+  Stack,
+  Stat,
+  Table,
+} from "@/components/ui";
 
 /**
- * Part 7 — reporting, from real rows only.
+ * Part 7 - reporting, from real rows only.
  *
  * Two unit traps are handled here, both verified against the edge functions that
  * write the rows:
@@ -25,16 +40,42 @@ import { Badge, Card, Empty, ErrorNote, PageHeader, Spinner, Table } from "@/com
  * Summing them naively would overstate ad revenue by 100x.
  */
 
-// Single-series charts throughout, so there is no categorical palette to collide:
-// monochrome graphite for magnitude, and the reserved status palette (always
-// paired with a text label, never colour alone) for product state.
-const SERIES_INK = "#26262a";
-const STATUS_COLOR: Record<string, string> = {
-  live: "#0ca30c", // good
-  under_review: "#fab219", // warning
-  draft: "#94a3b8", // neutral — not a status signal
-  rejected: "#d03b3b", // critical
-};
+/**
+ * CHART COLOURS COME FROM THE TOKEN SET, NOT FROM A SECOND PALETTE.
+ *
+ * Recharts takes colours as string props, so it cannot read a Tailwind class.
+ * The obvious shortcut is to hardcode hexes here, and that is exactly how a
+ * chart ends up rendering graphite gridlines on a near-black ground in dark
+ * mode. `tokenColor()` reads the live computed value of the same CSS variable
+ * the rest of the app uses, and `useResolvedTheme()` is what re-runs it when
+ * the mode flips.
+ *
+ * Single-series charts throughout, so there is no categorical palette to
+ * collide: monochrome for magnitude, and the reserved status tones (always
+ * paired with a text label, never colour alone) for product state.
+ */
+function useChartInk() {
+  // Subscribing to the resolved theme is the point of this line: it forces a
+  // re-render on the mode change, after which the reads below return the new
+  // values. The variable itself is deliberately unused.
+  useResolvedTheme();
+  return {
+    series: tokenColor("viz-series"),
+    grid: tokenColor("viz-grid"),
+    axis: tokenColor("viz-axis"),
+    axisText: tokenColor("ink-faint"),
+    surface: tokenColor("surface"),
+    line: tokenColor("line"),
+    ink: tokenColor("ink"),
+    hover: tokenColor("surface-2"),
+    status: {
+      live: tokenColor("tone-positive-dot"),
+      under_review: tokenColor("tone-caution-dot"),
+      draft: tokenColor("tone-neutral-dot"),
+      rejected: tokenColor("tone-critical-dot"),
+    } as Record<string, string>,
+  };
+}
 
 interface ReportData {
   vendorCount: number;
@@ -47,7 +88,11 @@ interface ReportData {
   topVendors: { id: string; brand: string; plan: string; boost: number; active: boolean }[];
 }
 
+const SUBTITLE = "Read-only. Every figure is computed from live rows.";
+
 export default function Reports() {
+  const ink = useChartInk();
+
   const report = useQuery({
     queryKey: ["reports"],
     queryFn: async (): Promise<ReportData> => {
@@ -82,7 +127,7 @@ export default function Reports() {
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count);
 
-      // Revenue — paid rows only, both sources normalised to rupees.
+      // Revenue - paid rows only, both sources normalised to rupees.
       const byDay = new Map<string, { subscriptions: number; ads: number }>();
       const bump = (iso: string, key: "subscriptions" | "ads", rupees: number) => {
         const day = iso.slice(0, 10);
@@ -170,200 +215,229 @@ export default function Reports() {
     },
   });
 
-  if (report.isLoading) return <Spinner />;
+  if (report.isLoading) {
+    return (
+      <Page>
+        <PageHeader title="Reports" subtitle={SUBTITLE} />
+        <SkeletonList rows={3} height="h-48" />
+      </Page>
+    );
+  }
   if (report.error) return <ErrorNote message={(report.error as Error).message} />;
 
   const d = report.data!;
   const totalRevenue = d.subscriptionRevenue + d.adRevenue;
 
+  // One tooltip treatment for both charts, on tokens, so the popup does not
+  // stay white when the page goes dark.
+  const tooltipStyle = {
+    background: ink.surface,
+    border: `1px solid ${ink.line}`,
+    borderRadius: "0.5rem",
+    color: ink.ink,
+    fontSize: 12,
+  } as const;
+
   return (
-    <div className="max-w-5xl">
-      <PageHeader title="Reports" subtitle="Read-only. Every figure is computed from live rows." />
+    <Page>
+      <PageHeader title="Reports" subtitle={SUBTITLE} />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat icon={Store} label="Vendors" value={String(d.vendorCount)} />
-        <Stat
-          icon={Boxes}
-          label="Products"
-          value={String(d.productsByStatus.reduce((s, x) => s + x.count, 0))}
-        />
-        <Stat icon={IndianRupee} label="Revenue (all time)" value={`₹${totalRevenue.toLocaleString("en-IN")}`} />
-        <Stat icon={Layers} label="Categories in use" value={String(d.categories.length)} />
-      </div>
-
-      <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Products by status</h2>
-        <div className="flex flex-wrap gap-2">
-          {d.productsByStatus.map((s) => (
-            <div key={s.status} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2">
-              {/* colour + label, never colour alone */}
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: STATUS_COLOR[s.status] ?? "#94a3b8" }}
-                aria-hidden
-              />
-              <span className="text-sm text-slate-700">{s.status.replace("_", " ")}</span>
-              <span className="text-sm font-semibold text-slate-900">{s.count}</span>
-            </div>
-          ))}
+      <Stack>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat icon={<Store size={18} />} label="Vendors" value={String(d.vendorCount)} />
+          <Stat
+            icon={<Boxes size={18} />}
+            label="Products"
+            value={String(d.productsByStatus.reduce((s, x) => s + x.count, 0))}
+          />
+          <Stat
+            icon={<IndianRupee size={18} />}
+            label="Revenue, all time"
+            value={`₹${totalRevenue.toLocaleString("en-IN")}`}
+          />
+          <Stat icon={<Layers size={18} />} label="Categories in use" value={String(d.categories.length)} />
         </div>
-      </Card>
 
-      <Card className="mb-4">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Revenue over time</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          Paid subscription invoices (incl. GST) plus paid ad orders, by day.{" "}
-          {d.adOrderCount === 0 && (
-            <span className="text-amber-700">
-              No paid ad orders exist yet, so this is subscription revenue only.
-            </span>
-          )}
-        </p>
-
-        {d.revenueByDay.length === 0 ? (
-          <Empty>No paid invoices or ad orders yet.</Empty>
-        ) : d.revenueByDay.length === 1 ? (
-          // One day of data is not a trend; a line would imply movement that
-          // isn't there, so state the figure instead.
-          <div className="rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            All revenue to date falls on a single day (
-            {format(new Date(d.revenueByDay[0].day), "d MMM yyyy")}):{" "}
-            <span className="font-semibold">₹{d.revenueByDay[0].total.toLocaleString("en-IN")}</span>. A
-            trend line needs at least two days of activity.
-          </div>
-        ) : (
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={d.revenueByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid stroke="#e2e8f0" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  tickFormatter={(v: string) => format(new Date(v), "d MMM")}
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  stroke="#cbd5e1"
-                />
-                <YAxis tick={{ fontSize: 11, fill: "#64748b" }} stroke="#cbd5e1" width={48} />
-                <Tooltip
-                  formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
-                  labelFormatter={(v: string) => format(new Date(v), "d MMM yyyy")}
-                />
-                <Line type="monotone" dataKey="total" stroke={SERIES_INK} strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        <div className="mt-3 flex gap-6 border-t border-slate-100 pt-3 text-sm">
-          <div>
-            <div className="text-xs text-slate-400">Subscriptions</div>
-            <div className="font-semibold text-slate-900">
-              ₹{d.subscriptionRevenue.toLocaleString("en-IN")}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">Ads ({d.adOrderCount} paid orders)</div>
-            <div className="font-semibold text-slate-900">₹{d.adRevenue.toLocaleString("en-IN")}</div>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="mb-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-800">Products per category</h2>
-        {d.categories.length === 0 ? (
-          <Empty>No products.</Empty>
-        ) : (
-          <div style={{ height: Math.max(140, d.categories.length * 28 + 30) }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={d.categories}
-                layout="vertical"
-                margin={{ top: 0, right: 24, bottom: 0, left: 8 }}
+        <Panel title="Products by status">
+          <div className="flex flex-wrap gap-2">
+            {d.productsByStatus.map((s) => (
+              <div
+                key={s.status}
+                className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2"
               >
-                <CartesianGrid stroke="#e2e8f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "#64748b" }} stroke="#cbd5e1" allowDecimals={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: "#334155" }}
-                  stroke="#cbd5e1"
-                  width={130}
+                {/* Colour AND label, never colour alone. */}
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: ink.status[s.status] ?? ink.status.draft }}
+                  aria-hidden
                 />
-                <Tooltip formatter={(v: number) => [String(v), "Products"]} cursor={{ fill: "#f1f5f9" }} />
-                <Bar dataKey="count" fill={SERIES_INK} radius={[0, 4, 4, 0]} barSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </Card>
-
-      <Card className="mb-4">
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Vendors on a plan</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          Ranked by search boost tier, which comes from the plan's{" "}
-          <span className="font-mono text-[11px]">limits.search_boost_tier</span>.
-        </p>
-        {d.topVendors.length === 0 ? (
-          <Empty>No vendor is on a paid plan.</Empty>
-        ) : (
-          <Table head={["Vendor", "Plan", "Boost tier", "Plan active"]}>
-            {d.topVendors.map((v) => (
-              <tr key={v.id}>
-                <td className="px-3 py-2 font-medium text-slate-900">{v.brand}</td>
-                <td className="px-3 py-2 text-slate-600">{v.plan}</td>
-                <td className="px-3 py-2 text-slate-700">{v.boost}</td>
-                <td className="px-3 py-2">
-                  {v.active ? <Badge tone="green" dot>active</Badge> : <Badge tone="red" dot>expired</Badge>}
-                </td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
-
-      <Card>
-        <h2 className="mb-1 text-sm font-semibold text-slate-800">Flagged items log</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          Internal tracking notes attached to vendors, products and ads — not a dispute or workflow
-          system. Add notes from the relevant vendor, product or ad screen.
-        </p>
-        {flags.isLoading ? (
-          <Spinner label="Loading log…" />
-        ) : (flags.data ?? []).length === 0 ? (
-          <Empty>Nothing flagged.</Empty>
-        ) : (
-          <div className="space-y-2">
-            {(flags.data ?? []).map((f) => (
-              <div key={f.id} className="rounded border border-slate-200 p-2">
-                <div className="mb-1 flex items-center gap-2">
-                  <Badge tone="blue">{f.entity_type}</Badge>
-                  <span className="font-mono text-[11px] text-slate-400">{f.entity_id.slice(0, 8)}</span>
-                </div>
-                <p className="whitespace-pre-wrap text-sm text-slate-800">{f.note}</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  {f.author?.full_name || f.author?.email || "Unknown admin"} ·{" "}
-                  {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
-                </p>
+                <span className="text-sm text-ink-muted">{s.status.replace("_", " ")}</span>
+                <span className="text-sm font-semibold tabular-nums text-ink">{s.count}</span>
               </div>
             ))}
           </div>
-        )}
-      </Card>
-    </div>
-  );
-}
+        </Panel>
 
-function Stat({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
-  return (
-    <Card className="flex items-center gap-3.5">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-tint text-brand ring-1 ring-inset ring-brand/10">
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-xs font-medium text-ink-muted">{label}</div>
-        <div className="mt-0.5 truncate font-display text-[1.75rem] font-bold leading-none tracking-tight tabular-nums text-ink">
-          {value}
-        </div>
-      </div>
-    </Card>
+        <Panel
+          title="Revenue over time"
+          description={
+            <>
+              Paid subscription invoices (incl. GST) plus paid ad orders, by day.{" "}
+              {d.adOrderCount === 0 && (
+                <span className="font-medium text-caution-fg">
+                  No paid ad orders exist yet, so this is subscription revenue only.
+                </span>
+              )}
+            </>
+          }
+        >
+          {d.revenueByDay.length === 0 ? (
+            <Empty>No paid invoices or ad orders yet.</Empty>
+          ) : d.revenueByDay.length === 1 ? (
+            // One day of data is not a trend; a line would imply movement that
+            // isn't there, so state the figure instead.
+            <Note>
+              All revenue to date falls on a single day (
+              {format(new Date(d.revenueByDay[0].day), "d MMM yyyy")}):{" "}
+              <span className="font-semibold tabular-nums text-ink">
+                ₹{d.revenueByDay[0].total.toLocaleString("en-IN")}
+              </span>
+              . A trend line needs at least two days of activity.
+            </Note>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={d.revenueByDay} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid stroke={ink.grid} vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    tickFormatter={(v: string) => format(new Date(v), "d MMM")}
+                    tick={{ fontSize: 11, fill: ink.axisText }}
+                    stroke={ink.axis}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: ink.axisText }} stroke={ink.axis} width={48} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
+                    labelFormatter={(v: string) => format(new Date(v), "d MMM yyyy")}
+                  />
+                  <Line type="monotone" dataKey="total" stroke={ink.series} strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          <div className="mt-4 flex gap-8 border-t border-line pt-3 text-sm">
+            <div>
+              <div className="text-xs text-ink-faint">Subscriptions</div>
+              <div className="font-semibold tabular-nums text-ink">
+                ₹{d.subscriptionRevenue.toLocaleString("en-IN")}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-ink-faint">Ads ({d.adOrderCount} paid orders)</div>
+              <div className="font-semibold tabular-nums text-ink">
+                ₹{d.adRevenue.toLocaleString("en-IN")}
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="Products per category">
+          {d.categories.length === 0 ? (
+            <Empty>No products.</Empty>
+          ) : (
+            <div style={{ height: Math.max(140, d.categories.length * 28 + 30) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={d.categories}
+                  layout="vertical"
+                  margin={{ top: 0, right: 24, bottom: 0, left: 8 }}
+                >
+                  <CartesianGrid stroke={ink.grid} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: ink.axisText }}
+                    stroke={ink.axis}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: ink.axisText }}
+                    stroke={ink.axis}
+                    width={130}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(v: number) => [String(v), "Products"]}
+                    cursor={{ fill: ink.hover }}
+                  />
+                  <Bar dataKey="count" fill={ink.series} radius={[0, 4, 4, 0]} barSize={14} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          title="Vendors on a plan"
+          description={
+            <>
+              Ranked by search boost tier, which comes from the plan's{" "}
+              <span className="font-mono text-2xs">limits.search_boost_tier</span>.
+            </>
+          }
+        >
+          {d.topVendors.length === 0 ? (
+            <Empty>No vendor is on a paid plan.</Empty>
+          ) : (
+            <Table head={["Vendor", "Plan", "Boost tier", "Plan active"]}>
+              {d.topVendors.map((v) => (
+                <tr key={v.id} className={ROW_HOVER}>
+                  <td className="px-3 py-2 font-medium text-ink">{v.brand}</td>
+                  <td className="px-3 py-2 text-ink-muted">{v.plan}</td>
+                  <td className="px-3 py-2 tabular-nums text-ink-muted">{v.boost}</td>
+                  <td className="px-3 py-2">
+                    {v.active ? (
+                      <Badge tone="positive" dot>active</Badge>
+                    ) : (
+                      <Badge tone="critical" dot>expired</Badge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Panel>
+
+        <Panel
+          title="Flagged items log"
+          description="Internal tracking notes attached to vendors, products and ads. Not a dispute or workflow system. Add notes from the relevant vendor, product or ad screen."
+        >
+          {flags.isLoading ? (
+            <Spinner label="Loading log…" />
+          ) : (flags.data ?? []).length === 0 ? (
+            <Empty>Nothing flagged.</Empty>
+          ) : (
+            <div className="space-y-2">
+              {(flags.data ?? []).map((f) => (
+                <div key={f.id} className="rounded-lg border border-line bg-surface-2 p-3">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Badge tone="info">{f.entity_type}</Badge>
+                    <span className="font-mono text-2xs text-ink-faint">{f.entity_id.slice(0, 8)}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm text-ink">{f.note}</p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    {f.author?.full_name || f.author?.email || "Unknown admin"} ·{" "}
+                    {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </Stack>
+    </Page>
   );
 }

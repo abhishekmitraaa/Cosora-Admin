@@ -75,13 +75,13 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
   });
 
   return (
-    <div className="rounded-xl border border-line bg-canvas p-4">
+    <div className="rounded-xl border border-line bg-surface-2 p-4">
       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink">
         <Flag size={13} className="text-ink-muted" />
         Flagged-items log
       </div>
       <p className="mb-3 text-xs leading-relaxed text-ink-muted">
-        Internal tracking notes only — not a dispute or workflow tool. Notes are append-only and
+        Internal tracking notes only, not a dispute or workflow tool. Notes are append-only and
         visible to all admins.
       </p>
 

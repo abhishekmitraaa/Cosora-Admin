@@ -12,7 +12,19 @@ import {
 } from "@/lib/chat";
 import AccountStatus from "@/components/AccountStatus";
 import FlagLog from "@/components/FlagLog";
-import { Badge, Card, Empty, ErrorNote, Note, PageHeader, Spinner } from "@/components/ui";
+import {
+  Badge,
+  Empty,
+  ErrorNote,
+  Note,
+  Notice,
+  Page,
+  PageHeader,
+  Panel,
+  SkeletonList,
+  Stack,
+  SubHeading,
+} from "@/components/ui";
 
 interface MessageRow {
   id: string;
@@ -90,7 +102,13 @@ export default function ChatThread() {
     },
   });
 
-  if (thread.isLoading) return <Spinner />;
+  if (thread.isLoading) {
+    return (
+      <Page>
+        <SkeletonList rows={3} height="h-40" />
+      </Page>
+    );
+  }
   if (thread.error) return <ErrorNote message={(thread.error as Error).message} />;
   if (!thread.data) return <ErrorNote message="Conversation not found, or not visible to your role." />;
 
@@ -101,8 +119,11 @@ export default function ChatThread() {
   const locked = c.status === "under_review";
 
   return (
-    <div className="max-w-4xl">
-      <Link to="/chats" className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
+    <Page>
+      <Link
+        to="/chats"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink"
+      >
         <ArrowLeft size={14} /> All chats
       </Link>
 
@@ -113,34 +134,31 @@ export default function ChatThread() {
         }`}
         actions={
           locked ? (
-            <Badge tone="amber" dot>under review</Badge>
+            <Badge tone="caution" dot>under review</Badge>
           ) : (
-            <Badge tone="green" dot>active</Badge>
+            <Badge tone="positive" dot>active</Badge>
           )
         }
       />
 
       {locked && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
-          <Lock size={14} className="mt-0.5 shrink-0" />
-          <span>
-            This conversation is locked for its participants. Resolve it from the{" "}
-            <Link to="/chat-review" className="font-medium underline">
-              review queue
-            </Link>{" "}
-            — unlocking is not possible from this screen.
-          </span>
-        </div>
+        <Notice tone="caution" className="mb-4" icon={<Lock size={14} />}>
+          This conversation is locked for its participants. Resolve it from the{" "}
+          <Link to="/chat-review" className="font-medium underline">
+            review queue
+          </Link>
+          . Unlocking is not possible from this screen.
+        </Notice>
       )}
 
+      <Stack>
       {reviews.length > 0 && (
-        <Card className="mb-4">
-          <h2 className="mb-2 text-sm font-semibold text-ink">Review history</h2>
+        <Panel title="Review history">
           <ul className="space-y-2">
             {reviews.map((r) => (
-              <li key={r.id} className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs">
+              <li key={r.id} className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone={r.status === "pending" ? "amber" : "slate"}>
+                  <Badge tone={r.status === "pending" ? "caution" : "neutral"}>
                     {REVIEW_STATUS_LABEL[r.status] ?? r.status}
                   </Badge>
                   <span className="font-medium text-ink">
@@ -157,15 +175,10 @@ export default function ChatThread() {
               </li>
             ))}
           </ul>
-        </Card>
+        </Panel>
       )}
 
-      <Card className="mb-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-ink">Thread</h2>
-          <span className="text-xs text-ink-faint">Read-only</span>
-        </div>
-
+      <Panel title="Thread" actions={<Badge>read-only</Badge>}>
         {messages.length === 0 ? (
           <Empty>No messages in this conversation.</Empty>
         ) : (
@@ -180,7 +193,7 @@ export default function ChatThread() {
                 <div key={m.id} className={right ? "flex justify-end" : "flex justify-start"}>
                   <div className="max-w-[80%]">
                     <div
-                      className={`mb-0.5 text-[11px] text-ink-faint ${right ? "text-right" : "text-left"}`}
+                      className={`mb-0.5 text-2xs text-ink-faint ${right ? "text-right" : "text-left"}`}
                     >
                       {participantLabel(sender, m.sender_id)}
                       {sides.resolved && (
@@ -191,7 +204,7 @@ export default function ChatThread() {
                     <div
                       className={`rounded-xl border px-3 py-2 text-sm ${
                         right
-                          ? "border-line-strong bg-canvas text-ink"
+                          ? "border-line-strong bg-surface-2 text-ink"
                           : "border-line bg-surface text-ink shadow-xs"
                       }`}
                     >
@@ -199,7 +212,8 @@ export default function ChatThread() {
                         <span className="whitespace-pre-wrap break-words">{m.body}</span>
                       ) : (
                         <span className="text-ink-faint">
-                          No text — this is a "{m.kind}" message. Its contents are not rendered here.
+                          No text. This is a &ldquo;{m.kind}&rdquo; message, and its contents are not
+                          rendered here.
                         </span>
                       )}
                     </div>
@@ -215,7 +229,7 @@ export default function ChatThread() {
             Showing the first {MESSAGE_LIMIT} messages. Anything after that is not loaded.
           </Note>
         )}
-      </Card>
+      </Panel>
 
       {/*
         The buyer's account controls live here because this panel has no buyer
@@ -224,10 +238,9 @@ export default function ChatThread() {
       */}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            {sides.resolved ? "Buyer" : "Participant A"} ·{" "}
-            {participantLabel(a, c.user_a)}
-          </h2>
+          <SubHeading className="mb-2 block">
+            {sides.resolved ? "Buyer" : "Participant A"} · {participantLabel(a, c.user_a)}
+          </SubHeading>
           <AccountStatus
             profileId={sides.resolved ? sides.buyerId! : c.user_a}
             name={participantLabel(sides.resolved ? sides.buyer : a, sides.resolved ? sides.buyerId! : c.user_a)}
@@ -235,10 +248,9 @@ export default function ChatThread() {
           />
         </div>
         <div>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-            {sides.resolved ? "Vendor" : "Participant B"} ·{" "}
-            {participantLabel(b, c.user_b)}
-          </h2>
+          <SubHeading className="mb-2 block">
+            {sides.resolved ? "Vendor" : "Participant B"} · {participantLabel(b, c.user_b)}
+          </SubHeading>
           <AccountStatus
             profileId={sides.resolved ? sides.vendorId! : c.user_b}
             name={participantLabel(sides.resolved ? sides.vendor : b, sides.resolved ? sides.vendorId! : c.user_b)}
@@ -264,9 +276,8 @@ export default function ChatThread() {
         and it is not visible to either participant. Use it for the context a
         verdict cannot carry: "third report this month", "spoke to the vendor".
       */}
-      <div className="mt-4">
-        <FlagLog entityType="conversation" entityId={c.id} />
-      </div>
-    </div>
+      <FlagLog entityType="conversation" entityId={c.id} />
+      </Stack>
+    </Page>
   );
 }

@@ -6,7 +6,18 @@ import { fetchAccountStatuses } from "@/lib/accounts";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
-import { Badge, Card, Empty, ErrorNote, PageHeader, ReadOnlyBanner, Spinner, Table } from "@/components/ui";
+import {
+  Badge,
+  Empty,
+  ErrorNote,
+  Note,
+  Page,
+  PageHeader,
+  ReadOnlyBanner,
+  ROW_HOVER,
+  SkeletonList,
+  Table,
+} from "@/components/ui";
 
 interface VendorListRow {
   id: string;
@@ -27,6 +38,11 @@ interface VendorListRow {
   ad_verified_until: string | null;
 }
 
+const SUBTITLE = "Accounts, verification and suspension. Open a vendor to review business documents.";
+
+/** Live dates read at full weight, lapsed ones drop back. Two states, one rule. */
+const dateTone = (live: boolean) => (live ? "tabular-nums text-ink-muted" : "tabular-nums text-ink-ghost");
+
 export default function Vendors() {
   const role = useRole();
   const writable = canWrite(role, "vendors");
@@ -46,23 +62,27 @@ export default function Vendors() {
       // Suspension lives on `profiles`, keyed by the same uuid
       // (vendor_profiles.id FKs profiles.id). Two FKs from vendor_profiles to
       // profiles would make a PostgREST embed ambiguous, so this merges
-      // client-side — the same approach lib/vendors.ts already takes.
+      // client-side, the same approach lib/vendors.ts already takes.
       const statuses = await fetchAccountStatuses(vendors.map((v) => v.id));
       return vendors.map((v) => ({ ...v, account_status: statuses.get(v.id) ?? "active" }));
     },
   });
 
-  if (vendors.isLoading) return <Spinner />;
+  if (vendors.isLoading) {
+    return (
+      <Page width="wide">
+        <PageHeader title="Vendors" subtitle={SUBTITLE} />
+        <SkeletonList rows={1} height="h-96" />
+      </Page>
+    );
+  }
   if (vendors.error) return <ErrorNote message={(vendors.error as Error).message} />;
 
   const rows = vendors.data ?? [];
 
   return (
-    <div className="max-w-6xl">
-      <PageHeader
-        title="Vendors"
-        subtitle="Accounts, verification and suspension. Open a vendor to review business documents."
-      />
+    <Page width="wide">
+      <PageHeader title="Vendors" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "vendors")} />}
 
@@ -72,17 +92,14 @@ export default function Vendors() {
         flag, and "why is this one verified?" is the question this table exists
         to answer.
       */}
-      <Card className="mb-4 border-slate-200 bg-slate-50">
-        <p className="text-xs text-slate-600">
-          <span className="font-semibold">Trust seal</span> shows when{" "}
-          <span className="font-medium">any</span> of these is true: the admin flag{" "}
-          <span className="font-mono text-[11px]">is_verified</span>, an active paid subscription (
-          <span className="font-mono text-[11px]">plan_expires_at</span> in the future), or an
-          ad-purchased seal (<span className="font-mono text-[11px]">ad_verified_until</span> in the
-          future). They're independent — clearing the admin flag won't remove a seal the other two
-          are granting.
-        </p>
-      </Card>
+      <Note className="mb-4">
+        <span className="font-semibold text-ink">Trust seal</span> shows when{" "}
+        <span className="font-medium text-ink">any</span> of these is true: the admin flag{" "}
+        <span className="font-mono text-2xs">is_verified</span>, an active paid subscription (
+        <span className="font-mono text-2xs">plan_expires_at</span> in the future), or an ad-purchased
+        seal (<span className="font-mono text-2xs">ad_verified_until</span> in the future). They are
+        independent, so clearing the admin flag will not remove a seal the other two are granting.
+      </Note>
 
       {rows.length === 0 ? (
         <Empty>No vendors.</Empty>
@@ -103,55 +120,66 @@ export default function Vendors() {
           {rows.map((v) => {
             const s = sealSources(v.is_verified, v.plan_expires_at, v.ad_verified_until);
             return (
-              <tr key={v.id} className="hover:bg-slate-50">
+              <tr key={v.id} className={ROW_HOVER}>
                 <td className="px-3 py-2">
-                  <Link to={`/vendors/${v.id}`} className="font-medium text-slate-900 hover:underline">
+                  <Link
+                    to={`/vendors/${v.id}`}
+                    className="font-medium text-ink underline-offset-2 hover:underline"
+                  >
                     {v.brand_name || "Unnamed vendor"}
                   </Link>
                 </td>
-                <td className="px-3 py-2 text-slate-600">{v.city || "—"}</td>
-                <td className="px-3 py-2 text-slate-600">{v.business_type || "—"}</td>
+                <td className="px-3 py-2 text-ink-muted">
+                  {v.city || <span className="text-ink-ghost">not set</span>}
+                </td>
+                <td className="px-3 py-2 text-ink-muted">
+                  {v.business_type || <span className="text-ink-ghost">not set</span>}
+                </td>
                 <td className="px-3 py-2">
                   {v.onboarding_complete ? (
-                    <Badge tone="green">complete</Badge>
+                    <Badge tone="positive">complete</Badge>
                   ) : (
-                    <Badge tone="amber">incomplete</Badge>
+                    <Badge tone="caution">incomplete</Badge>
                   )}
                 </td>
                 <td className="px-3 py-2">
                   {v.account_status === "suspended" ? (
-                    <Badge tone="red" dot>suspended</Badge>
+                    <Badge tone="critical" dot>suspended</Badge>
                   ) : (
-                    <Badge tone="green" dot>active</Badge>
+                    <Badge tone="positive" dot>active</Badge>
                   )}
                 </td>
-                <td className="px-3 py-2">{s.any ? <Badge tone="blue">seal</Badge> : <Badge>none</Badge>}</td>
+                <td className="px-3 py-2">{s.any ? <Badge tone="info">seal</Badge> : <Badge>none</Badge>}</td>
                 <td className="px-3 py-2 text-xs">
-                  {s.admin ? <Badge tone="blue">verified</Badge> : <span className="text-slate-400">—</span>}
+                  {s.admin ? (
+                    <Badge tone="info">verified</Badge>
+                  ) : (
+                    <span className="text-ink-ghost">not set</span>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-xs">
                   {v.plan_id ? (
-                    <span className={s.subscription ? "text-slate-700" : "text-slate-400"}>
+                    <span className={s.subscription ? "text-ink-muted" : "text-ink-ghost"}>
                       {v.plan_id}
                       {v.plan_expires_at && (
-                        <span className="block text-[11px]">
+                        <span className="block text-2xs tabular-nums">
                           {s.subscription ? "expires " : "expired "}
                           {format(new Date(v.plan_expires_at), "d MMM yyyy")}
                         </span>
                       )}
                     </span>
                   ) : (
-                    <span className="text-slate-400">no plan</span>
+                    <span className="text-ink-ghost">no plan</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-xs">
                   {v.ad_verified_until ? (
-                    <span className={s.ad ? "text-slate-700" : "text-slate-400"}>
+                    <span className={dateTone(s.ad)}>
                       {s.ad ? "until " : "expired "}
                       {format(new Date(v.ad_verified_until), "d MMM yyyy")}
                     </span>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-ink-ghost">none</span>
                   )}
                 </td>
               </tr>
@@ -159,6 +187,6 @@ export default function Vendors() {
           })}
         </Table>
       )}
-    </div>
+    </Page>
   );
 }

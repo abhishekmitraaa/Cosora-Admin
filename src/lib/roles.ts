@@ -43,7 +43,41 @@ export type Section =
   // Account suspension, generalised. Not part of "vendors": buyers get
   // suspended too, and the role gate is different (support/super_admin via
   // set_account_status, NOT vendor_ops).
-  | "accounts";
+  | "accounts"
+  // ── Added by the Phase-4 UI pass ────────────────────────────────────────
+  //
+  // Two kinds of new section live below, and the difference matters when
+  // reading the gates:
+  //
+  //   REAL DATA, no schema change. `geography` aggregates vendor_profiles rows
+  //   that already exist, so its gate mirrors an existing one exactly and the
+  //   DB is already enforcing it. (Ads monitoring is NOT a section: it is a
+  //   view inside "ads" and inherits that section's gate unchanged.)
+  //
+  //   DEV-SEED, no table yet. `content`, `payments`, `certificates`,
+  //   `discounts` and `customers` render from a local development fixture and
+  //   write nothing. Their gates are declared NOW so Phase 2 only has to swap
+  //   the data source, but until the tables exist these are UX only in a
+  //   stronger sense than the rest of this file: there is no RLS behind them
+  //   because there is nothing to apply RLS to. Do not read a gate here as
+  //   evidence that a write is protected.
+  //
+  // Aggregate view of vendor_profiles.city/state. Same roles as "vendors",
+  // because it is the same rows read a different way.
+  | "geography"
+  // Banners and theme configuration for the buyer-facing site.
+  | "content"
+  // Transaction ledger. Distinct from "reports", which keeps its KPI view.
+  | "payments"
+  // Physical certificate fulfilment.
+  | "certificates"
+  // Discount codes.
+  | "discounts"
+  // Buyer/vendor CRM and segmentation. Distinct from "accounts", which is
+  // suspension only.
+  | "customers"
+  // Third-party website analytics. An external link, not a built feature.
+  | "traction";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +122,32 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // it hid the page from the role that uses its vocabulary daily.
   "chat-reasons": ["super_admin", "support"],
   accounts: ["super_admin", "support"],
+
+  // ── Phase-4 sections ───────────────────────────────────────────────────
+  // Same three roles as `vendors`: this is the vendor list plotted, not a new
+  // dataset, and anyone who may open Vendors can already read every city and
+  // state it aggregates.
+  geography: ["super_admin", "vendor_ops", "support"],
+  // Site banners and theme are brand-level configuration. Starting at
+  // super_admin only; widen deliberately if a marketing role is ever added.
+  content: ["super_admin"],
+  // Finance reads and acts; support reads, because "did this vendor's payment
+  // land" is a support question. Mirrors the subscriptions split.
+  payments: ["super_admin", "finance_admin", "support"],
+  // NOTE FOR PHASE 2: this should be
+  //   ["super_admin", "finance_admin", "delivery_team"]
+  // and SECTION_WRITE should gain "delivery_team" too. The `delivery_team`
+  // value does NOT exist in the admin_role_type enum yet, so naming it here
+  // would not compile against database.types.ts and, worse, would imply a role
+  // nobody can actually hold. Gated to super_admin alone until the migration
+  // that creates the role lands; add both entries in the same change.
+  certificates: ["super_admin"],
+  discounts: ["super_admin", "finance_admin"],
+  customers: ["super_admin", "support", "finance_admin"],
+  // The hosted analytics dashboard, reached by an external link. Every role,
+  // matching `reports` - this panel already shows all-time revenue to all six
+  // roles, so site traffic is not a narrower secret than what is on that page.
+  traction: ALL_ROLES,
 };
 
 /**
@@ -113,6 +173,23 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // set_account_status() gates itself to these two, so vendor_ops sees the page
   // (it is reachable from a vendor) but not the actions.
   accounts: ["super_admin", "support"],
+
+  // ── Phase-4 sections ───────────────────────────────────────────────────
+  // An aggregate read of rows this app already lists. Nothing on the map
+  // writes, for any role.
+  geography: [],
+  content: ["super_admin"],
+  payments: ["super_admin", "finance_admin"],
+  // NOTE FOR PHASE 2: add "delivery_team" here at the same time as in
+  // SECTION_READ above, once the enum value exists.
+  certificates: ["super_admin"],
+  discounts: ["super_admin", "finance_admin"],
+  // Read-only by design in this pass. The CRM screen searches, segments and
+  // summarises; it does not edit anyone. Tag editing is a Phase-2 feature that
+  // needs a table to write to before it needs a role gate.
+  customers: [],
+  // An external link. There is nothing here to write.
+  traction: [],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */
@@ -146,6 +223,6 @@ export function canSuspendAccounts(role: AdminRole | null): boolean {
 export function readOnlyReason(role: AdminRole | null, section: Section): string {
   const label = role ? ROLE_LABELS[role] : "No role assigned";
   const allowed = SECTION_WRITE[section].map((r) => ROLE_LABELS[r]).join(" or ");
-  if (!allowed) return `${label} — this section is read-only for all roles.`;
+  if (!allowed) return `${label}. This section is read-only for every role.`;
   return `Read-only: you are signed in as ${label}. Changes here require ${allowed}, and the database will reject them otherwise.`;
 }

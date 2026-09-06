@@ -11,14 +11,19 @@ import {
   Card,
   Empty,
   ErrorNote,
+  Field,
   Input,
   Modal,
   Note,
+  Page,
   PageHeader,
   ReadOnlyBanner,
-  Spinner,
+  ROW_HOVER,
+  SkeletonList,
   Table,
 } from "@/components/ui";
+
+const SUBTITLE = "The reasons an admin may pick when suspending an account. Super admin only.";
 
 interface ReasonRow {
   id: string;
@@ -69,7 +74,7 @@ export default function ChatReasons() {
     mutationFn: async (value: string) => {
       // created_by is NOT NULL. Sending null produced a confusing 23502 from
       // Postgres instead of saying the session was the problem.
-      if (!identity?.id) throw new Error("No admin session — sign in again before adding a reason.");
+      if (!identity?.id) throw new Error("No admin session. Sign in again before adding a reason.");
       const { error } = await supabase
         .from("chat_block_reasons")
         .insert({ reason: value.trim(), active: true, created_by: identity.id });
@@ -94,24 +99,29 @@ export default function ChatReasons() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (reasons.isLoading) return <Spinner />;
+  if (reasons.isLoading) {
+    return (
+      <Page width="narrow">
+        <PageHeader title="Block reasons" subtitle={SUBTITLE} />
+        <SkeletonList rows={1} height="h-64" />
+      </Page>
+    );
+  }
   if (reasons.error) return <ErrorNote message={(reasons.error as Error).message} />;
 
   const rows = reasons.data ?? [];
 
   return (
-    <div className="max-w-3xl">
-      <PageHeader
-        title="Block reasons"
-        subtitle="The reasons an admin may pick when suspending an account. Super admin only."
-      />
+    <Page width="narrow">
+      <PageHeader title="Block reasons" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "chat-reasons")} />}
 
       <Note className="mb-4">
-        Every suspension — from the review queue or from a profile — must cite one of these, and the
-        choice is written to the <span className="font-mono text-[11px]">account_suspensions</span>{" "}
-        ledger. Support sees the active ones in the picker but cannot change the list.
+        Every suspension, whether from the review queue or from a profile, must cite one of these,
+        and the choice is written to the{" "}
+        <span className="font-mono text-2xs">account_suspensions</span> ledger. Support sees the
+        active ones in the picker but cannot change the list.
         <br />
         Reasons are never deleted: past suspensions point at them.{" "}
         <span className="font-medium text-ink">Deactivate</span> removes a reason from the picker
@@ -121,18 +131,20 @@ export default function ChatReasons() {
 
       <Card className="mb-4">
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             if (reason.trim()) add.mutate(reason);
           }}
         >
-          <Input
-            placeholder="e.g. Attempting to move the deal off-platform"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="min-w-[18rem] flex-1"
-          />
+          <Field label="New block reason" htmlFor="new-reason" className="min-w-[18rem] flex-1">
+            <Input
+              id="new-reason"
+              placeholder="Attempting to move the deal off-platform"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </Field>
           <Button type="submit" variant="primary" disabled={!writable || !reason.trim() || add.isPending}>
             {add.isPending ? "Adding…" : "Add reason"}
           </Button>
@@ -140,24 +152,27 @@ export default function ChatReasons() {
       </Card>
 
       {rows.length === 0 ? (
-        <Empty>No block reasons defined — no account can be suspended until one exists.</Empty>
+        <Empty>No block reasons defined, so no account can be suspended until one exists.</Empty>
       ) : (
         <Table head={["Reason", "State", "Added by", "Added", ""]}>
           {rows.map((r) => (
-            <tr key={r.id} className={r.active ? "" : "opacity-60"}>
+            <tr key={r.id} className={r.active ? ROW_HOVER : `opacity-60 ${ROW_HOVER}`}>
               <td className="px-3 py-2 text-ink">{r.reason}</td>
               <td className="px-3 py-2">
-                {r.active ? <Badge tone="green" dot>active</Badge> : <Badge dot>inactive</Badge>}
+                {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
               </td>
               <td className="px-3 py-2 text-ink-muted">
-                {r.creator?.full_name || r.creator?.email || <span className="text-ink-faint">—</span>}
+                {r.creator?.full_name || r.creator?.email || (
+                  <span className="text-ink-ghost">unknown</span>
+                )}
               </td>
-              <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-faint">
+              <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">
                 {format(new Date(r.created_at), "d MMM yyyy")}
               </td>
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-1.5">
                   <Button
+                    size="sm"
                     disabled={!writable}
                     onClick={() => {
                       setEditing(r);
@@ -168,6 +183,7 @@ export default function ChatReasons() {
                   </Button>
                   <Button
                     variant={r.active ? "danger" : "outline"}
+                    size="sm"
                     disabled={!writable || update.isPending}
                     onClick={() =>
                       update.mutate(
@@ -189,11 +205,18 @@ export default function ChatReasons() {
       )}
 
       <Modal open={editing !== null} title="Edit block reason" onClose={() => setEditing(null)}>
-        <p className="mb-3 text-sm text-ink-muted">
-          This text is what past suspensions citing this reason will read as. Correct wording, don't
-          repurpose it for a different offence — add a new reason for that.
+        <p className="mb-3 text-sm leading-relaxed text-ink-muted">
+          This text is what past suspensions citing this reason will read as. Correct the wording; do
+          not repurpose it for a different offence. Add a new reason for that.
         </p>
-        <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <Field label="Reason text" htmlFor="edit-reason">
+          <Input
+            id="edit-reason"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+        </Field>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => setEditing(null)}>Cancel</Button>
           <Button
@@ -216,6 +239,6 @@ export default function ChatReasons() {
           </Button>
         </div>
       </Modal>
-    </div>
+    </Page>
   );
 }

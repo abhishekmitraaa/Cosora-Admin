@@ -9,6 +9,138 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-06: **Phase 4 - one design system with a real dark mode, plus eight new
+  sections.** A visual pass over every existing screen with zero behaviour change,
+  and the UI for the sections Phase 2 will wire to real tables.
+
+  **Nothing an existing page does changed.** Verified mechanically rather than
+  asserted: every line in the 26 touched files matching a data-layer pattern
+  (`supabase.`, `.from(`, `.select(`, `.update(`, `.rpc(`, `assertWrote`,
+  `canWrite`, `useQuery`, `useMutation`, `invalidateQueries`, and the rest) was
+  extracted before and after and compared. 340 statements, all identical, with a
+  single exception: one em-dash inside a user-facing error string in
+  `ChatReview.tsx`. No query, no mutation, no `assertWrote`, no role gate and no
+  route moved.
+
+  ### The design system
+
+  - **`src/index.css` is now the single source of colour.** Every value is a CSS
+    variable holding an `R G B` triplet, read through
+    `rgb(var(--token) / <alpha-value>)` in `tailwind.config.js`. Before this, half
+    the app wrote `text-slate-600` and the other half wrote `text-ink-muted`, which
+    is precisely why it could not have a dark mode.
+  - **A real dark mode**, as one set of variable overrides rather than a `dark:`
+    variant on every utility, so the two modes cannot drift apart. Three-state
+    control (Light / Dark / System) in the rail footer; `System` removes the
+    attribute and lets `prefers-color-scheme` decide. `initTheme()` runs before the
+    first render so a dark-mode admin never sees a frame of light chrome.
+  - **The accent inverts and stays singular.** Near-black in light, near-white in
+    dark: the same `brand` token, because a near-black accent is invisible on a
+    near-black ground. Status tones are state, not accent, and are never used
+    decoratively.
+  - **WCAG AA, measured.** `scripts/theme-contrast-check.mjs` walks every token in
+    both modes and computes the real ratio for each foreground/background pair the
+    app actually uses. It found four failures on the first run and all four were
+    fixed rather than waived:
+      - `ink-faint` was 4.27:1 on the page ground, and it is the colour of every
+        `<dt>` label in the app. Darkened to clear 4.5:1 on all three surfaces.
+      - The caution status dot was 2.87:1, under the 3:1 WCAG asks of a non-text
+        indicator. Darkened.
+      - Input and outline-button borders measured 1.3:1. `line` and `line-strong`
+        are decorative grouping hairlines and are allowed to be quiet, so a new
+        `line-control` token was added at 3:1 for borders that IDENTIFY a control
+        (WCAG 1.4.11), and card edges kept the light one.
+      - The destructive button's red could not carry white text at 4.5:1, so
+        `danger` is now its own token pair rather than the `critical` status tint.
+  - **One radius scale and one type scale**, both documented in
+    `tailwind.config.js`. `text-[1.55rem]` and `text-[1.75rem]` are gone.
+    `scripts/copy-audit.mjs` fails on any arbitrary font size, any raw Tailwind
+    palette colour, and any em-dash in user-visible text (comments are exempt, and
+    it strips them properly rather than matching line prefixes).
+  - **The component kit grew** so pages stop hand-rolling surfaces: `Page`, `Stack`,
+    `Panel`, `Field`, `Attr`, `DataField`, `AttrGrid`, `Stat`, `Meter`, `Notice`,
+    `StatusBadge`, `Checkbox`, `SkeletonList`, `ThemeToggle`. Products, Ads and
+    Videos had each shipped a private copy of `Attr` and the three had already
+    diverged.
+  - **The nav is five collapsible groups**, not a 20-item scroll. Every `to` and
+    every label is unchanged; only the grouping is new.
+  - **Two latent bugs surfaced by the pass.** `ChatPatterns.tsx` carried two literal
+    `0x08` backspace bytes where the copy meant to print a backslash-b, so the
+    sentence explaining the POSIX word-boundary trap rendered with an empty
+    `<span>` in the middle of it. And `scripts/smoke.mjs` imported Playwright from
+    a path that no longer exists, so it would have thrown on its first line; that,
+    its `.bg-amber-50` banner selector (now a stable `data-marker`) and its
+    `../screenshots` output path are all fixed.
+
+  ### Ads monitoring (real data, no schema change)
+
+  A second view inside the existing `ads` section, inheriting its role gate. The
+  brief asked for three figures and **two of them do not exist in this schema**,
+  which `src/lib/adsAnalytics.ts` documents at length:
+
+  - **There is no running spend and it cannot be derived.** Cosora ads are not
+    auction-priced: `razorpay-create-order` charges `AD_PRICE[placement] x days x
+    items` up front, a flat rupee rate. There is no CPM, no CPC and no
+    per-impression cost anywhere, so `impressions x rate` would be an invented
+    number. `advertisements.daily_budget` looks like a cap and is not one: it is
+    written once as `prepaidTotal / days` and nothing decrements it. So the money
+    figure is **revenue booked** from paid `ad_orders`, and the bars are a
+    **schedule burn-down** of a campaign already paid for. Both are labelled as
+    exactly that on screen.
+  - **There is no conversions column**, so a "clicks with zero conversions" ratio
+    cannot be computed. The flags report served-and-never-clicked and
+    served-and-effectively-ignored instead, and the panel says plainly that these
+    are not conversion metrics.
+  - CTR of a campaign with zero impressions is `null`, not `0%`, and unmeasured
+    vendors sort last rather than beside genuinely poor ones.
+
+  ### Geography (real data, no schema change)
+
+  MapLibre GL 5, OpenStreetMap raster tiles, no API key. Google's Heatmap Layer is
+  deprecated and unavailable, so it was not an option. `vendor_profiles` has no
+  coordinates, so city and state text resolves against a static gazetteer in
+  `src/lib/geo.ts` in three tiers, and **the tier is reported**: exact city, state
+  centroid (marked `approximate`, because a cluster in open scrub is the fallback
+  and not a finding), or unplaced. Unplaced vendors are counted and listed, never
+  dropped: "we could not read the address" must not look like "nobody is there".
+  This is the one lazily-loaded route in the app, because maplibre is a third of
+  the bundle and three of six roles cannot see the section.
+
+  ### Five dev-seed sections
+
+  Site content, Payments, Certificates, Discounts and Customers. All five are
+  gated in `roles.ts`, routed in `App.tsx` and navigable from `Shell.tsx` now, so
+  Phase 2 only has to swap the data source.
+
+  - Each reads a store from `src/lib/devSeed/`, seeded in a development build and
+    `[]` in production, following `notificationsStore.ts`'s pattern.
+  - **The gate is at the declaration site, and that was load-bearing.** With the
+    check only inside the shared `createDevStore`, Rollup inlined three of five
+    call sites and kept the other two: the banner and discount fixtures shipped in
+    the production bundle. `devSeed(SEED)` folds to `[]` at build time. Verified by
+    grepping `dist/assets/*.js` for real seed strings, which is now the documented
+    check after any change there.
+  - Every seeded screen carries a `<DevSeedBanner>` in development so a fixture is
+    never mistaken for a Cosora figure.
+  - **Certificates is built on an unconfirmed decision** and says so on screen: it
+    assumes a physical printed article that gets couriered. If it is a digital
+    badge, the tabs collapse to issued and revoked. Gated to `super_admin` alone
+    because `delivery_team` does not exist in the `admin_role_type` enum yet;
+    `roles.ts` carries the note on exactly where to add it.
+  - The Payments **Live strip does not animate**. There is no Realtime subscription
+    in this repo and no table behind the screen, so a ticking animation would be
+    theatre an admin would read as money arriving. It takes rows as a prop with no
+    fetching of its own, so Phase 2 attaches a channel to its parent and the strip
+    is unchanged. Its status chip says "not live yet, no subscription attached".
+
+  ### Live Activity
+
+  A link, not a feature. Microsoft Clarity, not PostHog, and only one: two scripts
+  on the buyer site means two consent banners and two sets of numbers that
+  disagree in meetings. No embed, because Clarity sends `X-Frame-Options:
+  SAMEORIGIN` and sits behind a separate Microsoft login, so an iframe renders an
+  empty box. No Cosora schema, no query and no tracking code in this repo.
+
 - 2026-09-05: **Phase 0 — Video Closeups moderation. This panel could not act on
   `product_videos` at all.** New `src/pages/Videos.tsx`; `src/lib/roles.ts`,
   `src/App.tsx`, `src/components/Shell.tsx`, `src/pages/Products.tsx`, `README.md`,
