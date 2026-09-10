@@ -65,6 +65,13 @@ export type Section =
   // Aggregate view of vendor_profiles.city/state. Same roles as "vendors",
   // because it is the same rows read a different way.
   | "geography"
+  // Embedding-pipeline health history. Infrastructure, not moderation: the page
+  // is read-only, and the correct response to a bad status is to go and fix the
+  // pipeline rather than to action anything here. Unlike the UX-only sections
+  // noted above, this one IS enforced in the database —
+  // admin_embedding_pipeline_health() carries its own is_admin() guard, so the
+  // gate below is defence in depth rather than the only check.
+  | "system-health"
   // Banners and theme configuration for the buyer-facing site.
   | "content"
   // Transaction ledger. Distinct from "reports", which keeps its KPI view.
@@ -128,6 +135,12 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // dataset, and anyone who may open Vendors can already read every city and
   // state it aggregates.
   geography: ["super_admin", "vendor_ops", "support"],
+  // Must match admin_embedding_pipeline_health()'s own guard exactly — the RPC
+  // raises 42501 for anyone else, so listing a role here that the DB refuses
+  // would put a nav entry in front of a page that can only error. Deliberately
+  // NOT support/finance/ads: a stalled embedding queue is not something those
+  // roles can act on.
+  "system-health": ["super_admin", "vendor_ops"],
   // Site banners and theme are brand-level configuration. Starting at
   // super_admin only; widen deliberately if a marketing role is ever added.
   content: ["super_admin"],
@@ -178,6 +191,10 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // An aggregate read of rows this app already lists. Nothing on the map
   // writes, for any role.
   geography: [],
+  // Read-only by construction: there is no mutation on the System Health page,
+  // and the log table is service_role-only with RLS on and no policies, so no
+  // role can write it from a browser even if a page tried.
+  "system-health": [],
   content: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
   // NOTE FOR PHASE 2: add "delivery_team" here at the same time as in

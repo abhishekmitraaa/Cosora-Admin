@@ -41,6 +41,7 @@ import Certificates from "@/pages/Certificates";
 import Discounts from "@/pages/Discounts";
 import Customers from "@/pages/Customers";
 import LiveActivity from "@/pages/LiveActivity";
+import SystemHealth from "@/pages/SystemHealth";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -268,6 +269,14 @@ export default function App() {
                 element={
                   <RequireSection section="traction">
                     <LiveActivity />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/system-health"
+                element={
+                  <RequireSection section="system-health">
+                    <SystemHealth />
                   </RequireSection>
                 }
               />

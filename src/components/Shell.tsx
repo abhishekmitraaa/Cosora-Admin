@@ -9,6 +9,7 @@ import {
   Clapperboard,
   CreditCard,
   Award,
+  HeartPulse,
   LogOut,
   Map,
   Megaphone,
@@ -87,6 +88,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
       { to: "/traction", section: "traction", label: "Live Activity", icon: Activity },
+      { to: "/system-health", section: "system-health", label: "System Health", icon: HeartPulse },
     ],
   },
   {
