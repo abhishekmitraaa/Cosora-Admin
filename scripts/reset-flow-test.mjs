@@ -17,6 +17,7 @@
  * Run with the preview server up on :4174.
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { chromium } from "file:///c:/Users/Abhishek Mitra/OneDrive/Desktop/cosora lovable/textile-spark-net/node_modules/playwright/index.mjs";
 import { readFileSync } from "node:fs";
 
@@ -29,7 +30,7 @@ const env = Object.fromEntries(
 
 const BASE = "http://localhost:4174";
 const EMAIL = "rlstest-reset@cosora.test";
-const OLD = "TestPass123!";
+const OLD = credential("FIXTURE_PASSWORD");
 const NEW = "NewResetPass456!";
 
 const out = [];

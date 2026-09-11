@@ -9,6 +9,18 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-11 (Master Prompt 8, Phase 1): **No password is in this repository any more.**
+  The demo accounts' shared password (demo-admin is a `super_admin`) was rotated in the
+  live project, with sessions revoked; the old value now returns `invalid_credentials`.
+  `scripts/chat-moderation-behaviour.mjs` had it as a literal. Twelve more scripts and
+  both admin-creating seeds had the rlstest/chatfx fixture password as one. All now read
+  `.env` through `scripts/lib/test-credentials.mjs` (`credential()`,
+  `demoAccount()`). `seed-test-admins.sql` and `seed-chat-fixtures.sql` take the password
+  from `current_setting('cosora.fixture_password')`, and a guard aborts them if it is
+  unset. `.env.example` lists `DEMO_*_PASSWORD` and `FIXTURE_PASSWORD`; the README's
+  verification steps say how to seed. No fixture account exists today, so nothing
+  needed rotating there. `git grep -lF` for either old value → 0 files. The full account
+  is in `textile-spark-net/documentation/securityflags.md`.
 - 2026-09-11: **Both vendor-trust panels verified in a real browser, then committed and pushed.**
   `VendorKycPanel` (2026-09-08) and `VendorContractPanel` (2026-09-09) had lived only in a
   working tree — never committed — which is why a fresh clone of `origin/main` could not show

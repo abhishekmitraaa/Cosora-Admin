@@ -10,6 +10,7 @@
  * Cleanup afterwards: scripts/invite-tests-cleanup.sql
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -26,7 +27,7 @@ const db = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
 });
 const { error: loginErr } = await db.auth.signInWithPassword({
   email: "rlstest-superadmin@cosora.test",
-  password: "TestPass123!",
+  password: credential("FIXTURE_PASSWORD"),
 });
 if (loginErr) throw new Error(`login failed: ${loginErr.message}`);
 

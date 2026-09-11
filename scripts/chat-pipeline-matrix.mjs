@@ -25,6 +25,7 @@
  * Run: node scripts/chat-pipeline-matrix.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -49,7 +50,7 @@ const F = {
   conversation: null,
 };
 
-const PASSWORD = "TestPass123!";
+const PASSWORD = credential("FIXTURE_PASSWORD");
 const LOGINS = {
   buyerA: "chatfx-buyer-a@cosora.test",
   buyerB: "chatfx-buyer-b@cosora.test",

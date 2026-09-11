@@ -27,6 +27,7 @@
  * Run: node scripts/chat-moderation-behaviour.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { demoAccount } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -39,15 +40,15 @@ const env = Object.fromEntries(
 const URL_ = env.VITE_SUPABASE_URL;
 const ANON = env.VITE_SUPABASE_ANON_KEY;
 
-const BUYER = { email: "demo-buyer@cosora.dev", password: "cosora123" };
-const VENDOR = { email: "demo-vendor@cosora.dev", password: "cosora123" };
+const BUYER = demoAccount("buyer");
+const VENDOR = demoAccount("vendor");
 // demo-admin, which holds super_admin. The rlstest-* throwaway logins are
 // deleted after each use (see README), so depending on them here would make
 // this script fail for a reason that has nothing to do with what it tests.
 // super_admin satisfies the same support/super_admin predicate every RPC and
 // policy below checks; chat-moderation-matrix.mjs is the script that proves the
 // support role specifically.
-const SUPPORT = { email: "demo-admin@cosora.dev", password: "cosora123" };
+const SUPPORT = demoAccount("admin");
 
 const TAG = `zz-behaviour-${Date.now()}`;
 

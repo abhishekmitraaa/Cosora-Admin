@@ -7,13 +7,14 @@
  * Run with the preview server up on :4174.
  */
 import { chromium } from "file:///c:/Users/Abhishek Mitra/OneDrive/Desktop/cosora testing/cosora lovable/textile-spark-net/node_modules/playwright/index.mjs";
+import { credential } from "./lib/test-credentials.mjs";
 
 const BASE = "http://localhost:4174";
 
 async function loginAs(page, email) {
   await page.goto(BASE + "/login", { waitUntil: "networkidle" });
   await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', "TestPass123!");
+  await page.fill('input[type="password"]', credential("FIXTURE_PASSWORD"));
   await page.click('button[type="submit"]');
   await page.waitForTimeout(3500);
 }

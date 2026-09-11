@@ -15,6 +15,7 @@
  * Run: node scripts/invite-branches-test.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -24,7 +25,7 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
 
-const PASSWORD = "TestPass123!";
+const PASSWORD = credential("FIXTURE_PASSWORD");
 const SA = "rlstest-superadmin@cosora.test";
 const SUPPORT = "rlstest-support@cosora.test";
 const HASPW = "rlstest-haspw@cosora.test"; // exists + password -> branch 3

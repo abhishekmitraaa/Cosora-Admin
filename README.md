@@ -418,7 +418,13 @@ Two scripts drive the **real database with real logins** (anon key + password, s
 PostgREST runs as `authenticated`, exactly what the triggers check).
 
 ```bash
+# 0. Credentials come from .env (names in .env.example): FIXTURE_PASSWORD for
+#    the rlstest-*/chatfx-* logins, DEMO_*_PASSWORD for the demo accounts.
+#    No password is in any file here (2026-09-11).
 # 1. Seed throwaway accounts + isolated fixtures (SQL editor / service role).
+#    Put this line first, in the same run, with FIXTURE_PASSWORD from .env —
+#    the seed refuses to create anything without it:
+#      select set_config('cosora.fixture_password', '<FIXTURE_PASSWORD>', false);
 #    Paste the printed ids into the F = {...} block of both scripts.
 scripts/seed-test-admins.sql
 

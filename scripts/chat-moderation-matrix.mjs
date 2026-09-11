@@ -30,6 +30,7 @@
  * Run: node scripts/chat-moderation-matrix.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -41,7 +42,7 @@ const env = Object.fromEntries(
 
 const URL_ = env.VITE_SUPABASE_URL;
 const ANON = env.VITE_SUPABASE_ANON_KEY;
-const PASSWORD = "TestPass123!";
+const PASSWORD = credential("FIXTURE_PASSWORD");
 const NOWHERE = "00000000-0000-0000-0000-000000000000"; // an id that cannot exist
 const TAG = `zz-verify-${Date.now()}`;
 

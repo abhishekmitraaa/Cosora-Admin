@@ -17,6 +17,7 @@
  * Run: node scripts/rls-matrix.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -28,7 +29,7 @@ const env = Object.fromEntries(
 
 const URL_ = env.VITE_SUPABASE_URL;
 const ANON = env.VITE_SUPABASE_ANON_KEY;
-const PASSWORD = "TestPass123!";
+const PASSWORD = credential("FIXTURE_PASSWORD");
 
 const F = {
   vendor: "b92eaa10-4a83-42ff-b92a-feae098c9fa2",

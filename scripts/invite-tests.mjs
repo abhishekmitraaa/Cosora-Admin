@@ -9,6 +9,7 @@
  * Run: node scripts/invite-tests.mjs
  */
 import { createClient } from "@supabase/supabase-js";
+import { credential } from "./lib/test-credentials.mjs";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -18,7 +19,7 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
 
-const PASSWORD = "TestPass123!";
+const PASSWORD = credential("FIXTURE_PASSWORD");
 
 async function signIn(email) {
   const db = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {

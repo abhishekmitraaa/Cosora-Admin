@@ -33,6 +33,17 @@
 -- Tear down with scripts/drop-chat-fixtures.sql. ALWAYS.
 -- ─────────────────────────────────────────────────────────────
 
+-- The fixture password is NOT in this file (Master Prompt 8, Phase 1: it used to
+-- be, in a public repo, for accounts that include a super_admin). Before running,
+-- prepend this line with FIXTURE_PASSWORD from .env, in the same SQL-editor run:
+--   select set_config('cosora.fixture_password', '<FIXTURE_PASSWORD>', false);
+-- Without it the guard below aborts before any account is created.
+do $guard$ begin
+  if length(coalesce(current_setting('cosora.fixture_password', true), '')) < 16 then
+    raise exception 'set cosora.fixture_password first (see the comment above)';
+  end if;
+end $guard$;
+
 do $$
 declare
   r record;
@@ -55,7 +66,7 @@ begin
       email_change_token_current, phone_change, phone_change_token, reauthentication_token
     ) values (
       '00000000-0000-0000-0000-000000000000', r.uid, 'authenticated', 'authenticated',
-      r.email, extensions.crypt('TestPass123!', extensions.gen_salt('bf')),
+      r.email, extensions.crypt(current_setting('cosora.fixture_password'), extensions.gen_salt('bf')),
       now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb,
       jsonb_build_object('full_name', r.name),
       '', '', '', '', '', '', '', ''
