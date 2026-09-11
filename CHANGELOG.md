@@ -9,6 +9,108 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-11: **Both vendor-trust panels verified in a real browser, then committed and pushed.**
+  `VendorKycPanel` (2026-09-08) and `VendorContractPanel` (2026-09-09) had lived only in a
+  working tree — never committed — which is why a fresh clone of `origin/main` could not show
+  them. Before pushing, `textile-spark-net/tests/mp7-admin-vendor-panels.spec.ts` drove this app
+  at `/vendors/:id` as a super_admin, 3/3:
+  - the Supplier agreement panel lists a vendor's two contracts at the same version, flags the
+    duplicate, opens a drawn signature through a 5-minute signed URL (the URL resolves), and
+    offers no edit or delete control;
+  - a typed signature renders "typed — no image on file", with no "View signature" button;
+  - on the KYC panel, **Reject** on a PAN (with a reason) writes `verified = false`, the reason
+    and `reviewed_by` = the clicking admin; the vendor's own `/kyc` in the vendor app shows the
+    reason; **Approve** then writes `verified = true` and clears it. This is the first time the
+    approve/reject buttons have been clicked by a real admin session — every earlier check was
+    at the RPC layer.
+  The login came from the environment (`DEMO_ADMIN_PASSWORD`), not from a file. See the
+  buyer/vendor repo's `documentation/securityflags.md` (2026-09-11): the demo super_admin
+  password ships in that app's production bundle and needs rotating.
+
+- 2026-09-09: **The signed supplier agreement is finally visible here.** New
+  `src/components/VendorContractPanel.tsx`, mounted on `/vendors/:id` under the KYC panel.
+  Shows `agreement_version`, `signed_name`, the signing timestamp, and a 5-minute signed URL
+  for the signature image — the same on-demand `createSignedUrl` pattern the KYC panel uses,
+  because `business-docs` is private and has no public URL.
+  - **Read-only, and that is a design constraint rather than a first iteration.**
+    `vendor_contracts` has SELECT and INSERT policies and **no UPDATE or DELETE for anyone,
+    admins included** — an editable contract is not evidence. A UI with an edit or delete
+    control would advertise a capability the database refuses, so there is none. Two further
+    guards sit behind that, both added on the app side the same day: the `vendor_id` FK is
+    `ON DELETE RESTRICT`, and DELETE on `vendor_profiles` is now admin-only. Together they
+    closed a hole where a vendor could destroy their own signed agreement by deleting their
+    profile and letting the old `ON DELETE CASCADE` do the rest.
+  - **A null `signature_url` is rendered as "typed — no image on file", not as a broken
+    image or a blank.** Onboarding offers two ways to sign: draw on a canvas, or accept the
+    auto-generated cursive rendering of the typed name. Only a drawn signature produces a
+    file. A typed one is still a complete signature — `signed_name` + `agreement_version` +
+    timestamp + the vendor's affirmative act — so the panel says which kind it is. Generating
+    a picture of the typed name to fill the gap was considered and rejected: it would look
+    like a signature the vendor never made.
+  - **It warns when a vendor has more than one agreement**, and explains both ways that
+    happens: a legitimate re-sign after the agreement text changed (different
+    `agreement_version`), versus a duplicate at the SAME version left by a retried onboarding
+    submit before `trg_vendor_contracts_one_per_version` existed. The duplicate cannot be
+    deleted by anyone, so the panel tells the reviewer to read the newest.
+  - **`vendor_contracts` had to be added to `src/lib/database.types.ts`** — the generated
+    types here predate the table, so `supabase.from("vendor_contracts")` did not typecheck.
+  - Verified: the panel's exact query returns both of a test vendor's rows when run through
+    RLS as a `super_admin`, confirming `vendor_contracts_select`'s `is_admin()` branch. The
+    rendered panel was verified in a browser on 2026-09-11 — see the entry above. (This entry
+    originally said the panel could not be rendered because "no admin credentials are
+    available". That was wrong: a super_admin demo login was in the buyer/vendor repo all along.)
+
+- 2026-09-08: **KYC review — the counterparty to a promise the vendor app was already
+  making.** New: `src/components/VendorKycPanel.tsx`. Changed: `src/pages/VendorDetail.tsx`,
+  `src/lib/database.types.ts`.
+
+  **The gap.** `/onboarding` in the vendor app tells a seller their documents are "submitted
+  for review" and leaves `vendor_documents.verified = false`. Nothing in this panel could see
+  one of those rows, let alone flip the flag — `VendorDetail` rendered `gstin`/`pan`/`cin` as
+  text and stopped there. The promise had nobody on the other end of it.
+
+  **Documents are private and read through a signed URL.** They moved out of the public
+  `product-images` bucket into `business-docs` in the same pass (see the vendor app's log for
+  the exposure that prompted it). An admin needs **no new policy** to read one:
+  `business_docs_owner_select` is already
+  `foldername(name)[1] = auth.uid() OR is_admin()`. That was verified against the live
+  project *before* any UI was written — an admin session signed another vendor's KYC path and
+  fetched it, 200. Signing happens on demand for the one document being opened, not for the
+  whole list on mount, because a signed URL is a bearer token for five minutes.
+
+  **The verdict goes through an RPC, not an UPDATE, and for two reasons.** The standing one
+  is this repo's own rule: an UPDATE that RLS denies matches zero rows and returns success, so
+  a refused write is indistinguishable from an applied one — the same reason `Products.tsx`
+  and `Videos.tsx` use `approve_vendor_content`/`reject_vendor_content`. The new one is that
+  `vendor_documents_all` is a permissive `ALL` policy (`vendor_id = auth.uid() OR is_admin()`)
+  which let a **vendor** set `verified = true` on their own KYC from the browser. A trigger
+  now refuses the review columns to non-admins and
+  `set_vendor_document_verified(p_doc_id, p_verified, p_reason)` — SECURITY DEFINER, gated to
+  support/super_admin — is the only writer. It raises on every failure path.
+
+  **The write gate here is `canWrite(role, "accounts")`, not `"vendors"`.** The database gates
+  this on support/super_admin (the `set_account_status` predicate), while the `vendors`
+  section is vendor_ops/super_admin. Matching the button to the function keeps a disabled
+  control from being the only thing standing between a wrong role and a 42501.
+
+  **A rejection requires a reason and the vendor sees it.** The database refuses a rejection
+  with an empty reason. `vendor_documents` gained `rejection_reason`, `reviewed_at` and
+  `reviewed_by`, so "never reviewed" stays distinguishable from "reviewed and refused"; the
+  reason renders on the vendor's own `/kyc` page and the vendor is notified. Approving clears
+  it, mirroring `approve_vendor_content`.
+
+  **Approving KYC does not grant the trust seal, on purpose.** The seal has exactly three
+  additive sources and this is not a fourth — auto-granting would make the Manual verification
+  card stop describing what buyers actually see. KYC status is shown as a row *inside* that
+  card, labelled "does not grant a seal", because it is the context a human wants before
+  pressing the button, not a substitute for pressing it.
+
+  **Verified end to end against the live project**, not just in the browser: vendor uploads to
+  `business-docs` → row carries a PATH → admin selects another vendor's row → admin opens the
+  scan through a signed URL (200) → admin rejects with a reason → the VENDOR reads that reason
+  back → admin approves → `verified` flips and the reason clears → both verdicts produced a
+  `notifications` row. 8/8.
+
 - 2026-09-06: **Phase 4 - one design system with a real dark mode, plus eight new
   sections.** A visual pass over every existing screen with zero behaviour change,
   and the UI for the sections Phase 2 will wire to real tables.

@@ -1779,11 +1779,52 @@ export type Database = {
           },
         ]
       }
+      vendor_contracts: {
+        Row: {
+          agreement_version: string
+          created_at: string
+          id: string
+          signature_url: string | null
+          signed_at: string
+          signed_name: string
+          vendor_id: string
+        }
+        Insert: {
+          agreement_version: string
+          created_at?: string
+          id?: string
+          signature_url?: string | null
+          signed_at?: string
+          signed_name: string
+          vendor_id: string
+        }
+        Update: {
+          agreement_version?: string
+          created_at?: string
+          id?: string
+          signature_url?: string | null
+          signed_at?: string
+          signed_name?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_contracts_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_documents: {
         Row: {
           created_at: string
           doc_type: string
           file_url: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           id: string
           vendor_id: string
           verified: boolean
@@ -1792,6 +1833,9 @@ export type Database = {
           created_at?: string
           doc_type: string
           file_url?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           id?: string
           vendor_id: string
           verified?: boolean
@@ -1800,6 +1844,9 @@ export type Database = {
           created_at?: string
           doc_type?: string
           file_url?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           id?: string
           vendor_id?: string
           verified?: boolean
@@ -2024,6 +2071,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_vendor_document_verified: {
+        Args: { p_doc_id: string; p_verified: boolean; p_reason?: string | null }
+        Returns: undefined
+      }
       active_ads: {
         Args: { filter_category?: string; max_count?: number }
         Returns: {

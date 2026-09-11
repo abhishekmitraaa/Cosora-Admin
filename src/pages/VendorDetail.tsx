@@ -8,6 +8,8 @@ import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
 import AccountStatus from "@/components/AccountStatus";
+import VendorKycPanel, { useVendorKycDocs, kycSummary } from "@/components/VendorKycPanel";
+import VendorContractPanel from "@/components/VendorContractPanel";
 import FlagLog from "@/components/FlagLog";
 import {
   Badge,
@@ -55,6 +57,11 @@ export default function VendorDetail() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "vendors");
+
+  // KYC is read here as well as inside the panel so the seal card can show it
+  // as CONTEXT for the human making the verification call. React Query dedupes
+  // the two subscriptions to one request.
+  const kycDocs = useVendorKycDocs(id);
 
   const vendor = useQuery({
     queryKey: ["vendor", id],
@@ -160,6 +167,10 @@ export default function VendorDetail() {
           </p>
         </Panel>
 
+        <VendorKycPanel vendorId={v.id} />
+
+        <VendorContractPanel vendorId={v.id} />
+
         {/* Verification - explicitly framed as one of three seal sources. */}
         <Panel
           title="Manual verification"
@@ -191,6 +202,20 @@ export default function VendorDetail() {
                   : "none"
               }
             />
+            {/* CONTEXT, NOT A SOURCE. Approving KYC deliberately does not grant
+                the seal: that would make a silent fourth source and this card
+                would stop describing what buyers actually see. It sits here
+                because "have we seen their PAN?" is the question a human asks
+                before pressing the button below. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 py-2 text-xs">
+              <span className="text-ink-muted">KYC documents</span>
+              <span className="flex items-center gap-2">
+                <span className="text-ink-faint">
+                  {kycDocs.isLoading ? "loading…" : "does not grant a seal"}
+                </span>
+                <Badge tone={kycSummary(kycDocs.data).tone}>{kycSummary(kycDocs.data).label}</Badge>
+              </span>
+            </div>
           </div>
 
           <Button
