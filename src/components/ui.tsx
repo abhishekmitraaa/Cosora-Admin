@@ -413,6 +413,22 @@ const STATUS_TONE: Record<string, Tone> = {
   inactive: "neutral",
   rejected: "critical",
   suspended: "critical",
+  // ad campaign states (20260912120000). Without these every new status fell
+  // through to "neutral", so "pending_review" and "expired" rendered grey and
+  // identical — the queue's most important distinction, invisible.
+  pending_review: "caution",
+  changes_requested: "caution",
+  scheduled: "info",
+  paused_by_vendor: "caution",
+  paused_by_admin: "critical",
+  expired: "neutral",
+  archived: "neutral",
+  budget_exhausted: "neutral",
+  ended: "neutral",
+  promoted: "positive",
+  resumed: "positive",
+  resubmitted: "caution",
+  submitted: "caution",
   // money
   paid: "positive",
   processed: "positive",

@@ -2,12 +2,16 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { supabase, assertWrote } from "@/lib/supabase";
+// assertWrote is no longer imported here: every write on this page now goes
+// through a review RPC that raises on refusal, so there is no silent zero-row
+// UPDATE left to assert against.
+import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
-import { useAdminSession, useRole } from "@/hooks/useAdminSession";
+import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import FlagLog from "@/components/FlagLog";
 import AdsMonitoring from "@/components/AdsMonitoring";
+import AdReviewQueue from "@/components/AdReviewQueue";
 import {
   Attr,
   AttrGrid,
@@ -28,7 +32,7 @@ import {
   Textarea,
 } from "@/components/ui";
 
-type AdStatus = "active" | "paused" | "rejected";
+type AdStatus = "active" | "paused" | "rejected" | "expired";
 
 interface AdRow {
   id: string;
@@ -50,7 +54,21 @@ const TABS: { id: AdStatus; label: string }[] = [
   { id: "active", label: "Active" },
   { id: "paused", label: "Paused" },
   { id: "rejected", label: "Rejected" },
+  { id: "expired", label: "Finished" },
 ];
+
+/**
+ * One tab can cover several stored statuses. "Paused" covers both pauses and
+ * the legacy single 'paused' value — an admin looking for paused campaigns
+ * means all of them, even though only they can lift `paused_by_admin`.
+ * "Finished" covers 'expired' and the legacy 'ended'.
+ */
+const TAB_STATUSES: Record<AdStatus, string[]> = {
+  active: ["active"],
+  paused: ["paused_by_admin", "paused_by_vendor", "paused"],
+  rejected: ["rejected"],
+  expired: ["expired", "ended"],
+};
 
 /**
  * Two views of the same section, not two sections.
@@ -61,16 +79,20 @@ const TABS: { id: AdStatus; label: string }[] = [
  * above the page rather than a nav entry, so the rail does not grow an item
  * that leads to the same place.
  */
-type View = "moderation" | "monitoring";
+type View = "review" | "moderation" | "monitoring";
 
 const SUBTITLE = "Post-publish moderation. Take down a live campaign and record why.";
+const REVIEW_SUBTITLE = "Approve or reject campaigns before they reach buyers.";
 
 export default function Ads() {
   const role = useRole();
-  const { identity } = useAdminSession();
+  // `identity` is gone: moderated_by is written inside the RPCs from auth.uid(),
+  // which the client cannot forge.
   const qc = useQueryClient();
   const writable = canWrite(role, "ads");
-  const [view, setView] = useState<View>("moderation");
+  // Review is the default landing view: it is the one that has campaigns
+  // waiting on a person, and a paid vendor is waiting on each of them.
+  const [view, setView] = useState<View>("review");
   const [tab, setTab] = useState<AdStatus>("active");
   const [action, setAction] = useState<{ ad: AdRow; next: "paused" | "rejected" } | null>(null);
   const [reason, setReason] = useState("");
@@ -84,7 +106,7 @@ export default function Ads() {
           `id, title, placement, status, daily_budget, impressions, clicks,
            starts_at, ends_at, created_at, vendor_id, moderation_reason, moderated_at`,
         )
-        .eq("status", tab)
+        .in("status", TAB_STATUSES[tab])
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
 
@@ -95,49 +117,48 @@ export default function Ads() {
   });
 
   /**
-   * Takedown = a status change plus the recorded reason, in one UPDATE.
-   * `enforce_ads_moderation` raises 42501 unless the caller is
-   * super_admin/ads_moderator (for both the status AND the reason columns), so
-   * the DB is the gate here too.
+   * Takedown goes through the review RPCs, not a bare UPDATE.
    *
-   * The buyer-side effect is real and immediate: the `active_ads` RPC serves
-   * only status='active', and ad_impression/ad_click no-op on anything else.
+   * The old version wrote status + moderation_reason + moderated_* in one
+   * UPDATE and leaned on `assertWrote` to catch a silent RLS denial. That
+   * worked, but it could not write the ad_review_log row in the same
+   * transaction, so the decision history had a hole exactly where a takedown
+   * happened. pause_ad_campaign_by_admin / reject_ad_campaign check
+   * authorization inside themselves, RAISE on refusal, and log atomically.
+   *
+   * The buyer-side effect is real and immediate: active_ads() gates on
+   * is_ad_eligible(), which requires status='active'.
    */
   const moderate = useMutation({
     mutationFn: async ({ id, next, why }: { id: string; next: "paused" | "rejected"; why: string }) => {
-      assertWrote(
-        await supabase
-          .from("advertisements")
-          .update({
-            status: next,
-            moderation_reason: why,
-            moderated_at: new Date().toISOString(),
-            moderated_by: identity?.id ?? null,
-          })
-          .eq("id", id)
-          .select("id"),
-        `${next === "paused" ? "pause" : "reject"} campaign`,
-      );
+      const { error } =
+        next === "paused"
+          ? await supabase.rpc("pause_ad_campaign_by_admin", { p_ad_id: id, p_reason_code: why })
+          : await supabase.rpc("reject_ad_campaign", { p_ad_id: id, p_reason_code: why });
+      if (error) throw new Error(error.message);
     },
     onSuccess: (_d, vars) => {
       toast.success(vars.next === "paused" ? "Campaign paused" : "Campaign rejected");
       setAction(null);
       setReason("");
       void qc.invalidateQueries({ queryKey: ["ads"] });
+      void qc.invalidateQueries({ queryKey: ["ad-review"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const restore = useMutation({
     mutationFn: async (id: string) => {
-      assertWrote(
-        await supabase.from("advertisements").update({ status: "active" }).eq("id", id).select("id"),
-        "restore campaign",
-      );
+      const { error } = await supabase.rpc("resume_ad_campaign", { p_ad_id: id });
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      toast.success("Campaign restored to active");
+      // resume_ad_campaign re-checks the schedule, so a campaign resumed before
+      // its start date lands on 'scheduled' and a campaign that ended while
+      // paused is refused outright rather than silently republished.
+      toast.success("Campaign resumed");
       void qc.invalidateQueries({ queryKey: ["ads"] });
+      void qc.invalidateQueries({ queryKey: ["ad-review"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -145,7 +166,11 @@ export default function Ads() {
   const header = (
     <PageHeader
       title="Ads"
-      subtitle={view === "moderation" ? SUBTITLE : "Delivery and revenue across every campaign."}
+      subtitle={
+        view === "review" ? REVIEW_SUBTITLE
+          : view === "moderation" ? SUBTITLE
+          : "Delivery and revenue across every campaign."
+      }
       actions={<ViewSwitch value={view} onChange={setView} />}
     />
   );
@@ -155,6 +180,15 @@ export default function Ads() {
       <Page width="wide">
         {header}
         <AdsMonitoring />
+      </Page>
+    );
+  }
+
+  if (view === "review") {
+    return (
+      <Page>
+        {header}
+        <AdReviewQueue />
       </Page>
     );
   }
@@ -178,20 +212,21 @@ export default function Ads() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "ads")} />}
 
       {/*
-        Stated up front because it's a deliberate product decision, not an
-        oversight: money has already changed hands by the time an ad exists, so
-        there is no pre-publish approval step and none was added here.
+        This banner used to say "No pre-publish gate — ads still auto-publish on
+        payment". That is no longer true, and leaving it would have been the
+        most misleading sentence in the panel: a moderator would believe live
+        campaigns had never been reviewed.
       */}
       <Note className="mb-4">
-        <span className="font-semibold text-ink">No pre-publish gate.</span> Ads still auto-publish on
-        payment, exactly as before. This screen is a takedown tool for campaigns that are already
-        live. <span className="font-medium text-ink">Pausing</span> stops serving immediately, but the
-        vendor can resume it themselves from their dashboard.{" "}
-        <span className="font-medium text-ink">Rejecting</span> also stops serving and the vendor{" "}
-        <span className="font-medium text-ink">cannot</span> reactivate it (the{" "}
-        <span className="font-mono text-2xs">guard_ad_activation</span> trigger only allows
-        reactivation from <span className="font-mono text-2xs">paused</span>). Use reject for anything
-        that must stay down.
+        <span className="font-semibold text-ink">Campaigns are reviewed before they run.</span> Paid
+        campaigns land in the <span className="font-medium text-ink">Review</span> tab and reach no
+        buyer until approved. This screen handles campaigns that are already live.{" "}
+        <span className="font-medium text-ink">Pausing</span> stops serving immediately and, because
+        it is an <span className="font-medium text-ink">admin</span> pause, the vendor{" "}
+        <span className="font-medium text-ink">cannot</span> lift it themselves.{" "}
+        <span className="font-medium text-ink">Rejecting</span> also stops serving and cannot be
+        reactivated by the vendor. Both are recorded on{" "}
+        <span className="font-mono text-2xs">ad_review_log</span>.
       </Note>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
@@ -255,6 +290,7 @@ export default function Ads() {
 /** Segmented control. Same shape as the theme toggle, so it reads as a switch. */
 function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => void }) {
   const options: { id: View; label: string }[] = [
+    { id: "review", label: "Review" },
     { id: "moderation", label: "Moderation" },
     { id: "monitoring", label: "Monitoring" },
   ];
@@ -336,7 +372,7 @@ function AdCard({
         </div>
 
         <div className="flex w-full flex-col gap-1.5 sm:w-40">
-          {a.status === "active" && (
+          {(a.status === "active" || a.status === "scheduled") && (
             <>
               <Button disabled={!writable || busy} onClick={() => onAct("paused")}>
                 Pause
@@ -346,7 +382,7 @@ function AdCard({
               </Button>
             </>
           )}
-          {a.status === "paused" && (
+          {(a.status === "paused_by_admin" || a.status === "paused_by_vendor" || a.status === "paused") && (
             <>
               <Button variant="primary" disabled={!writable || busy} onClick={onRestore}>
                 Resume
@@ -356,10 +392,18 @@ function AdCard({
               </Button>
             </>
           )}
+          {/*
+            "Restore to active" was here for rejected campaigns. It is gone on
+            purpose: reject is a REVIEW DECISION, and undoing it by forcing the
+            status back to 'active' would skip review entirely and leave the
+            decision log saying the campaign is rejected while it served. A
+            rejected campaign that should run is resubmitted by the vendor and
+            re-approved in the Review tab, which records both steps.
+          */}
           {a.status === "rejected" && (
-            <Button variant="primary" disabled={!writable || busy} onClick={onRestore}>
-              Restore to active
-            </Button>
+            <p className="text-2xs text-ink-faint">
+              Rejected. The vendor can edit and resubmit it for review.
+            </p>
           )}
           <Button variant="ghost" onClick={() => setShowLog((s) => !s)}>
             {showLog ? "Hide log" : "Flag / log"}

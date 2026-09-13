@@ -99,6 +99,22 @@ export type Database = {
           },
         ]
       }
+      ad_review_log: {
+        Row: {
+          ad_id: string
+          created_at: string
+          decision: string
+          id: string
+          new_status: string | null
+          note: string | null
+          previous_status: string | null
+          reason_code: string | null
+          reviewer_id: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       ad_orders: {
         Row: {
           amount: number
@@ -2097,6 +2113,44 @@ export type Database = {
       admin_role: {
         Args: never
         Returns: Database["public"]["Enums"]["admin_role_type"]
+      }
+      approve_ad_campaign: {
+        Args: { p_ad_id: string; p_note?: string }
+        Returns: string
+      }
+      archive_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
+      ad_fraud_signals: {
+        Args: { p_days?: number }
+        Returns: {
+          ad_id: string
+          clicks: number
+          clicks_per_viewer: number
+          depth_ratio: number
+          distinct_viewers: number
+          post_click_events: number
+          reasons: string[]
+          status: string
+          title: string
+          vendor_id: string
+        }[]
+      }
+      ad_review_metrics: { Args: { p_days?: number }; Returns: Json }
+      pause_ad_campaign_by_admin: {
+        Args: { p_ad_id: string; p_reason_code: string }
+        Returns: undefined
+      }
+      reject_ad_campaign: {
+        Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
+        Returns: undefined
+      }
+      request_ad_changes: {
+        Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
+        Returns: undefined
+      }
+      resume_ad_campaign: { Args: { p_ad_id: string }; Returns: string }
+      suspend_ad_campaign: {
+        Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
+        Returns: undefined
       }
       admin_role_values: { Args: never; Returns: string[] }
       approve_vendor_content: {

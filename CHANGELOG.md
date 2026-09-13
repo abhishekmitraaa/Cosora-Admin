@@ -9,6 +9,46 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-12 (Advertising System v3): **The panel gained the half of ad moderation that did not exist: review before publish.**
+  This page used to carry a banner reading *"No pre-publish gate. Ads still auto-publish on
+  payment, exactly as before."* That was true, and it was the problem. It is now false, and
+  leaving it would have been the most misleading sentence in the panel — a moderator would
+  believe live campaigns had been reviewed when nothing had ever reviewed them.
+  - **New `Review` view** (`src/components/AdReviewQueue.tsx`), now the default landing tab
+    on `/ads`, because it is the one with campaigns waiting on a person — and a vendor who
+    has already paid is waiting behind each. Tabs: waiting for review, changes requested,
+    scheduled, suspended. Queue ordered **oldest first**; newest-first would starve the
+    campaign that has been waiting longest. Each row expands to creative, targeting,
+    schedule and an append-only decision history from `ad_review_log`.
+  - **Actions call RPCs, never a table write.** `approve_ad_campaign`, `reject_ad_campaign`,
+    `request_ad_changes`, `suspend_ad_campaign` — all SECURITY DEFINER, all raising on
+    refusal. `assertWrote` is gone from `Ads.tsx`: it existed to catch a silent zero-row
+    UPDATE, and there is no longer one to catch. Approve returns **where it landed** —
+    a campaign starting in the future becomes `scheduled`, and the toast says so rather
+    than claiming it is live.
+  - **Moderation view rewired too.** Pause/reject/resume now go through
+    `pause_ad_campaign_by_admin` / `reject_ad_campaign` / `resume_ad_campaign`, so each
+    takedown writes its `ad_review_log` row in the same transaction — the old single UPDATE
+    could not, leaving the decision history blank exactly where a takedown happened.
+    **"Restore to active" was removed from rejected campaigns**: undoing a review decision
+    by forcing the status back would skip review entirely. A rejected campaign is
+    resubmitted by the vendor and re-approved, which records both steps.
+  - **Reason codes are a fixed vocabulary**, not free text, because the rejection-reason
+    breakdown counts them and "misleading" vs "Misleading claims" would split one reason
+    into two rows. The free-text note carries the detail and is what the vendor reads.
+  - **Migrations** (applied live): `20260912120000` state model + INSERT-bound activation
+    guard, `…0100` the nine review RPCs, `…0400` `ad_fraud_signals()` +
+    `ad_review_metrics()`, `…0500` trust seals granted on approval instead of payment.
+  - **Invalid-traffic signal is read-only.** The brief asked for flagged campaigns to be
+    "routed to `suspend_ad_campaign`" and, one sentence later, said "never auto-block —
+    human review only". Those are incompatible; suspending *is* blocking. `ad_fraud_signals()`
+    ranks and surfaces, a human presses Suspend. It is a heuristic over session ids with no
+    IP or device fingerprint available, and is labelled as one.
+  - **Verified:** new `scripts/ad-review-rls.mjs`, **26/26** against the live database with
+    real logins — a buyer refused every RPC, the campaign's own owner refused every
+    moderator action and a direct `status='active'` write, an admin allowed, a vendor
+    refused when resuming an **admin** pause, and `ad_review_log` INSERT/DELETE refused
+    even for a super_admin. `npm run typecheck` → 0 errors (probe-verified).
 - 2026-09-11 (Master Prompt 8, Phase 1): **No password is in this repository any more.**
   The demo accounts' shared password (demo-admin is a `super_admin`) was rotated in the
   live project, with sessions revoked; the old value now returns `invalid_credentials`.
