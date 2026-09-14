@@ -1,26 +1,31 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
-import { SEED_ACTIVE, useDevSeed } from "@/lib/devSeed/store";
 import {
   CERT_STATUS_LABELS,
-  certificateStore,
   COURIERS,
+  cancelCertificate,
+  dispatchCertificate,
+  fetchCertificateOrders,
+  markDelivered,
+  markPrinted,
+  markReturned,
+  missingAddress,
   nextStatus,
-  updateCertificate,
   type CertificateOrder,
   type CertStatus,
-} from "@/lib/devSeed/certificates";
+} from "@/lib/certificates";
 import {
   Attr,
   AttrGrid,
   Badge,
   Button,
   Card,
-  DevSeedBanner,
   Empty,
+  ErrorNote,
   Field,
   Input,
   Notice,
@@ -29,27 +34,31 @@ import {
   PageHeader,
   ReadOnlyBanner,
   Select,
+  SkeletonList,
   StatusBadge,
   Tabs,
 } from "@/components/ui";
 
 /**
- * C3 - CERTIFICATE FULFILMENT. DEV-SEED DATA. Nothing here reads or writes
- * Supabase.
+ * C3 - CERTIFICATE FULFILMENT. REAL DATA.
  *
- * ⚠ BUILT PENDING ANDY'S CONFIRMATION that the certificate is a physical
- * printed article that gets couriered. Everything on this screen (print step,
- * courier, tracking number, delivery address, returns) follows from that
- * assumption. See src/lib/devSeed/certificates.ts for what exists in the schema
- * today, which is the ₹199 `verifiedCertificate` ad placement and nothing else.
+ * WHAT CHANGED, 2026-09-13. This screen used to read and write
+ * src/lib/devSeed/certificates.ts — nine invented orders in a local store,
+ * under a banner saying it was "built on an unconfirmed decision" that the
+ * certificate is a physical printed article that gets couriered.
  *
- * ROLE GATE: super_admin only, in roles.ts, section "certificates". The
- * `delivery_team` role that should own this screen day to day does not exist in
- * the `admin_role_type` enum yet; the note in roles.ts says exactly where to
- * add it once Phase 2 creates it.
+ * Mitra confirmed that decision. So the assumption is now a requirement, the
+ * table exists (certificate_orders), and this screen reads it. The caution
+ * banner is gone because the thing it cautioned about was answered — not
+ * because it was quietly dropped.
  *
- * SHAPE: card-and-action, matching Products.tsx and Ads.tsx, with tabs by
- * status the way those two use tabs by moderation state.
+ * The tabs, the forward-only pipeline and the courier list are unchanged: they
+ * were right, and only the data source moved.
+ *
+ * Every action is a SECURITY DEFINER RPC that raises on refusal. There is no
+ * UPDATE policy on the table for any role, so a bare client UPDATE would match
+ * zero rows and PostgREST would report SUCCESS — the clerk would be told a
+ * parcel was dispatched when nothing had been written.
  */
 
 const TABS: { id: CertStatus; label: string }[] = [
@@ -64,11 +73,31 @@ const TABS: { id: CertStatus; label: string }[] = [
 export default function Certificates() {
   const role = useRole();
   const writable = canWrite(role, "certificates");
-  const rows = useDevSeed(certificateStore);
   const [tab, setTab] = useState<CertStatus>("processing");
 
-  const tabs = TABS.map((t) => ({ ...t, count: rows.filter((r) => r.status === t.id).length }));
-  const visible = rows.filter((r) => r.status === tab);
+  const { data: rows, isLoading, error } = useQuery({
+    queryKey: ["certificate_orders"],
+    queryFn: fetchCertificateOrders,
+  });
+
+  const all = rows ?? [];
+  const tabs = TABS.map((t) => ({ ...t, count: all.filter((r) => r.status === t.id).length }));
+  const visible = all.filter((r) => r.status === tab);
+
+  // A vendor with several open orders is almost always the per-product pricing
+  // artefact, not a genuine request for several parcels: buying
+  // `verifiedCertificate` alongside N products charges N x Rs199 and creates N
+  // campaign rows, and the trigger makes one fulfilment order per row. The
+  // certificate is about the VENDOR, so printing three identical ones is
+  // nearly always wrong. Surfaced rather than auto-merged, because the fix is a
+  // refund decision and that belongs to a person.
+  const openByVendor = new Map<string, number>();
+  for (const c of all) {
+    if (c.status === "processing" || c.status === "printed") {
+      openByVendor.set(c.vendorId, (openByVendor.get(c.vendorId) ?? 0) + 1);
+    }
+  }
+  const duplicated = [...openByVendor.values()].filter((n) => n > 1).length;
 
   return (
     <Page>
@@ -78,29 +107,34 @@ export default function Certificates() {
       />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "certificates")} />}
-      {SEED_ACTIVE && <DevSeedBanner what="Certificate fulfilment" />}
-
-      <Notice tone="caution" title="Built on an unconfirmed decision" className="mb-4">
-        This screen assumes the verification certificate is a{" "}
-        <span className="font-semibold">physical printed article that gets couriered</span>. The
-        print step, the courier, the tracking number, the delivery address and the returned tab all
-        follow from that. If it turns out to be a digital badge, this collapses to issued and
-        revoked and most of what is below comes out. Flagged for Andy rather than assumed silently.
-      </Notice>
 
       <Note className="mb-4">
         The address on each card is a <span className="font-medium text-ink">snapshot taken at purchase</span>,
         not a live read of the vendor profile. A vendor who moves after ordering must not have the
-        address rewritten on a parcel already in transit, so Phase 2's table needs to store it rather
-        than join to <span className="font-mono text-2xs">vendor_profiles</span>.
+        address rewritten on a parcel already in transit — so a vendor who fills their profile in
+        later does <span className="font-medium text-ink">not</span> fix an order placed before they did.
       </Note>
+
+      {duplicated > 0 && (
+        <Notice tone="caution" title="Several open orders for one vendor" className="mb-4">
+          {duplicated === 1 ? "One vendor has" : `${duplicated} vendors have`} more than one
+          certificate open at once. Buying the certificate alongside several products charges once
+          per product and creates one order per product, but the certificate is about the vendor —
+          so this is usually a pricing artefact, not a request for several parcels. Confirm before
+          printing, and cancel the extras with a reason so the refund is traceable.
+        </Notice>
+      )}
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      {visible.length === 0 ? (
+      {error ? (
+        <ErrorNote message={error instanceof Error ? error.message : "Couldn't load certificate orders"} />
+      ) : isLoading ? (
+        <SkeletonList rows={3} />
+      ) : visible.length === 0 ? (
         <Empty>
-          {rows.length === 0
-            ? "No certificate orders. In a production build this screen is empty because the certificate_orders table does not exist yet."
+          {all.length === 0
+            ? "No certificate orders yet. One is created automatically when a vendor buys the verification certificate."
             : `Nothing is ${CERT_STATUS_LABELS[tab].toLowerCase()} right now.`}
         </Empty>
       ) : (
@@ -115,51 +149,68 @@ export default function Certificates() {
 }
 
 function CertificateCard({ order: c, writable }: { order: CertificateOrder; writable: boolean }) {
+  const qc = useQueryClient();
   const [courier, setCourier] = useState(c.courier ?? "");
   const [tracking, setTracking] = useState(c.trackingNumber ?? "");
   const next = nextStatus(c.status);
+  const noAddress = missingAddress(c);
+
+  const act = useMutation({
+    mutationFn: async (fn: () => Promise<void>) => fn(),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["certificate_orders"] }),
+    // The RPC raises on refusal, so the message the clerk sees is the database's
+    // own reason ("this vendor had no delivery address on file when they
+    // ordered"), not a generic failure.
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "That didn't go through"),
+  });
+
+  const run = (fn: () => Promise<void>, ok: string) =>
+    act.mutate(fn, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ["certificate_orders"] }); toast.success(ok); } });
 
   /**
-   * Dispatch is the one step with a precondition, and it is a real one: a
-   * parcel marked dispatched with no courier and no tracking number is a parcel
-   * nobody can find when the vendor calls. So the button is disabled until both
-   * are present, and says why.
+   * Dispatch is the one step with real preconditions: a parcel marked
+   * dispatched with no courier and no tracking number is a parcel nobody can
+   * find when the vendor calls, and one with no address was never postable at
+   * all. The database refuses both; the button says so first.
    */
-  const dispatchBlocked = next === "dispatched" && (!courier.trim() || !tracking.trim());
-
-  function advance() {
-    if (!next) return;
-    updateCertificate(c.id, {
-      status: next,
-      ...(next === "dispatched"
-        ? { courier: courier.trim(), trackingNumber: tracking.trim() }
-        : {}),
-    });
-    toast.success(`${c.reference} moved to ${CERT_STATUS_LABELS[next].toLowerCase()}`);
-  }
+  const dispatchBlocked = next === "dispatched" && (!courier.trim() || !tracking.trim() || noAddress);
 
   return (
     <Card className="transition-shadow hover:shadow-card-hover">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-[18rem] flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-section font-bold text-ink">{c.vendorName}</h3>
+            <h3 className="font-display text-section font-bold text-ink">
+              {c.vendorName ?? c.contactName ?? "Unnamed vendor"}
+            </h3>
             <StatusBadge status={c.status} />
             <span className="font-mono text-2xs text-ink-faint">{c.reference}</span>
           </div>
 
-          <address className="mt-2 not-italic text-sm leading-relaxed text-ink-muted">
-            {c.address}
-            <br />
-            {c.city}, {c.state} {c.postalCode}
-          </address>
+          {noAddress ? (
+            <Notice tone="critical" className="mt-2 text-xs">
+              <span className="font-semibold">No delivery address.</span> This vendor had no address
+              on their profile when they ordered, so there is nothing to put on a label. Collect one
+              and record it against the order before dispatch — the database refuses dispatch
+              without it.
+            </Notice>
+          ) : (
+            <address className="mt-2 not-italic text-sm leading-relaxed text-ink-muted">
+              {c.addressLine}
+              {c.area ? <>, {c.area}</> : null}
+              <br />
+              {[c.city, c.state].filter(Boolean).join(", ")} {c.postalCode}
+            </address>
+          )}
 
           <AttrGrid cols={3}>
-            <Attr label="Contact" value={c.contactName} />
-            <Attr label="Phone" value={c.contactPhone} mono />
+            <Attr label="Contact" value={c.contactName ?? "—"} />
+            <Attr label="Phone" value={c.contactPhone ?? "—"} mono />
             <Attr label="Purchased" value={format(new Date(c.purchasedAt), "d MMM yyyy")} />
             {c.courier && <Attr label="Courier" value={c.courier} />}
             {c.trackingNumber && <Attr label="Tracking" value={c.trackingNumber} mono />}
+            {c.dispatchedAt && <Attr label="Dispatched" value={format(new Date(c.dispatchedAt), "d MMM yyyy")} />}
           </AttrGrid>
 
           {c.returnReason && (
@@ -198,7 +249,13 @@ function CertificateCard({ order: c, writable }: { order: CertificateOrder; writ
               <Field
                 label="Tracking number"
                 htmlFor={`tracking-${c.id}`}
-                hint={dispatchBlocked ? "Both are required before dispatch." : undefined}
+                hint={
+                  noAddress
+                    ? "No address on file — dispatch is blocked."
+                    : dispatchBlocked
+                      ? "Both are required before dispatch."
+                      : undefined
+                }
               >
                 <Input
                   id={`tracking-${c.id}`}
@@ -216,8 +273,13 @@ function CertificateCard({ order: c, writable }: { order: CertificateOrder; writ
             <Button
               variant="primary"
               className="w-full"
-              disabled={!writable || dispatchBlocked}
-              onClick={advance}
+              disabled={!writable || dispatchBlocked || act.isPending}
+              onClick={() => {
+                if (next === "printed") run(() => markPrinted(c.id), `${c.reference} marked printed`);
+                else if (next === "dispatched")
+                  run(() => dispatchCertificate(c.id, courier.trim(), tracking.trim()), `${c.reference} dispatched`);
+                else run(() => markDelivered(c.id), `${c.reference} marked delivered`);
+              }}
             >
               Mark {CERT_STATUS_LABELS[next].toLowerCase()}
             </Button>
@@ -231,12 +293,11 @@ function CertificateCard({ order: c, writable }: { order: CertificateOrder; writ
             <Button
               variant="danger"
               className="w-full"
-              disabled={!writable}
+              disabled={!writable || act.isPending}
               onClick={() => {
-                const why = prompt("Why has this come back? It is recorded on the order.");
+                const why = prompt("Why has this come back? It is recorded on the order and shown to the vendor.");
                 if (!why?.trim()) return;
-                updateCertificate(c.id, { status: "returned", returnReason: why.trim() });
-                toast.success(`${c.reference} marked returned`);
+                run(() => markReturned(c.id, why.trim()), `${c.reference} marked returned`);
               }}
             >
               Mark returned
@@ -247,12 +308,11 @@ function CertificateCard({ order: c, writable }: { order: CertificateOrder; writ
             <Button
               variant="danger"
               className="w-full"
-              disabled={!writable}
+              disabled={!writable || act.isPending}
               onClick={() => {
-                const why = prompt("Why is this being cancelled? It is recorded on the order.");
+                const why = prompt("Why is this being cancelled? It is recorded on the order and shown to the vendor.");
                 if (!why?.trim()) return;
-                updateCertificate(c.id, { status: "cancelled", returnReason: why.trim() });
-                toast.success(`${c.reference} cancelled`);
+                run(() => cancelCertificate(c.id, why.trim()), `${c.reference} cancelled`);
               }}
             >
               Cancel order
@@ -262,16 +322,8 @@ function CertificateCard({ order: c, writable }: { order: CertificateOrder; writ
           {c.status === "returned" && (
             <Button
               className="w-full"
-              disabled={!writable}
-              onClick={() => {
-                updateCertificate(c.id, {
-                  status: "printed",
-                  courier: null,
-                  trackingNumber: null,
-                  returnReason: null,
-                });
-                toast.success(`${c.reference} back in the print queue`);
-              }}
+              disabled={!writable || act.isPending}
+              onClick={() => run(() => markPrinted(c.id), `${c.reference} back in the print queue`)}
             >
               Send again
             </Button>

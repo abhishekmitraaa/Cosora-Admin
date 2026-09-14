@@ -131,7 +131,12 @@ export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
       const { error } = await supabase.rpc("set_vendor_document_verified", {
         p_doc_id: id,
         p_verified: verified,
-        p_reason: reason ?? null,
+        // `undefined`, not `null`: p_reason is `text DEFAULT NULL`, so omitting
+        // it and passing null land on the same value, and the generated types
+        // type an optional RPC argument as `string | undefined`. (Surfaced when
+        // database.types.ts was regenerated for certificate_orders — the older
+        // file typed it loosely enough to accept null.)
+        p_reason: reason ?? undefined,
       });
       // The function raises on every failure path, so an error here is a real
       // refusal — never a silent no-op.

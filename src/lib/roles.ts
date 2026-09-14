@@ -54,13 +54,17 @@ export type Section =
   //   DB is already enforcing it. (Ads monitoring is NOT a section: it is a
   //   view inside "ads" and inherits that section's gate unchanged.)
   //
-  //   DEV-SEED, no table yet. `content`, `payments`, `certificates`,
-  //   `discounts` and `customers` render from a local development fixture and
-  //   write nothing. Their gates are declared NOW so Phase 2 only has to swap
-  //   the data source, but until the tables exist these are UX only in a
-  //   stronger sense than the rest of this file: there is no RLS behind them
-  //   because there is nothing to apply RLS to. Do not read a gate here as
-  //   evidence that a write is protected.
+  //   DEV-SEED, no table yet. `content`, `payments`, `discounts` and
+  //   `customers` render from a local development fixture and write nothing.
+  //   Their gates are declared NOW so Phase 2 only has to swap the data source,
+  //   but until the tables exist these are UX only in a stronger sense than the
+  //   rest of this file: there is no RLS behind them because there is nothing
+  //   to apply RLS to. Do not read a gate here as evidence that a write is
+  //   protected.
+  //
+  //   `certificates` LEFT this group on 2026-09-13: certificate_orders exists,
+  //   RLS is on it, and every write goes through certificate_fulfiller(), so
+  //   its gate is now a mirror of a real SQL predicate like the rest.
   //
   // Aggregate view of vendor_profiles.city/state. Same roles as "vendors",
   // because it is the same rows read a different way.
@@ -147,14 +151,18 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // Finance reads and acts; support reads, because "did this vendor's payment
   // land" is a support question. Mirrors the subscriptions split.
   payments: ["super_admin", "finance_admin", "support"],
-  // NOTE FOR PHASE 2: this should be
+  // NO LONGER DEV-SEED (2026-09-13). certificate_orders exists, and this gate
+  // now MIRRORS A REAL SQL PREDICATE: certificate_fulfiller() in migration
+  // 20260913130000 admits super_admin and finance_admin. If these ever drift,
+  // the database wins and the admin sees a 42501.
+  //
+  // STILL OUTSTANDING: the intended list is
   //   ["super_admin", "finance_admin", "delivery_team"]
-  // and SECTION_WRITE should gain "delivery_team" too. The `delivery_team`
-  // value does NOT exist in the admin_role_type enum yet, so naming it here
-  // would not compile against database.types.ts and, worse, would imply a role
-  // nobody can actually hold. Gated to super_admin alone until the migration
-  // that creates the role lands; add both entries in the same change.
-  certificates: ["super_admin"],
+  // and `delivery_team` does NOT exist in the admin_role_type enum, so naming
+  // it here would imply a role nobody can hold. Add it here, in SECTION_WRITE,
+  // and in certificate_fulfiller() in the same change that creates the enum
+  // value.
+  certificates: ["super_admin", "finance_admin"],
   discounts: ["super_admin", "finance_admin"],
   customers: ["super_admin", "support", "finance_admin"],
   // The hosted analytics dashboard, reached by an external link. Every role,
@@ -197,9 +205,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "system-health": [],
   content: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
-  // NOTE FOR PHASE 2: add "delivery_team" here at the same time as in
-  // SECTION_READ above, once the enum value exists.
-  certificates: ["super_admin"],
+  // Mirrors certificate_fulfiller() exactly. Add "delivery_team" here at the
+  // same time as in SECTION_READ and in the SQL, once the enum value exists.
+  certificates: ["super_admin", "finance_admin"],
   discounts: ["super_admin", "finance_admin"],
   // Read-only by design in this pass. The CRM screen searches, segments and
   // summarises; it does not edit anyone. Tag editing is a Phase-2 feature that
