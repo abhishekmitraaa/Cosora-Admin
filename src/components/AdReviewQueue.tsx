@@ -480,16 +480,14 @@ function ReviewCard({
 }
 
 /** Append-only decision history. Read-only by construction: ad_review_log has no
- *  UPDATE or DELETE grant, so there is nothing to edit here even for a super admin. */
+ *  UPDATE or DELETE grant, so there is nothing to edit here even for a super admin.
+ *  Read through admin_ad_review_log_list (admin-schema separation, Phase 3b). */
 function DecisionHistory({ adId }: { adId: string }) {
   const log = useQuery({
     queryKey: ["ad-review-log", adId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ad_review_log")
-        .select("id, ad_id, decision, reason_code, note, previous_status, new_status, created_at")
-        .eq("ad_id", adId)
-        .order("created_at", { ascending: false });
+      // Newest first.
+      const { data, error } = await supabase.rpc("admin_ad_review_log_list", { p_ad_id: adId });
       if (error) throw new Error(error.message);
       return (data ?? []) as LogRow[];
     },

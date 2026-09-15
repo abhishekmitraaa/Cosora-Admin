@@ -198,20 +198,11 @@ export default function Reports() {
   const flags = useQuery({
     queryKey: ["all-flags"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_flags")
-        .select("id, entity_type, entity_id, note, created_at, author:profiles!admin_flags_author_id_fkey(full_name, email)")
-        .order("created_at", { ascending: false })
-        .limit(25);
+      // Newest 25 across all entities, via the admin_flags RPC (admin-schema
+      // separation, Phase 3b); author_full_name / author_email are on each row.
+      const { data, error } = await supabase.rpc("admin_flag_list", { p_limit: 25 });
       if (error) throw new Error(error.message);
-      return data as unknown as {
-        id: string;
-        entity_type: string;
-        entity_id: string;
-        note: string;
-        created_at: string;
-        author: { full_name: string | null; email: string | null } | null;
-      }[];
+      return data;
     },
   });
 
@@ -429,7 +420,7 @@ export default function Reports() {
                   </div>
                   <p className="whitespace-pre-wrap text-sm text-ink">{f.note}</p>
                   <p className="mt-1 text-xs text-ink-faint">
-                    {f.author?.full_name || f.author?.email || "Unknown admin"} ·{" "}
+                    {f.author_full_name || f.author_email || "Unknown admin"} ·{" "}
                     {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                   </p>
                 </div>

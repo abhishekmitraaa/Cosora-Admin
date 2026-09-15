@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Flag } from "lucide-react";
-import { supabase, describeWriteError } from "@/lib/supabase";
+import { supabase, assertWrote } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { Button, Textarea } from "./ui";
 
@@ -19,7 +19,8 @@ interface FlagRow {
   note: string;
   created_at: string;
   author_id: string;
-  author: { full_name: string | null; email: string | null } | null;
+  author_full_name: string | null;
+  author_email: string | null;
 }
 
 /**
@@ -33,6 +34,10 @@ interface FlagRow {
  *
  * This is the one table `support` may write (admin_flags_insert allows any
  * is_admin author writing under their own author_id).
+ *
+ * Read and written ONLY through admin_flag_list / admin_flag_add (admin-schema
+ * separation, Phase 3b): the table is moving behind the admin wall, where a
+ * direct query cannot reach it. Both RPCs re-check that same policy inside.
  */
 export default function FlagLog({ entityType, entityId }: { entityType: FlagEntity; entityId: string }) {
   const qc = useQueryClient();
@@ -44,27 +49,29 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
   const flags = useQuery({
     queryKey: key,
     queryFn: async (): Promise<FlagRow[]> => {
-      const { data, error } = await supabase
-        .from("admin_flags")
-        .select("id, note, created_at, author_id, author:profiles!admin_flags_author_id_fkey(full_name, email)")
-        .eq("entity_type", entityType)
-        .eq("entity_id", entityId)
-        .order("created_at", { ascending: false });
+      // Newest first; author_full_name / author_email come back on each row.
+      const { data, error } = await supabase.rpc("admin_flag_list", {
+        p_entity_type: entityType,
+        p_entity_id: entityId,
+      });
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as FlagRow[];
+      return data ?? [];
     },
   });
 
   const addNote = useMutation({
     mutationFn: async (text: string) => {
       if (!identity) throw new Error("Not signed in");
-      const { error } = await supabase.from("admin_flags").insert({
-        entity_type: entityType,
-        entity_id: entityId,
-        note: text.trim(),
-        author_id: identity.id, // must equal auth.uid() — the insert policy checks it
-      });
-      if (error) throw new Error(describeWriteError(error));
+      // author_id is not sent: admin_flag_add always writes auth.uid(), and
+      // returns the row it inserted.
+      assertWrote(
+        await supabase.rpc("admin_flag_add", {
+          p_entity_type: entityType,
+          p_entity_id: entityId,
+          p_note: text.trim(),
+        }),
+        "add note to log",
+      );
     },
     onSuccess: () => {
       setNote("");
@@ -111,7 +118,7 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
           <div key={f.id} className="rounded-lg border border-line bg-surface p-2.5 shadow-xs">
             <p className="whitespace-pre-wrap text-sm text-ink">{f.note}</p>
             <p className="mt-1 text-xs text-ink-faint">
-              {f.author?.full_name || f.author?.email || "Unknown admin"} ·{" "}
+              {f.author_full_name || f.author_email || "Unknown admin"} ·{" "}
               {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
             </p>
           </div>

@@ -2627,6 +2627,20 @@ export type Database = {
         Returns: boolean
       }
       ad_viewer_city: { Args: never; Returns: string }
+      admin_ad_review_log_list: {
+        Args: { p_ad_id: string }
+        Returns: {
+          ad_id: string
+          created_at: string
+          decision: string
+          id: string
+          new_status: string
+          note: string
+          previous_status: string
+          reason_code: string
+          reviewer_id: string
+        }[]
+      }
       admin_embedding_pipeline_health: {
         Args: { p_limit?: number }
         Returns: {
@@ -2638,6 +2652,30 @@ export type Database = {
           status: string
           vault_secret_ok: boolean
           videos_missing: number
+        }[]
+      }
+      admin_flag_add: {
+        Args: { p_entity_id: string; p_entity_type: string; p_note: string }
+        Returns: {
+          author_id: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          note: string
+        }[]
+      }
+      admin_flag_list: {
+        Args: { p_entity_id?: string; p_entity_type?: string; p_limit?: number }
+        Returns: {
+          author_email: string
+          author_full_name: string
+          author_id: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          note: string
         }[]
       }
       admin_role: {
