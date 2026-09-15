@@ -156,17 +156,19 @@ for (const [role, email] of Object.entries(ACCOUNTS)) {
     if (!denied && spec.revert) await spec.revert(db);
   }
 
-  // admin_flags: the one table EVERY admin (support included) may write.
-  const { data: flagRows, error: flagErr } = await db.from("admin_flags").insert({
-    entity_type: "vendor",
-    entity_id: F.vendor,
-    note: `matrix test by ${role}`,
-    author_id: selfId,
-  }).select("id");
-  const flagDenied = Boolean(flagErr) || !flagRows?.length;
+  // The flagged-items log: the one thing EVERY admin (support included) may write.
+  // Since admin-schema separation Phase 3c the table is admin.admin_flags, which
+  // PostgREST cannot reach; the only write path is admin_flag_add(), which checks
+  // is_admin() inside and always records auth.uid() as the author.
+  const { data: flagRows, error: flagErr } = await db.rpc("admin_flag_add", {
+    p_entity_type: "vendor",
+    p_entity_id: F.vendor,
+    p_note: `matrix test by ${role}`,
+  });
+  const flagDenied = Boolean(flagErr) || !flagRows?.length || flagRows[0].author_id !== selfId;
   results.push({
     role,
-    action: "admin_flags.insert (note)",
+    action: "admin_flag_add (note, author = self)",
     expected: "ALLOW",
     actual: flagDenied ? "DENY" : "ALLOW",
     verdict: flagDenied ? "*** FAIL ***" : "PASS",
@@ -175,17 +177,19 @@ for (const [role, email] of Object.entries(ACCOUNTS)) {
   });
   if (flagDenied) failures++;
 
-  // admin_flags authorship forgery must be refused for everyone.
-  const { data: forgeRows, error: forgeErr } = await db.from("admin_flags").insert({
-    entity_type: "vendor",
-    entity_id: F.vendor,
-    note: "forged author",
-    author_id: "33333333-3333-3333-3333-333333333333",
-  }).select("id");
+  // Authorship forgery must be refused for everyone. admin_flag_add has no author
+  // parameter at all, so the only way to try is to pass one: PostgREST finds no
+  // function with that signature and refuses (PGRST202) before anything is written.
+  const { data: forgeRows, error: forgeErr } = await db.rpc("admin_flag_add", {
+    p_entity_type: "vendor",
+    p_entity_id: F.vendor,
+    p_note: "forged author",
+    p_author_id: "33333333-3333-3333-3333-333333333333",
+  });
   const forgeDenied = Boolean(forgeErr) || !forgeRows?.length;
   results.push({
     role,
-    action: "admin_flags.insert AS SOMEONE ELSE",
+    action: "admin_flag_add AS SOMEONE ELSE (extra author param)",
     expected: "DENY",
     actual: forgeDenied ? "DENY" : "ALLOW",
     verdict: forgeDenied ? "PASS" : "*** FAIL ***",

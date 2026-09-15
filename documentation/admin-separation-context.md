@@ -16,6 +16,20 @@ State before this repo's work: Phase 1 (schema + `admin.admin_users`) ✅, Phase
 
 ---
 
+## 2026-09-16: Phase 3c complete (tables moved). HARD STOP: Phase 3 needs Mitra's independent verification; do not start Phase 4.
+
+**Branch:** `admin-separation/phase-3c` (this repo; from `main` @ `c322055`). The DB migration is in textile-spark-net
+(`20260916090000_move_admin_flags_and_review_log_to_admin`); its canonical context has the full V1–V8 record.
+- `admin_flags` / `ad_review_log` are now `admin.*`; REST returns 404/406 for every client. Panel code unchanged. Production (`cosora-admin.vercel.app`)
+  verified in a real browser after the move: 5 RPC calls 200, 0 direct table requests, no page errors.
+- `admin_ad_review_log_list` is admin-only (Q-4).
+- Scripts: `ad-review-rls.mjs` (log via RPC as admin, +Q-4 vendor-deny case, 2 table-write cases retired; **25/25**), `rls-matrix.mjs`
+  (note + forgery via `admin_flag_add`), `chat-pipeline-matrix.mjs` T6.8 (via `admin_flag_add`), `drop-test-admins.sql` and `drop-chat-fixtures.sql`
+  (`admin.admin_flags`; both executed cleanly). Converted rls-matrix/T6.8 cases 14/14 with demo accounts. The full `rls-matrix` / `chat-pipeline`
+  suites were **not** run (they need seeded admin logins with a known password in prod).
+- `src/lib/database.types.ts`: −86 lines (table types gone, RPCs kept). Typecheck 0, build passes.
+- No script in this repo does a direct PostgREST read of the moved tables.
+
 ## 2026-09-15: Phase 3b complete (panel off the tables). HARD STOP: 3c needs Mitra's explicit, independent go.
 
 **Do not start 3c because checks are green.** 3c is the irreversible `SET SCHEMA admin` move.

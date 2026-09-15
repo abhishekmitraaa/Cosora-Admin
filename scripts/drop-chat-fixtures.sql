@@ -37,7 +37,8 @@ delete from public.conversations
  where user_a::text like 'cf00000%' or user_b::text like 'cf00000%';
 
 -- Anything the tests wrote through the fixtures.
-delete from public.admin_flags where entity_id::text like 'cf00000%';
+-- admin_flags lives in the admin schema since admin-schema separation Phase 3c.
+delete from admin.admin_flags where entity_id::text like 'cf00000%';
 delete from public.keyword_blocklist where term like 'chatfx-%';
 delete from public.flag_patterns where label like 'chatfx-%';
 

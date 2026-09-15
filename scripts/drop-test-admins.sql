@@ -2,7 +2,8 @@
 -- Always run this when finished — the seeded accounts are admin logins with a
 -- known password.
 
-delete from public.admin_flags
+-- admin_flags lives in the admin schema since admin-schema separation Phase 3c.
+delete from admin.admin_flags
  where note like 'matrix test%'
     or note = 'forged author'
     or entity_id in (select id from public.vendor_profiles where brand_name = 'RLS Test Brand');

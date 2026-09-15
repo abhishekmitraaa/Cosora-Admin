@@ -158,22 +158,19 @@ if (!adId) {
     admin.db.rpc("resume_ad_campaign", { p_ad_id: adId }));
 
   // ── The log is append-only for everyone ──
-  await check("admin  → INSERT into ad_review_log", "deny", async () => {
-    const { data, error } = await admin.db
-      .from("ad_review_log")
-      .insert({ ad_id: adId, decision: "approved", new_status: "active" })
-      .select("id");
-    return { error: error ?? (data?.length ? null : { code: "RLS", message: "0 rows" }) };
-  });
-  await check("admin  → DELETE from ad_review_log", "deny", async () => {
-    const { data, error } = await admin.db
-      .from("ad_review_log").delete().eq("ad_id", adId).select("id");
-    return { error: error ?? (data?.length ? null : { code: "RLS", message: "0 rows" }) };
-  });
+  // Admin-schema separation, Phase 3c (2026-09-16): the log is admin.ad_review_log,
+  // in a schema PostgREST does not expose and no client role can use. The two
+  // cases that used to live here (admin INSERT / DELETE on the table, both
+  // "deny") are RETIRED as superseded: there is no REST surface to write through
+  // at all, and a request to /rest/v1/ad_review_log now 404s — which would pass
+  // a "deny" check vacuously. Append-only is now structural: the only writers are
+  // the SECURITY DEFINER review functions. Reads go through
+  // admin_ad_review_log_list(), which is admin-only (Q-4).
+  await check("vendor → admin_ad_review_log_list for own campaign (admin-only, Q-4)", "deny", () =>
+    vendor.db.rpc("admin_ad_review_log_list", { p_ad_id: adId }));
 
   // The decision history must actually have recorded all of the above.
-  const { data: log } = await vendor.db
-    .from("ad_review_log").select("decision").eq("ad_id", adId);
+  const { data: log } = await admin.db.rpc("admin_ad_review_log_list", { p_ad_id: adId });
   const decisions = (log ?? []).map((r) => r.decision);
   const expected = ["changes_requested", "resubmitted", "approved", "paused", "resumed"];
   const missing = expected.filter((d) => !decisions.includes(d));

@@ -582,18 +582,22 @@ try {
         JSON.stringify((bn.data ?? [])[0] ?? null));
     }
 
-    // 6.8 admin_flags on a conversation
+    // 6.8 flagged-items log note on a conversation
+    // Since admin-schema separation Phase 3c the log is admin.admin_flags, reachable
+    // only through admin_flag_add / admin_flag_list. The note is not deleted here:
+    // there is no delete path for support (the old direct delete matched 0 rows under
+    // RLS anyway); scripts/drop-chat-fixtures.sql removes it with the fixtures.
     {
-      const f = await S.support.db.from("admin_flags")
-        .insert({ entity_type: "conversation", entity_id: CONV_AB, note: `${TAG} support note`, author_id: S.support.id })
-        .select("id, entity_type, entity_id");
+      const f = await S.support.db.rpc("admin_flag_add", {
+        p_entity_type: "conversation", p_entity_id: CONV_AB, p_note: `${TAG} support note`,
+      });
+      const row = f.data?.[0];
       rec("T6.8", "n/a", "DB",
-        "support adds an admin_flags note scoped to entity_type=conversation",
-        "accepted, scoped to the right entity",
-        f.error ? `raised ${f.error.code}` : `entity_type=${f.data[0].entity_type}`,
-        !f.error && f.data?.[0]?.entity_type === "conversation" && f.data[0].entity_id === CONV_AB,
+        "support adds a flagged-items note (admin_flag_add) scoped to entity_type=conversation",
+        "accepted, scoped to the right entity, authored by support",
+        f.error ? `raised ${f.error.code}` : `entity_type=${row?.entity_type}`,
+        !f.error && row?.entity_type === "conversation" && row.entity_id === CONV_AB && row.author_id === S.support.id,
         "Medium", f.error?.message ?? "");
-      if (!f.error) await S.support.db.from("admin_flags").delete().eq("id", f.data[0].id);
     }
 
     // 6.9 role gate — the four non-chat roles must be refused at the DB
