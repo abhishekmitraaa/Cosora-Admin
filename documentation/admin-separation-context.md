@@ -13,9 +13,21 @@ PostgREST, revoked from anon/authenticated), with approvals still atomic and DB-
 State before this repo's work: Phase 1 (schema + `admin.admin_users`) ✅, Phase 2 (`is_admin()`/`admin_role()` read
 `admin.admin_users`; `profiles` mirrored into it; Q-17 closed) ✅, Phase 3a (SECURITY DEFINER RPCs over
 `admin_flags` / `ad_review_log`, still in `public`) ✅, migrations in textile-spark-net.
-Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b below.
+Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b ✅; 4c below.
 
 ---
+
+## 2026-09-22: Phase 4c complete (tables moved). HARD STOP: Phase 4 needs Mitra's independent verification.
+
+**Branch:** `admin-separation/phase-4c` (this repo, from `main` @ `a0218a6`). The DB migration is in textile-spark-net
+(`20260921190000_move_chat_moderation_tables_to_admin`); its canonical context has the full V1–V8 record.
+- The five tables are `admin.*`: REST gives 404 PGRST205 for every client, and panel code is unchanged. Prod was re-verified after the move: 6 RPCs at 200, 0 table requests.
+- Scripts:
+  - `chat-moderation-behaviour.mjs` (17/17 live) and `chat-moderation-matrix.mjs` (converted cases 22/22 with demo accounts; `p_verdict` fix) are on the RPCs.
+  - `chat-pipeline-matrix.mjs` is on the RPCs (helpers + T7.7 exercised).
+  - `drop-chat-fixtures.sql` is on `admin.*` and ran cleanly.
+- The full matrices were **not** run: they need seeded `rlstest-*`/`chatfx-*` logins in prod.
+- `src/lib/database.types.ts`: −249 lines. Typecheck 0, build passes.
 
 ## 2026-09-21: Phase 4b complete (panel off the five chat/suspension tables). HARD STOP: 4c needs Mitra's independent go, after the panel is confirmed off the tables IN PRODUCTION.
 

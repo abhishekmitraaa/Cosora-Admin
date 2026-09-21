@@ -21,6 +21,17 @@
  *      with scripts/drop-test-admins.sql — they are admin accounts with a known
  *      password.
  *
+ * Since admin-schema separation Phase 4c (2026-09-21) conversation_reviews,
+ * keyword_blocklist, flag_patterns, chat_block_reasons and account_suspensions
+ * live in the `admin` schema and no client role can reach them over REST. Their
+ * cases go through the SECURITY DEFINER RPCs that front them (the same ones the
+ * panel calls), whose gates reproduce the tables' policies exactly — so the
+ * allowed-role lists below are unchanged. An RPC RAISES 42501 on refusal where
+ * the table used to return 0 rows; both count as a denial here.
+ * chat_block_reasons has no delete RPC (retiring a reason is a deactivate), so
+ * the super_admin throwaway reason is deactivated, and
+ * scripts/drop-chat-fixtures.sql removes the `zz-verify-%` rows as postgres.
+ *
  * Non-destructive: every table write is a uniquely-named throwaway row that the
  * script removes again, and both RPCs are called with a deliberately
  * nonexistent id so an AUTHORIZED caller fails on "not found" rather than
@@ -59,11 +70,11 @@ const ACCOUNTS = {
 const READS = {
   "conversations.select": { allowed: ["super_admin", "support"], run: (db) => db.from("conversations").select("id, status").limit(1) },
   "messages.select": { allowed: ["super_admin", "support"], run: (db) => db.from("messages").select("id, body").limit(1) },
-  "conversation_reviews.select": { allowed: ["super_admin", "support"], run: (db) => db.from("conversation_reviews").select("id, status").limit(1) },
-  "keyword_blocklist.select": { allowed: ["super_admin", "support"], run: (db) => db.from("keyword_blocklist").select("id, term").limit(1) },
-  "flag_patterns.select": { allowed: ["super_admin", "support"], run: (db) => db.from("flag_patterns").select("id, label").limit(1) },
-  "chat_block_reasons.select(active)": { allowed: ["super_admin", "support"], run: (db) => db.from("chat_block_reasons").select("id, reason").eq("active", true).limit(1) },
-  "account_suspensions.select": { allowed: ["super_admin", "support"], run: (db) => db.from("account_suspensions").select("id, active").limit(1) },
+  "conversation_reviews.select": { allowed: ["super_admin", "support"], run: (db) => db.rpc("admin_conversation_review_list") },
+  "keyword_blocklist.select": { allowed: ["super_admin", "support"], run: (db) => db.rpc("admin_keyword_list") },
+  "flag_patterns.select": { allowed: ["super_admin", "support"], run: (db) => db.rpc("admin_flag_pattern_list") },
+  "chat_block_reasons.select(active)": { allowed: ["super_admin", "support"], run: (db) => db.rpc("admin_block_reason_list", { p_active_only: true }) },
+  "account_suspensions.select": { allowed: ["super_admin", "support"], run: (db) => db.rpc("admin_account_suspension_list") },
 };
 
 /**
@@ -75,20 +86,22 @@ const READS = {
 const WRITES = {
   "keyword_blocklist.insert": {
     allowed: ["super_admin", "support"],
-    run: (db, ctx) => db.from("keyword_blocklist").insert({ term: `${TAG}-${ctx.role}`, added_by: ctx.selfId }).select("id"),
-    undo: (db, ctx) => db.from("keyword_blocklist").delete().eq("term", `${TAG}-${ctx.role}`),
+    run: (db, ctx) => db.rpc("admin_keyword_add", { p_term: `${TAG}-${ctx.role}` }),
+    undo: (db, ctx, rows) => Promise.all(rows.map((r) => db.rpc("admin_keyword_remove", { p_id: r.id }))),
   },
   "flag_patterns.insert": {
     allowed: ["super_admin", "support"],
     run: (db, ctx) =>
-      db.from("flag_patterns").insert({ pattern: `${TAG}-${ctx.role}`, label: `${TAG} ${ctx.role}`, active: false, added_by: ctx.selfId }).select("id"),
-    undo: (db, ctx) => db.from("flag_patterns").delete().eq("pattern", `${TAG}-${ctx.role}`),
+      db.rpc("admin_flag_pattern_add", { p_pattern: `${TAG}-${ctx.role}`, p_label: `${TAG} ${ctx.role}`, p_active: false }),
+    undo: (db, ctx, rows) => Promise.all(rows.map((r) => db.rpc("admin_flag_pattern_remove", { p_id: r.id }))),
   },
   // THE ONE THAT MATTERS: support is allowed everywhere above and refused here.
   "chat_block_reasons.insert": {
     allowed: ["super_admin"],
-    run: (db, ctx) => db.from("chat_block_reasons").insert({ reason: `${TAG}-${ctx.role}`, active: false, created_by: ctx.selfId }).select("id"),
-    undo: (db, ctx) => db.from("chat_block_reasons").delete().eq("reason", `${TAG}-${ctx.role}`),
+    // admin_block_reason_add always creates an ACTIVE reason; deactivate it at
+    // once so it never appears in the picker. There is no delete RPC.
+    run: (db, ctx) => db.rpc("admin_block_reason_add", { p_reason: `${TAG}-${ctx.role}` }),
+    undo: (db, ctx, rows) => Promise.all(rows.map((r) => db.rpc("admin_block_reason_update", { p_id: r.id, p_active: false }))),
   },
 };
 
@@ -107,7 +120,9 @@ const RPCS = {
   },
   "rpc resolve_conversation_review": {
     allowed: ["super_admin", "support"],
-    run: (db) => db.rpc("resolve_conversation_review", { p_review_id: NOWHERE, p_resolution: "resumed", p_reason_id: null }),
+    // p_verdict, not p_resolution: with the wrong name PostgREST finds no such
+    // function (PGRST202) for every role, which this matrix scored as "passed auth".
+    run: (db) => db.rpc("resolve_conversation_review", { p_review_id: NOWHERE, p_verdict: "resumed", p_reason_id: null }),
   },
 };
 
@@ -158,7 +173,7 @@ for (const [role, email] of Object.entries(ACCOUNTS)) {
       shouldAllow ? !denied : denied,
       error ? `${error.code ?? ""} ${error.message}` : "",
     );
-    if (!denied && spec.undo) await spec.undo(db, ctx);
+    if (!denied && spec.undo) await spec.undo(db, ctx, data);
   }
 
   for (const [action, spec] of Object.entries(RPCS)) {

@@ -22,6 +22,14 @@
  * leave a demo account suspended. Run scripts/seed-chat-fixtures.sql first and
  * scripts/drop-chat-fixtures.sql after.
  *
+ * ADMIN SCHEMA (Phase 4c, 2026-09-21). keyword_blocklist, flag_patterns,
+ * chat_block_reasons, conversation_reviews and account_suspensions live in the
+ * `admin` schema; no client role can reach them over REST. Every read and write
+ * of them here goes through the SECURITY DEFINER RPCs that front them (the ones
+ * the panel uses), whose gates reproduce the old policies exactly. The cases
+ * that asserted a DIRECT client write to them is refused (T7.7) now assert the
+ * table is not reachable at all (PGRST205), which is strictly stronger.
+ *
  * Run: node scripts/chat-pipeline-matrix.mjs
  */
 import { createClient } from "@supabase/supabase-js";
@@ -122,13 +130,44 @@ async function openConversation(actor, otherId) {
   return data;
 }
 
+/** Add blocklist terms, as support, through the admin RPC. Returns the first error, if any. */
+async function addTerms(...terms) {
+  let firstError = null;
+  for (const t of terms) {
+    const { error } = await S.support.db.rpc("admin_keyword_add", { p_term: t });
+    firstError ??= error;
+  }
+  return firstError;
+}
+
+/** Remove every blocklist row whose term matches exactly (the old .delete().eq("term")). */
+async function removeTerms(match) {
+  const { data } = await S.support.db.rpc("admin_keyword_list");
+  for (const k of (data ?? []).filter((row) => match(row.term))) {
+    await S.support.db.rpc("admin_keyword_remove", { p_id: k.id });
+  }
+}
+
+/** A conversation's reviews (optionally one status), as support, newest first. */
+async function reviews(convId, status = null) {
+  return S.support.db.rpc("admin_conversation_review_list", { p_status: status, p_conversation_id: convId });
+}
+
+/** The single pending review of a conversation — the old `.eq("status","pending").single()`:
+ *  data only when exactly one row matches, otherwise an error, as PostgREST's single() did. */
+async function onePending(convId) {
+  const { data, error } = await reviews(convId, "pending");
+  if (error) return { data: null, error };
+  if ((data ?? []).length !== 1) return { data: null, error: { code: "PGRST116", message: `expected 1 pending review, got ${data?.length ?? 0}` } };
+  return { data: data[0], error: null };
+}
+
 /** Reopen and clear the queue for a conversation, as support. */
 async function unlock(convId) {
-  const { data: pending } = await S.support.db
-    .from("conversation_reviews")
-    .select("id")
-    .eq("conversation_id", convId)
-    .eq("status", "pending");
+  const { data: pending } = await S.support.db.rpc("admin_conversation_review_list", {
+    p_status: "pending",
+    p_conversation_id: convId,
+  });
   for (const r of pending ?? []) {
     await S.support.db.rpc("resolve_conversation_review", {
       p_review_id: r.id,
@@ -234,8 +273,7 @@ try {
 
     const term = `${TAG}-zzblocked`;
     const wild = `${TAG}-100%off`; // contains a SQL LIKE wildcard on purpose
-    await S.support.db.from("keyword_blocklist")
-      .insert([{ term, added_by: S.support.id }, { term: wild, added_by: S.support.id }]);
+    await addTerms(term, wild);
 
     for (const [id, dir, sender, conv] of [
       ["T2.1", "buyer→vendor", S.buyerA, CONV_AB],
@@ -283,8 +321,7 @@ try {
 
     // 2.5 empty term must not block everything
     {
-      const empty = await S.support.db.from("keyword_blocklist")
-        .insert({ term: "", added_by: S.support.id }).select("id");
+      const empty = await S.support.db.rpc("admin_keyword_add", { p_term: "" });
       let ok, actual;
       if (empty.error) {
         ok = true;
@@ -295,7 +332,7 @@ try {
           .select("id");
         ok = !send.error;
         actual = send.error ? `*** EVERY MESSAGE BLOCKED (${send.error.code}) ***` : "ordinary message still sends";
-        await S.support.db.from("keyword_blocklist").delete().eq("id", empty.data[0].id);
+        await S.support.db.rpc("admin_keyword_remove", { p_id: empty.data[0].id });
       }
       rec("T2.5", "n/a", "DB", "insert an empty-string blocklist row, then send an ordinary message",
         "empty term does not block everything", actual, ok, "Critical", "");
@@ -304,7 +341,8 @@ try {
     // 2.6 a blocklist hit is NOT a moderation event.
     //
     // Asserted as a DELTA across one blocklisted send, not as an absolute count.
-    // conversation_reviews has no DELETE policy for any client role, so rows from
+    // conversation_reviews is not deletable by any client (no DELETE policy, and
+    // since 4c not reachable at all), so rows from
     // earlier runs cannot be cleared from here; an absolute count would measure
     // history rather than this test.
     {
@@ -312,10 +350,10 @@ try {
       const before = await reviewIds(CONV_AB);
       const stBefore = await statusOf(CONV_AB);
       const t = `${TAG}-zznotamodevent`;
-      await S.support.db.from("keyword_blocklist").insert({ term: t, added_by: S.support.id });
+      await addTerms(t);
       await S.buyerA.db.from("messages")
         .insert({ conversation_id: CONV_AB, sender_id: S.buyerA.id, body: `x ${t} y`, kind: "text" }).select("id");
-      await S.support.db.from("keyword_blocklist").delete().eq("term", t);
+      await removeTerms((x) => x === t);
       const after = await reviewIds(CONV_AB);
       const stAfter = await statusOf(CONV_AB);
       const added = after.filter((id) => !before.includes(id));
@@ -327,8 +365,7 @@ try {
 
     // 2.7 delete the term, same message now sends
     {
-      await S.support.db.from("keyword_blocklist").delete().eq("term", term);
-      await S.support.db.from("keyword_blocklist").delete().eq("term", wild);
+      await removeTerms((x) => x === term || x === wild);
       const send = await S.buyerA.db.from("messages")
         .insert({ conversation_id: CONV_AB, sender_id: S.buyerA.id, body: `hello ${term} there`, kind: "text" })
         .select("id");
@@ -342,8 +379,9 @@ try {
   // T3 — regex auto-flag (soft stop), against the 3 live seeded patterns
   // ══════════════════════════════════════════════════════════════════════
   {
-    const { data: patterns } = await S.support.db
-      .from("flag_patterns").select("id, label, pattern").eq("active", true).order("label");
+    // admin_flag_pattern_list orders active first, then by label.
+    const { data: allPatterns } = await S.support.db.rpc("admin_flag_pattern_list");
+    const patterns = (allPatterns ?? []).filter((p) => p.active);
 
     const PROBES = {
       "Indian mobile number": "please ring 9876543210",
@@ -369,10 +407,7 @@ try {
           .select("id");
         const after = await countMessages(conv);
         const st = await statusOf(conv);
-        const { data: revs } = await S.support.db
-          .from("conversation_reviews")
-          .select("id, source, matched_pattern_id")
-          .eq("conversation_id", conv);
+        const { data: revs } = await reviews(conv);
         // Only rows THIS send created, and only the pattern under test.
         const mine = (revs ?? []).filter((r) => !idsBefore.includes(r.id) && r.matched_pattern_id === p.id);
         const ok = !send.error && after === before + 1 && st === "under_review" &&
@@ -406,14 +441,14 @@ try {
 
     // invalid regex rejected by the CHECK before it can ever reach the trigger
     {
-      const bad = await S.support.db.from("flag_patterns")
-        .insert({ pattern: "[unclosed", label: `${TAG} malformed`, active: false, added_by: S.support.id })
-        .select("id");
+      const bad = await S.support.db.rpc("admin_flag_pattern_add", {
+        p_pattern: "[unclosed", p_label: `${TAG} malformed`, p_active: false,
+      });
       rec("T3.5", "n/a", "DB", "insert a syntactically invalid regex into flag_patterns",
         "rejected by flag_patterns_pattern_valid",
         bad.error ? `raised ${bad.error.code}` : "*** ACCEPTED ***",
         Boolean(bad.error), "Critical", bad.error?.message ?? "");
-      if (!bad.error) await S.support.db.from("flag_patterns").delete().eq("id", bad.data[0].id);
+      if (!bad.error) await S.support.db.rpc("admin_flag_pattern_remove", { p_id: bad.data[0].id });
     }
   }
 
@@ -431,9 +466,7 @@ try {
         p_conversation_id: conv, p_message_id: null, p_reported_reason: reason,
       });
       const st = await statusOf(conv);
-      const { data: revs } = await S.support.db
-        .from("conversation_reviews").select("id, source, reported_reason, reason_id")
-        .eq("conversation_id", conv).eq("status", "pending");
+      const { data: revs } = await reviews(conv, "pending");
       const row = (revs ?? []).find((r) => r.reported_reason === reason);
       const ok = !rep.error && st === "under_review" && Boolean(row) &&
         row.source === "user_report" && row.reason_id === null;
@@ -446,13 +479,11 @@ try {
 
     // 4.3 report an ALREADY-LOCKED conversation — behaviour is not assumed
     {
-      const before = await S.support.db
-        .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB);
+      const before = await reviews(CONV_AB);
       const again = await S.buyerA.db.rpc("submit_report", {
         p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: "Second report while locked",
       });
-      const after = await S.support.db
-        .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB);
+      const after = await reviews(CONV_AB);
       const added = (after.data?.length ?? 0) - (before.data?.length ?? 0);
       // Documenting real behaviour, not asserting a guess. Either is defensible;
       // silently doing nothing while reporting success would not be.
@@ -500,8 +531,7 @@ try {
     await S.buyerA.db.rpc("submit_report", {
       p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: `${TAG} for resume`,
     });
-    const { data: r1 } = await S.support.db
-      .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB).eq("status", "pending").single();
+    const { data: r1 } = await onePending(CONV_AB);
     await S.support.db.rpc("resolve_conversation_review", {
       p_review_id: r1.id, p_verdict: "resumed", p_resume: true,
     });
@@ -514,8 +544,7 @@ try {
     await S.buyerA.db.rpc("submit_report", {
       p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: `${TAG} default probe`,
     });
-    const { data: r2 } = await S.support.db
-      .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB).eq("status", "pending").single();
+    const { data: r2 } = await onePending(CONV_AB);
     await S.support.db.rpc("resolve_conversation_review", { p_review_id: r2.id, p_verdict: "resumed" });
     const afterDefault = await statusOf(CONV_AB);
     rec("T6.3b", "n/a", "DB",
@@ -529,14 +558,12 @@ try {
     await S.buyerA.db.rpc("submit_report", {
       p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: `${TAG} keep locked`,
     });
-    const { data: r3 } = await S.support.db
-      .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB).eq("status", "pending").single();
+    const { data: r3 } = await onePending(CONV_AB);
     await S.support.db.rpc("resolve_conversation_review", {
       p_review_id: r3.id, p_verdict: "kept_locked", p_resume: true,
     });
     const keptStatus = await statusOf(CONV_AB);
-    const { data: r3after } = await S.support.db
-      .from("conversation_reviews").select("status").eq("id", r3.id).single();
+    const r3after = ((await reviews(CONV_AB)).data ?? []).find((r) => r.id === r3.id) ?? null;
     rec("T6.5", "n/a", "DB",
       "resolve kept_locked, deliberately passing p_resume=true",
       "verdict recorded, conversation STILL under_review (kept_locked ignores p_resume)",
@@ -560,8 +587,7 @@ try {
         p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: `${TAG} notif probe`,
       });
       await S.support.db.from("notifications").delete().eq("conversation_id", CONV_AB); // ignore: admin can't, see below
-      const { data: r4 } = await S.support.db
-        .from("conversation_reviews").select("id").eq("conversation_id", CONV_AB).eq("status", "pending").single();
+      const { data: r4 } = await onePending(CONV_AB);
       await S.support.db.rpc("resolve_conversation_review", {
         p_review_id: r4.id, p_verdict: "resumed", p_resume: true,
       });
@@ -602,7 +628,7 @@ try {
 
     // 6.9 role gate — the four non-chat roles must be refused at the DB
     for (const role of ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin"]) {
-      const readRes = await S[role].db.from("conversation_reviews").select("id").limit(1);
+      const readRes = await S[role].db.rpc("admin_conversation_review_list");
       const rpcRes = await S[role].db.rpc("resolve_conversation_review", {
         p_review_id: "00000000-0000-0000-0000-000000000000", p_verdict: "resumed", p_resume: true,
       });
@@ -616,7 +642,7 @@ try {
         readDenied && rpcDenied, "Critical", rpcRes.error?.message ?? "");
     }
     for (const role of ["support", "super_admin"]) {
-      const readRes = await S[role].db.from("conversation_reviews").select("id").limit(1);
+      const readRes = await S[role].db.rpc("admin_conversation_review_list");
       rec(`T6.9-${role}`, "n/a", "DB", `as ${role}: read conversation_reviews`,
         "allowed (no error)", readRes.error ? `ERROR ${readRes.error.code}` : "allowed",
         !readRes.error, "Critical", readRes.error?.message ?? "");
@@ -629,9 +655,9 @@ try {
   {
     // 7.1 manual suspend
     await setStatus(F.buyerA, "suspended");
-    const { data: susp } = await S.support.db
-      .from("account_suspensions").select("id, source, conversation_review_id, active")
-      .eq("profile_id", F.buyerA).eq("active", true);
+    const { data: susp } = await S.support.db.rpc("admin_account_suspension_list", {
+      p_profile_ids: [F.buyerA], p_active: true,
+    });
     const notif = await S.buyerA.db.from("notifications").select("kind").eq("kind", "account_suspended");
     rec("T7.1", "n/a", "DB", "set_account_status(suspended, source=admin_manual)",
       "account_status flips, ledger row appended, account_suspended notification fires",
@@ -694,19 +720,24 @@ try {
         Boolean(grant.error) || (grant.data?.length ?? 0) === 0, "Critical", grant.error?.message ?? "");
     }
 
-    // 7.7 append-only ledger
+    // 7.7 append-only ledger. Since Phase 4c the table is admin.account_suspensions,
+    // which no client role can reach at all: every direct statement must FAIL
+    // (PGRST205, table not in the exposed schema), not merely match 0 rows. Only
+    // set_account_status (SECURITY DEFINER) writes it.
     {
-      const ins = await S.support.db.from("account_suspensions")
+      // .from() here is deliberate: it is the negative test that the table is
+      // unreachable over REST.
+      const table = "account_suspensions";
+      const ins = await S.support.db.from(table)
         .insert({ profile_id: F.buyerA, source: "admin_manual" }).select("id");
-      const upd = await S.support.db.from("account_suspensions")
+      const upd = await S.support.db.from(table)
         .update({ active: false }).eq("profile_id", F.buyerA).select("id");
-      const del = await S.support.db.from("account_suspensions")
+      const del = await S.support.db.from(table)
         .delete().eq("profile_id", F.buyerA).select("id");
-      const allDenied = (Boolean(ins.error) || (ins.data?.length ?? 0) === 0) &&
-        (upd.data?.length ?? 0) === 0 && (del.data?.length ?? 0) === 0;
+      const allDenied = Boolean(ins.error) && Boolean(upd.error) && Boolean(del.error);
       rec("T7.7", "n/a", "DB", "as a support admin: INSERT / UPDATE / DELETE account_suspensions directly",
-        "all three refused (rows-returned = 0); only set_account_status writes it",
-        `insert=${ins.error ? "raised" : (ins.data?.length ?? 0) + " rows"}, update=${upd.data?.length ?? 0} rows, delete=${del.data?.length ?? 0} rows`,
+        "all three FAIL: the table is not reachable over REST; only set_account_status writes it",
+        `insert=${ins.error?.code ?? "*** OK ***"}, update=${upd.error?.code ?? "*** OK ***"}, delete=${del.error?.code ?? "*** OK ***"}`,
         allDenied, "Critical", ins.error?.message ?? "");
     }
 
@@ -717,8 +748,9 @@ try {
         p_conversation_id: CONV_AB, p_message_id: null, p_reported_reason: `${TAG} independence probe`,
       });
       await setStatus(F.buyerA, "active");
-      const { data: open } = await S.support.db
-        .from("account_suspensions").select("id").eq("profile_id", F.buyerA).eq("active", true);
+      const { data: open } = await S.support.db.rpc("admin_account_suspension_list", {
+        p_profile_ids: [F.buyerA], p_active: true,
+      });
       const rein = await S.buyerA.db.from("notifications").select("kind").eq("kind", "account_reinstated");
       const convStill = await statusOf(CONV_AB);
       rec("T7.5", "n/a", "DB",
@@ -898,8 +930,11 @@ try {
     }
     if (CONV_AB) await unlock(CONV_AB);
     if (CONV_BA) await unlock(CONV_BA);
-    await S.support.db.from("keyword_blocklist").delete().like("term", `${TAG}%`);
-    await S.support.db.from("flag_patterns").delete().like("label", `${TAG}%`);
+    await removeTerms((t) => t.startsWith(TAG));
+    const { data: pats } = await S.support.db.rpc("admin_flag_pattern_list");
+    for (const p of (pats ?? []).filter((x) => x.label.startsWith(TAG))) {
+      await S.support.db.rpc("admin_flag_pattern_remove", { p_id: p.id });
+    }
   } catch (e) {
     console.error("TEARDOWN PROBLEM:", e.message);
   }
@@ -919,7 +954,7 @@ process.exit(failures === 0 ? 0 : 1);
 // ── helpers ──
 /** Every review id on a conversation — the basis for the delta assertions. */
 async function reviewIds(convId) {
-  const { data } = await S.support.db.from("conversation_reviews").select("id").eq("conversation_id", convId);
+  const { data } = await reviews(convId);
   return (data ?? []).map((r) => r.id);
 }
 async function countMessages(convId) {

@@ -9,6 +9,15 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · Phase 4c): **The five chat-moderation and suspension tables moved into the `admin` schema (textile-spark-net migration `20260921190000`). The panel needed no code change, because 4b already made it RPC-only; this repo's scripts and types follow the move.**
+  - **The production panel was verified after the move** in a real browser on `cosora-admin.vercel.app`. The keywords, patterns, reasons, review queue, chat thread, accounts and vendor-detail screens all load through the RPCs: 6 RPCs at 200, 0 direct table requests, no errors.
+  - **Scripts:**
+    - `chat-moderation-behaviour.mjs` now reads and writes through the RPCs. Case 7b's second pending review is filed by a participant's `submit_report` instead of a direct insert. It ran **17/17 green** against the walled database.
+    - `chat-moderation-matrix.mjs` moved its five tables' cases onto the RPCs, with the allowed-role lists unchanged. It also fixes a latent bug: the resolve case passed `p_resolution`, not `p_verdict`, so it never reached the function.
+    - `chat-pipeline-matrix.mjs` has about 30 sites on the RPCs, via small helpers (`reviews`, `onePending`, `addTerms`/`removeTerms`). T7.7 now asserts direct ledger writes FAIL (PGRST205), where before they matched 0 rows.
+    - `drop-chat-fixtures.sql` uses `admin.*` and ran cleanly. It also removes the matrix's `zz-verify-%` reasons, which have no client delete path.
+  - The two matrices need the seeded `rlstest-*`/`chatfx-*` logins, which are not seeded in production. Their converted cases were run with demo accounts instead.
+  - `src/lib/database.types.ts` −249 lines (the five table blocks). Typecheck 0 (the harness fires 1 on an injected error); build passes.
 - 2026-09-21 (Admin-schema separation · Phase 4b): **The chat-moderation and suspension screens now read and write `keyword_blocklist`, `flag_patterns`, `chat_block_reasons`, `conversation_reviews` and `account_suspensions` only through the Phase 4a RPCs (textile-spark-net migration `20260921090000`). There are no direct queries on those tables, and nothing on screen changed.** No database change.
   - **Nine files and fifteen call sites.** They are:
     - `ChatKeywords`: `admin_keyword_list` / `_add` / `_remove`.

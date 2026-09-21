@@ -23,81 +23,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      account_suspensions: {
-        Row: {
-          active: boolean
-          conversation_review_id: string | null
-          id: string
-          profile_id: string
-          reason_id: string | null
-          reinstated_at: string | null
-          reinstated_by: string | null
-          source: string
-          suspended_at: string
-          suspended_by: string | null
-        }
-        Insert: {
-          active?: boolean
-          conversation_review_id?: string | null
-          id?: string
-          profile_id: string
-          reason_id?: string | null
-          reinstated_at?: string | null
-          reinstated_by?: string | null
-          source: string
-          suspended_at?: string
-          suspended_by?: string | null
-        }
-        Update: {
-          active?: boolean
-          conversation_review_id?: string | null
-          id?: string
-          profile_id?: string
-          reason_id?: string | null
-          reinstated_at?: string | null
-          reinstated_by?: string | null
-          source?: string
-          suspended_at?: string
-          suspended_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_suspensions_conversation_review_id_fkey"
-            columns: ["conversation_review_id"]
-            isOneToOne: false
-            referencedRelation: "conversation_reviews"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_suspensions_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_suspensions_reason_id_fkey"
-            columns: ["reason_id"]
-            isOneToOne: false
-            referencedRelation: "chat_block_reasons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_suspensions_reinstated_by_fkey"
-            columns: ["reinstated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_suspensions_suspended_by_fkey"
-            columns: ["suspended_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ad_orders: {
         Row: {
           amount: number
@@ -514,116 +439,6 @@ export type Database = {
           },
         ]
       }
-      chat_block_reasons: {
-        Row: {
-          active: boolean
-          created_at: string
-          created_by: string
-          id: string
-          reason: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          created_by: string
-          id?: string
-          reason: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          created_by?: string
-          id?: string
-          reason?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_block_reasons_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversation_reviews: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          flagged_message_id: string | null
-          id: string
-          matched_pattern_id: string | null
-          reason_id: string | null
-          reported_reason: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          source: string
-          status: string
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          flagged_message_id?: string | null
-          id?: string
-          matched_pattern_id?: string | null
-          reason_id?: string | null
-          reported_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          source: string
-          status?: string
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          flagged_message_id?: string | null
-          id?: string
-          matched_pattern_id?: string | null
-          reason_id?: string | null
-          reported_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          source?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_reviews_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_reviews_flagged_message_id_fkey"
-            columns: ["flagged_message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_reviews_matched_pattern_id_fkey"
-            columns: ["matched_pattern_id"]
-            isOneToOne: false
-            referencedRelation: "flag_patterns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_reviews_reason_id_fkey"
-            columns: ["reason_id"]
-            isOneToOne: false
-            referencedRelation: "chat_block_reasons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_reviews_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       conversations: {
         Row: {
           created_at: string
@@ -791,41 +606,6 @@ export type Database = {
           },
         ]
       }
-      flag_patterns: {
-        Row: {
-          active: boolean
-          added_by: string | null
-          created_at: string
-          id: string
-          label: string
-          pattern: string
-        }
-        Insert: {
-          active?: boolean
-          added_by?: string | null
-          created_at?: string
-          id?: string
-          label: string
-          pattern: string
-        }
-        Update: {
-          active?: boolean
-          added_by?: string | null
-          created_at?: string
-          id?: string
-          label?: string
-          pattern?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "flag_patterns_added_by_fkey"
-            columns: ["added_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       follows: {
         Row: {
           created_at: string
@@ -853,35 +633,6 @@ export type Database = {
           {
             foreignKeyName: "follows_vendor_id_fkey"
             columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      keyword_blocklist: {
-        Row: {
-          added_by: string | null
-          created_at: string
-          id: string
-          term: string
-        }
-        Insert: {
-          added_by?: string | null
-          created_at?: string
-          id?: string
-          term: string
-        }
-        Update: {
-          added_by?: string | null
-          created_at?: string
-          id?: string
-          term?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "keyword_blocklist_added_by_fkey"
-            columns: ["added_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

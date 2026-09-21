@@ -22,6 +22,13 @@
  *     redaction path), so the messages it sends stay in the test thread. It
  *     uses the two demo accounts' own conversation for exactly that reason.
  *
+ * Since admin-schema separation Phase 4c (2026-09-21) the five moderation tables
+ * (keyword_blocklist, flag_patterns, chat_block_reasons, conversation_reviews,
+ * account_suspensions) live in the `admin` schema and no client role can reach
+ * them over REST. Every read and write of them here goes through the same
+ * SECURITY DEFINER RPCs the panel uses (admin_keyword_*, admin_flag_pattern_*,
+ * admin_conversation_review_list, submit_report, resolve_conversation_review).
+ *
  * Prerequisites: none. It uses the three demo accounts, so it runs as-is.
  *
  * Run: node scripts/chat-moderation-behaviour.mjs
@@ -92,11 +99,10 @@ const CONV = conv.id;
 
 /** Reopen the thread as support, between cases that lock it. */
 async function unlock() {
-  const { data: pending } = await support.db
-    .from("conversation_reviews")
-    .select("id")
-    .eq("conversation_id", CONV)
-    .eq("status", "pending");
+  const { data: pending } = await support.db.rpc("admin_conversation_review_list", {
+    p_status: "pending",
+    p_conversation_id: CONV,
+  });
   for (const r of pending ?? []) {
     await support.db.rpc("resolve_conversation_review", {
       p_review_id: r.id,
@@ -117,16 +123,10 @@ try {
   // ── 1. A blocklisted term is a HARD stop: no row, nothing queued ──────────
   {
     const term = `${TAG}-blocked-term`;
-    const ins = await support.db
-      .from("keyword_blocklist")
-      .insert({ term, added_by: support.id })
-      .select("id");
+    const ins = await support.db.rpc("admin_keyword_add", { p_term: term });
     blocklistId = ins.data?.[0]?.id ?? null;
 
-    const before = await support.db
-      .from("conversation_reviews")
-      .select("id")
-      .eq("conversation_id", CONV);
+    const before = await support.db.rpc("admin_conversation_review_list", { p_conversation_id: CONV });
 
     const send = await buyer.db
       .from("messages")
@@ -154,10 +154,7 @@ try {
       (written.data?.length ?? 0) === 0,
     );
 
-    const after = await support.db
-      .from("conversation_reviews")
-      .select("id")
-      .eq("conversation_id", CONV);
+    const after = await support.db.rpc("admin_conversation_review_list", { p_conversation_id: CONV });
     // The distinction that matters: a blocklist hit is NOT a moderation event.
     // Nothing is queued, which is exactly why the list must not be seeded blind.
     check(
@@ -173,10 +170,11 @@ try {
     // \y not \b — \b is a BACKSPACE in POSIX ARE, so a \b pattern compiles and
     // never fires. That failure mode is what case 5b guards.
     const marker = `${TAG.replace(/-/g, "")}marker`;
-    const ins = await support.db
-      .from("flag_patterns")
-      .insert({ pattern: `\\y${marker}\\y`, label: `${TAG} probe`, active: true, added_by: support.id })
-      .select("id");
+    const ins = await support.db.rpc("admin_flag_pattern_add", {
+      p_pattern: `\\y${marker}\\y`,
+      p_label: `${TAG} probe`,
+      p_active: true,
+    });
     patternId = ins.data?.[0]?.id ?? null;
 
     const send = await buyer.db
@@ -194,11 +192,10 @@ try {
     const { data: c } = await support.db.from("conversations").select("status").eq("id", CONV).single();
     check("2b. conversation flips to under_review", "under_review", c?.status ?? "?", c?.status === "under_review");
 
-    const reviews = await support.db
-      .from("conversation_reviews")
-      .select("id, source, matched_pattern_id")
-      .eq("conversation_id", CONV)
-      .eq("status", "pending");
+    const reviews = await support.db.rpc("admin_conversation_review_list", {
+      p_status: "pending",
+      p_conversation_id: CONV,
+    });
     const mine = (reviews.data ?? []).filter((r) => r.matched_pattern_id === patternId);
     check(
       "2c. exactly one review row created",
@@ -248,13 +245,15 @@ try {
       );
     }
 
-    const r2 = await support.db
-      .from("conversation_reviews")
-      .insert({ conversation_id: CONV, source: "user_report", status: "pending" })
-      .select("id");
-    if (r2.data?.[0]) {
+    // A second pending review, filed the way the product files one: a
+    // participant's report (conversation_reviews is not client-writable).
+    const r2Reason = `${TAG} 7b`;
+    await buyer.db.rpc("submit_report", { p_conversation_id: CONV, p_message_id: null, p_reported_reason: r2Reason });
+    const r2 = await support.db.rpc("admin_conversation_review_list", { p_status: "pending", p_conversation_id: CONV });
+    const r2Row = (r2.data ?? []).find((r) => r.reported_reason === r2Reason);
+    if (r2Row) {
       await support.db.rpc("resolve_conversation_review", {
-        p_review_id: r2.data[0].id,
+        p_review_id: r2Row.id,
         p_verdict: "resumed",
         p_resume: true,
       });
@@ -309,10 +308,11 @@ try {
 
   // ── 5. flag_patterns CHECK rejects a malformed regex ──────────────────────
   {
-    const bad = await support.db
-      .from("flag_patterns")
-      .insert({ pattern: "[unclosed", label: `${TAG} malformed`, active: false, added_by: support.id })
-      .select("id");
+    const bad = await support.db.rpc("admin_flag_pattern_add", {
+      p_pattern: "[unclosed",
+      p_label: `${TAG} malformed`,
+      p_active: false,
+    });
     check(
       "5. invalid regex is refused by the CHECK",
       "raises",
@@ -321,7 +321,7 @@ try {
       bad.error?.message ?? "",
     );
     if (!bad.error && bad.data?.[0]) {
-      await support.db.from("flag_patterns").delete().eq("id", bad.data[0].id);
+      await support.db.rpc("admin_flag_pattern_remove", { p_id: bad.data[0].id });
     }
 
     // 5b — the constraint's blind spot, asserted so nobody mistakes it for
@@ -355,13 +355,11 @@ try {
     const c = await support.db.from("conversations").select("status").eq("id", CONV).single();
     check("6b. it locks the conversation", "under_review", c.data?.status ?? "?", c.data?.status === "under_review");
 
-    const rows = await support.db
-      .from("conversation_reviews")
-      .select("id, reported_reason, reason_id, source")
-      .eq("conversation_id", CONV)
-      .eq("status", "pending")
-      .eq("source", "user_report");
-    const stored = rows.data?.find((r) => r.reported_reason === reason);
+    const rows = await support.db.rpc("admin_conversation_review_list", {
+      p_status: "pending",
+      p_conversation_id: CONV,
+    });
+    const stored = rows.data?.find((r) => r.source === "user_report" && r.reported_reason === reason);
     check(
       "6c. reported_reason is stored verbatim",
       JSON.stringify(reason),
@@ -381,10 +379,10 @@ try {
   // Teardown. Deactivate before deleting the pattern so nothing can match while
   // the rest of the teardown runs.
   if (patternId) {
-    await support.db.from("flag_patterns").update({ active: false }).eq("id", patternId);
-    await support.db.from("flag_patterns").delete().eq("id", patternId);
+    await support.db.rpc("admin_flag_pattern_update", { p_id: patternId, p_active: false });
+    await support.db.rpc("admin_flag_pattern_remove", { p_id: patternId });
   }
-  if (blocklistId) await support.db.from("keyword_blocklist").delete().eq("id", blocklistId);
+  if (blocklistId) await support.db.rpc("admin_keyword_remove", { p_id: blocklistId });
 
   const finalStatus = await unlock();
   // `messages` has NO delete policy, deliberately — there is no redaction path
