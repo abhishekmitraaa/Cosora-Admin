@@ -91,12 +91,13 @@ export default function Accounts() {
       // the same reason lib/vendors.ts and lib/accounts.ts resolve by id.
       const [vendors, suspensions] = await Promise.all([
         supabase.from("vendor_profiles").select("id, brand_name").in("id", ids),
-        supabase.from("account_suspensions").select("profile_id").in("profile_id", ids).eq("active", true),
+        supabase.rpc("admin_account_suspension_list", { p_profile_ids: ids, p_active: true }),
       ]);
       if (vendors.error) throw new Error(vendors.error.message);
-      // A support/super_admin caller can read this; anyone else gets nothing
-      // back rather than an error, which would read as "never suspended".
-      // openSuspensions is therefore only rendered for roles that may write.
+      // A support/super_admin caller can read this; anyone else is refused
+      // (42501), deliberately not thrown here, so they get nothing, which would
+      // read as "never suspended". openSuspensions is therefore only rendered
+      // for roles that may write.
       const brands = new Map((vendors.data ?? []).map((v) => [v.id, v.brand_name]));
       const open = new Map<string, number>();
       for (const s of suspensions.data ?? []) {

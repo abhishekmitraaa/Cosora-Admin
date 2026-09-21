@@ -9,6 +9,21 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-21 (Admin-schema separation · Phase 4b): **The chat-moderation and suspension screens now read and write `keyword_blocklist`, `flag_patterns`, `chat_block_reasons`, `conversation_reviews` and `account_suspensions` only through the Phase 4a RPCs (textile-spark-net migration `20260921090000`). There are no direct queries on those tables, and nothing on screen changed.** No database change.
+  - **Nine files and fifteen call sites.** They are:
+    - `ChatKeywords`: `admin_keyword_list` / `_add` / `_remove`.
+    - `ChatPatterns`: `admin_flag_pattern_list` / `_add` / `_update` / `_remove`; `regex_probe` is unchanged.
+    - `ChatReasons`: `admin_block_reason_list` / `_add` / `_update`.
+    - `lib/chat.ts` (the reason picker): `admin_block_reason_list(true)`.
+    - `ChatReview` and `ChatThread`: `admin_conversation_review_list`, by status or by conversation.
+    - `AccountStatus` and `Accounts`: `admin_account_suspension_list`.
+  - **Writes go through `assertWrote`**, including the inserts that used to check only for an error. `added_by`/`created_by` are no longer sent, because the RPC sets them to the caller.
+  - **Rendering is untouched.** The RPCs return embedded data as flat columns. Each page folds them back into the shape it already rendered, so the JSX did not change. An embed is null exactly when its joined row is absent, as before.
+  - **Proof.** A browser dump of 12 screens was taken before the change and after each table, with labelled fixtures so every screen had data: **identical text on all 12, every time.** The screens are the keywords, patterns and reasons lists, all five review tabs, a chat thread, Accounts, vendor detail with account status, and the reason picker. After the change the pages made 0 direct requests to the five tables.
+  - Every write was exercised in the UI against the live project: keyword add/remove, pattern test/add/deactivate/activate/delete, reason add/edit/deactivate, review resume, and account suspend/reinstate. Each went through its RPC. Buyer, vendor and anon are refused on every RPC. All verification rows and notifications were deleted afterwards.
+  - **No role loses anything.** Where the table used to return 0 rows, the RPC raises 42501. No screen reaches that path: the chat screens and Accounts are route-guarded to support/super_admin, which is exactly the set the policies admit, and `AccountStatus`'s history query only runs for them. `Accounts` still ignores a failed suspension read, as it did before.
+  - Fixed the stale comment in `lib/chat.ts` saying support "may only read ACTIVE rows". `chat_block_reasons_select` has no active filter.
+  - `src/lib/database.types.ts` was regenerated (+143 lines: the 12 RPCs, plus `lead_cap_used` from unrelated buyer-repo work). Typecheck 0 (the harness fires 1 on an injected error); build passes.
 - 2026-09-16 (Admin-schema separation · Phase 3c): **`admin_flags` and `ad_review_log` moved into the `admin` schema (textile-spark-net migration `20260916090000`). The panel needed no code change, because 3b already made it RPC-only; this repo's scripts and types follow the move.**
   - **Production panel verified after the move** in a real browser on `cosora-admin.vercel.app`: flag log (including adding a note), the Reports flagged-items list and a campaign's decision history all render. Five RPC calls, all 200; 0 direct table requests; no page errors.
   - **Decision history is admin-only now (Q-4).** `admin_ad_review_log_list` refuses a campaign's own vendor with 42501. The panel is admin-only, so nothing visible changes.

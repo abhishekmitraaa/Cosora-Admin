@@ -76,21 +76,47 @@ export default function ChatReview() {
     queryKey: ["chat-review", tab],
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("conversation_reviews")
-        .select(
-          `id, source, reported_reason, created_at, conversation_id, status,
-           reviewed_at, reviewed_by,
-           pattern:flag_patterns(label, pattern),
-           reason:chat_block_reasons(reason),
-           flagged:messages(id, body, kind, created_at, sender_id),
-           conversation:conversations(id, status, user_a, user_b)`,
-        )
-        .eq("status", tab)
-        .order(tab === "pending" ? "created_at" : "reviewed_at", { ascending: false });
+      // Ordered by created_at (pending) or reviewed_at (closed tabs), newest
+      // first. The RPC returns the four embeds flattened; they are folded back
+      // into the shape this page renders. Each marker column is NOT NULL in its
+      // own table, so null means "no joined row", which is what a null embed meant.
+      const { data, error } = await supabase.rpc("admin_conversation_review_list", {
+        p_status: tab,
+      });
       if (error) throw new Error(error.message);
 
-      const rows = (data ?? []) as unknown as ReviewRow[];
+      const rows: ReviewRow[] = (data ?? []).map((r) => ({
+        id: r.id,
+        source: r.source,
+        reported_reason: r.reported_reason,
+        created_at: r.created_at,
+        conversation_id: r.conversation_id,
+        status: r.status,
+        reviewed_at: r.reviewed_at,
+        reviewed_by: r.reviewed_by,
+        reason: r.reason !== null ? { reason: r.reason } : null,
+        pattern:
+          r.pattern_label !== null ? { label: r.pattern_label, pattern: r.pattern_pattern } : null,
+        flagged:
+          r.flagged_created_at !== null
+            ? {
+                id: r.flagged_message_id,
+                body: r.flagged_body,
+                kind: r.flagged_kind,
+                created_at: r.flagged_created_at,
+                sender_id: r.flagged_sender_id,
+              }
+            : null,
+        conversation:
+          r.conversation_status !== null
+            ? {
+                id: r.conversation_id,
+                status: r.conversation_status,
+                user_a: r.conversation_user_a,
+                user_b: r.conversation_user_b,
+              }
+            : null,
+      }));
       // reviewed_by is included so the audit tabs can name the admin who
       // decided. It is a profiles id like the participants, so one lookup
       // covers both — fetchParticipants de-duplicates.

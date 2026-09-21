@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase, assertWrote, describeWriteError } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
-import { useAdminSession, useRole } from "@/hooks/useAdminSession";
+import { useRole } from "@/hooks/useAdminSession";
 import {
   Badge,
   Button,
@@ -33,12 +33,12 @@ interface PatternRow {
   active: boolean;
   created_at: string;
   added_by: string | null;
-  adder: { full_name: string | null; email: string | null } | null;
+  adder_full_name: string | null;
+  adder_email: string | null;
 }
 
 export default function ChatPatterns() {
   const role = useRole();
-  const { identity } = useAdminSession();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-patterns");
   const [pattern, setPattern] = useState("");
@@ -51,13 +51,10 @@ export default function ChatPatterns() {
   const patterns = useQuery({
     queryKey: ["flag-patterns"],
     queryFn: async (): Promise<PatternRow[]> => {
-      const { data, error } = await supabase
-        .from("flag_patterns")
-        .select("id, pattern, label, active, created_at, added_by, adder:profiles(full_name, email)")
-        .order("active", { ascending: false })
-        .order("label", { ascending: true });
+      // Active first, then by label; adder_full_name / adder_email come back on each row.
+      const { data, error } = await supabase.rpc("admin_flag_pattern_list");
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as PatternRow[];
+      return data ?? [];
     },
   });
 
@@ -92,13 +89,15 @@ export default function ChatPatterns() {
 
   const add = useMutation({
     mutationFn: async (row: { pattern: string; label: string }) => {
-      const { error } = await supabase.from("flag_patterns").insert({
-        pattern: row.pattern.trim(),
-        label: row.label.trim(),
-        active: true,
-        added_by: identity?.id ?? null,
-      });
-      if (error) throw new Error(describeWriteError(error));
+      // added_by is set to the caller by the RPC; it is not a parameter.
+      assertWrote(
+        await supabase.rpc("admin_flag_pattern_add", {
+          p_pattern: row.pattern.trim(),
+          p_label: row.label.trim(),
+          p_active: true,
+        }),
+        "add pattern",
+      );
     },
     onSuccess: () => {
       setPattern("");
@@ -117,7 +116,7 @@ export default function ChatPatterns() {
   const update = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
       assertWrote(
-        await supabase.from("flag_patterns").update({ active }).eq("id", id).select("id"),
+        await supabase.rpc("admin_flag_pattern_update", { p_id: id, p_active: active }),
         active ? "activate pattern" : "deactivate pattern",
       );
     },
@@ -128,7 +127,7 @@ export default function ChatPatterns() {
   const remove = useMutation({
     mutationFn: async (id: string) => {
       assertWrote(
-        await supabase.from("flag_patterns").delete().eq("id", id).select("id"),
+        await supabase.rpc("admin_flag_pattern_remove", { p_id: id }),
         "delete pattern",
       );
     },
@@ -292,7 +291,7 @@ export default function ChatPatterns() {
                 {p.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
               </td>
               <td className="px-3 py-2 text-ink-muted">
-                {p.adder?.full_name || p.adder?.email || (
+                {p.adder_full_name || p.adder_email || (
                   <span className="text-ink-ghost">unknown</span>
                 )}
               </td>

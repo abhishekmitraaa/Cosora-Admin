@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { supabase, assertWrote, describeWriteError } from "@/lib/supabase";
+import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useAdminSession, useRole } from "@/hooks/useAdminSession";
 import {
@@ -31,7 +31,8 @@ interface ReasonRow {
   active: boolean;
   created_at: string;
   created_by: string | null;
-  creator: { full_name: string | null; email: string | null } | null;
+  creator_full_name: string | null;
+  creator_email: string | null;
 }
 
 /**
@@ -55,13 +56,10 @@ export default function ChatReasons() {
   const reasons = useQuery({
     queryKey: ["chat-block-reasons", "all"],
     queryFn: async (): Promise<ReasonRow[]> => {
-      const { data, error } = await supabase
-        .from("chat_block_reasons")
-        .select("id, reason, active, created_at, created_by, creator:profiles(full_name, email)")
-        .order("active", { ascending: false })
-        .order("reason", { ascending: true });
+      // Active first, then by reason; creator_full_name / creator_email come back on each row.
+      const { data, error } = await supabase.rpc("admin_block_reason_list");
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as ReasonRow[];
+      return data ?? [];
     },
   });
 
@@ -72,13 +70,14 @@ export default function ChatReasons() {
 
   const add = useMutation({
     mutationFn: async (value: string) => {
-      // created_by is NOT NULL. Sending null produced a confusing 23502 from
-      // Postgres instead of saying the session was the problem.
+      // created_by is NOT NULL and the RPC sets it to the caller. Without a
+      // session that would surface as a confusing Postgres error instead of
+      // saying the session was the problem.
       if (!identity?.id) throw new Error("No admin session. Sign in again before adding a reason.");
-      const { error } = await supabase
-        .from("chat_block_reasons")
-        .insert({ reason: value.trim(), active: true, created_by: identity.id });
-      if (error) throw new Error(describeWriteError(error));
+      assertWrote(
+        await supabase.rpc("admin_block_reason_add", { p_reason: value.trim() }),
+        "add block reason",
+      );
     },
     onSuccess: () => {
       setReason("");
@@ -91,7 +90,12 @@ export default function ChatReasons() {
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: { reason?: string; active?: boolean } }) => {
       assertWrote(
-        await supabase.from("chat_block_reasons").update(patch).eq("id", id).select("id"),
+        // An absent field is sent as nothing, which the RPC reads as "unchanged".
+        await supabase.rpc("admin_block_reason_update", {
+          p_id: id,
+          p_reason: patch.reason,
+          p_active: patch.active,
+        }),
         "update block reason",
       );
     },
@@ -162,7 +166,7 @@ export default function ChatReasons() {
                 {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
               </td>
               <td className="px-3 py-2 text-ink-muted">
-                {r.creator?.full_name || r.creator?.email || (
+                {r.creator_full_name || r.creator_email || (
                   <span className="text-ink-ghost">unknown</span>
                 )}
               </td>

@@ -2541,6 +2541,26 @@ export type Database = {
         Returns: boolean
       }
       ad_viewer_city: { Args: never; Returns: string }
+      admin_account_suspension_list: {
+        Args: { p_active?: boolean; p_profile_ids?: string[] }
+        Returns: {
+          active: boolean
+          conversation_review_id: string
+          id: string
+          profile_id: string
+          reason: string
+          reason_id: string
+          reinstated_at: string
+          reinstated_by: string
+          reinstated_by_email: string
+          reinstated_by_full_name: string
+          source: string
+          suspended_at: string
+          suspended_by: string
+          suspended_by_email: string
+          suspended_by_full_name: string
+        }[]
+      }
       admin_ad_review_log_list: {
         Args: { p_ad_id: string }
         Returns: {
@@ -2553,6 +2573,62 @@ export type Database = {
           previous_status: string
           reason_code: string
           reviewer_id: string
+        }[]
+      }
+      admin_block_reason_add: {
+        Args: { p_reason: string }
+        Returns: {
+          active: boolean
+          created_at: string
+          created_by: string
+          id: string
+          reason: string
+        }[]
+      }
+      admin_block_reason_list: {
+        Args: { p_active_only?: boolean }
+        Returns: {
+          active: boolean
+          created_at: string
+          created_by: string
+          creator_email: string
+          creator_full_name: string
+          id: string
+          reason: string
+        }[]
+      }
+      admin_block_reason_update: {
+        Args: { p_active?: boolean; p_id: string; p_reason?: string }
+        Returns: {
+          active: boolean
+          id: string
+          reason: string
+        }[]
+      }
+      admin_conversation_review_list: {
+        Args: { p_conversation_id?: string; p_status?: string }
+        Returns: {
+          conversation_id: string
+          conversation_status: string
+          conversation_user_a: string
+          conversation_user_b: string
+          created_at: string
+          flagged_body: string
+          flagged_created_at: string
+          flagged_kind: string
+          flagged_message_id: string
+          flagged_sender_id: string
+          id: string
+          matched_pattern_id: string
+          pattern_label: string
+          pattern_pattern: string
+          reason: string
+          reason_id: string
+          reported_reason: string
+          reviewed_at: string
+          reviewed_by: string
+          source: string
+          status: string
         }[]
       }
       admin_embedding_pipeline_health: {
@@ -2590,6 +2666,69 @@ export type Database = {
           entity_type: string
           id: string
           note: string
+        }[]
+      }
+      admin_flag_pattern_add: {
+        Args: { p_active?: boolean; p_label: string; p_pattern: string }
+        Returns: {
+          active: boolean
+          added_by: string
+          created_at: string
+          id: string
+          label: string
+          pattern: string
+        }[]
+      }
+      admin_flag_pattern_list: {
+        Args: never
+        Returns: {
+          active: boolean
+          added_by: string
+          adder_email: string
+          adder_full_name: string
+          created_at: string
+          id: string
+          label: string
+          pattern: string
+        }[]
+      }
+      admin_flag_pattern_remove: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      admin_flag_pattern_update: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: {
+          active: boolean
+          id: string
+        }[]
+      }
+      admin_keyword_add: {
+        Args: { p_term: string }
+        Returns: {
+          added_by: string
+          created_at: string
+          id: string
+          term: string
+        }[]
+      }
+      admin_keyword_list: {
+        Args: never
+        Returns: {
+          added_by: string
+          adder_email: string
+          adder_full_name: string
+          created_at: string
+          id: string
+          term: string
+        }[]
+      }
+      admin_keyword_remove: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
         }[]
       }
       admin_role: {
@@ -2747,6 +2886,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_conversation_member: { Args: { cid: string }; Returns: boolean }
+      lead_cap_used: {
+        Args: { p_since: string; p_vendor: string }
+        Returns: number
+      }
       log_engagement_event: {
         Args: {
           p_ad_id?: string

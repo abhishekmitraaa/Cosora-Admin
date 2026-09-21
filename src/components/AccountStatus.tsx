@@ -69,17 +69,24 @@ export default function AccountStatus({
     queryKey: ["account-suspensions", profileId],
     enabled: writable,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("account_suspensions")
-        .select(
-          `id, source, suspended_at, suspended_by, reinstated_at, reinstated_by, active,
-           conversation_review_id, reason:chat_block_reasons(reason)`,
-        )
-        .eq("profile_id", profileId)
-        .order("suspended_at", { ascending: false });
+      // Newest first. The flat reason text is folded back into the embed shape;
+      // it is NOT NULL on chat_block_reasons, so null means no reason row.
+      const { data, error } = await supabase.rpc("admin_account_suspension_list", {
+        p_profile_ids: [profileId],
+      });
       if (error) throw new Error(error.message);
 
-      const rows = (data ?? []) as unknown as SuspensionRow[];
+      const rows: SuspensionRow[] = (data ?? []).map((s) => ({
+        id: s.id,
+        source: s.source,
+        suspended_at: s.suspended_at,
+        suspended_by: s.suspended_by,
+        reinstated_at: s.reinstated_at,
+        reinstated_by: s.reinstated_by,
+        active: s.active,
+        conversation_review_id: s.conversation_review_id,
+        reason: s.reason !== null ? { reason: s.reason } : null,
+      }));
       // suspended_by / reinstated_by / profile_id all FK to profiles, so
       // PostgREST cannot embed the actor (PGRST201) — resolved separately.
       const actorIds = [

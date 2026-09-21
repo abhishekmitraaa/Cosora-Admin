@@ -103,19 +103,15 @@ export interface BlockReason {
 }
 
 /**
- * The reason picker's options. Support may only read ACTIVE rows (RLS), so the
- * filter is here for super_admin's benefit — support gets the same list either
- * way. A deactivated reason must never be selectable for a NEW suspension, but
- * stays readable on historical rows that already reference it.
+ * The reason picker's options: active reasons only, ordered by reason. Support
+ * and super_admin can both read every row (chat_block_reasons_select has no
+ * active filter), so the filter is what keeps a deactivated reason out of a NEW
+ * suspension while it stays readable on historical rows that reference it.
  */
 export async function fetchActiveBlockReasons(): Promise<BlockReason[]> {
-  const { data, error } = await supabase
-    .from("chat_block_reasons")
-    .select("id, reason")
-    .eq("active", true)
-    .order("reason", { ascending: true });
+  const { data, error } = await supabase.rpc("admin_block_reason_list", { p_active_only: true });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).map(({ id, reason }) => ({ id, reason }));
 }
 
 /** conversations.status → badge copy. */

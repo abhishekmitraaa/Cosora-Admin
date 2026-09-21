@@ -13,8 +13,40 @@ PostgREST, revoked from anon/authenticated), with approvals still atomic and DB-
 State before this repo's work: Phase 1 (schema + `admin.admin_users`) ✅, Phase 2 (`is_admin()`/`admin_role()` read
 `admin.admin_users`; `profiles` mirrored into it; Q-17 closed) ✅, Phase 3a (SECURITY DEFINER RPCs over
 `admin_flags` / `ad_review_log`, still in `public`) ✅, migrations in textile-spark-net.
+Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b below.
 
 ---
+
+## 2026-09-21: Phase 4b complete (panel off the five chat/suspension tables). HARD STOP: 4c needs Mitra's independent go, after the panel is confirmed off the tables IN PRODUCTION.
+
+**Do not start 4c because checks are green.** 4c is the irreversible move plus the message-trigger repoint.
+
+**Branch:** `admin-separation/phase-4b` (this repo, from `main` @ `95a7c28`). No database change. The 4a RPCs are live; the 4a migration is on
+textile-spark-net branch `admin-separation/phase-4a` (`a15890e`).
+
+**Call site → RPC** (15 sites, 9 files):
+- `ChatKeywords`: `admin_keyword_list` / `_add(p_term)` / `_remove(p_id)`.
+- `ChatPatterns`: `admin_flag_pattern_list` / `_add` / `_update(p_id, p_active)` / `_remove`.
+- `ChatReasons`: `admin_block_reason_list` / `_add` / `_update`.
+- `lib/chat.ts` `fetchActiveBlockReasons` (`ReasonPicker`): `admin_block_reason_list({ p_active_only: true })`.
+- `ChatReview`: `admin_conversation_review_list({ p_status })`. `ChatThread`: `({ p_conversation_id })`. Flat columns are folded back into the old embed objects.
+- `AccountStatus`: `admin_account_suspension_list({ p_profile_ids: [id] })`. `Accounts`: `({ p_profile_ids: ids, p_active: true })`.
+- `AccountStatus` keeps its separate `profiles` lookup for the actor names.
+- Writes go through `assertWrote`. `added_by`/`created_by` are not sent. `App.tsx` is untouched.
+
+**Verification:**
+- V1: 0 direct `from()` calls or embeds on the five tables in `src`.
+- V2: browser dump of 12 screens before the change and after each table, identical every time; 0 direct table requests after.
+- V3: every write passed in the UI through its RPC. Buyer, vendor and anon are refused on every RPC (`set_account_status` raises its own P0001 for a non-admin, pre-existing).
+- V4: typecheck 0 (harness fires 1); build passes.
+- The fixtures, the UI rows, one ledger row and 4 notifications were all deleted; live data is back to 0/3/7/1/0.
+- Scripts: `scratchpad/phase4b/dump.mjs`, `diff.cjs`, `writes.mjs` (not committed; `APP_URL` selects the target).
+
+**Before 4c (production check):** deploy this branch, then re-run the dump against `cosora-admin.vercel.app` and confirm 0 requests to `/rest/v1/{the five tables}`.
+
+**4c also has to switch these scripts, which still use the tables directly:**
+- this repo: `chat-moderation-behaviour.mjs:252` (→ `submit_report`), `chat-pipeline-matrix.mjs`, `chat-moderation-matrix.mjs`, `drop-chat-fixtures.sql` (→ `admin.*`).
+- textile-spark-net tests: `chat-pipeline.spec.ts`, `admin-chat-moderation.spec.ts`, `contact-gate-check.mjs`.
 
 ## 2026-09-16: Phase 3c complete (tables moved). HARD STOP: Phase 3 needs Mitra's independent verification; do not start Phase 4.
 

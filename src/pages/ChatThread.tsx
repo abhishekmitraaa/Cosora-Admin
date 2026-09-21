@@ -80,14 +80,9 @@ export default function ChatThread() {
           .eq("conversation_id", id!)
           .order("created_at", { ascending: true })
           .limit(MESSAGE_LIMIT),
-        supabase
-          .from("conversation_reviews")
-          .select(
-            `id, status, source, reported_reason, created_at, reviewed_at,
-             pattern:flag_patterns(label), reason:chat_block_reasons(reason)`,
-          )
-          .eq("conversation_id", id!)
-          .order("created_at", { ascending: false }),
+        // Newest first. Flat pattern_label / reason are folded back into the
+        // embed shape below; null means no joined row, as a null embed did.
+        supabase.rpc("admin_conversation_review_list", { p_conversation_id: id! }),
         fetchParticipants([conversation.user_a, conversation.user_b]),
       ]);
       if (messages.error) throw new Error(messages.error.message);
@@ -96,7 +91,18 @@ export default function ChatThread() {
       return {
         conversation,
         messages: (messages.data ?? []) as MessageRow[],
-        reviews: (reviews.data ?? []) as unknown as ReviewRow[],
+        reviews: (reviews.data ?? []).map(
+          (r): ReviewRow => ({
+            id: r.id,
+            status: r.status,
+            source: r.source,
+            reported_reason: r.reported_reason,
+            created_at: r.created_at,
+            reviewed_at: r.reviewed_at,
+            pattern: r.pattern_label !== null ? { label: r.pattern_label } : null,
+            reason: r.reason !== null ? { reason: r.reason } : null,
+          }),
+        ),
         people: people as Map<string, Participant>,
       };
     },
