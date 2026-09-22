@@ -2456,6 +2456,17 @@ export type Database = {
           id: string
         }[]
       }
+      admin_grant: {
+        Args: {
+          p_role: Database["public"]["Enums"]["admin_role_type"]
+          p_user_id: string
+        }
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          id: string
+          is_active: boolean
+        }[]
+      }
       admin_keyword_add: {
         Args: { p_term: string }
         Returns: {
@@ -2482,11 +2493,64 @@ export type Database = {
           id: string
         }[]
       }
+      admin_list_admins: {
+        Args: never
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          email: string
+          full_name: string
+          id: string
+        }[]
+      }
+      admin_revoke: {
+        Args: { p_user_id: string }
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          id: string
+          is_active: boolean
+        }[]
+      }
       admin_role: {
         Args: never
         Returns: Database["public"]["Enums"]["admin_role_type"]
       }
       admin_role_values: { Args: never; Returns: string[] }
+      admin_search_candidates: {
+        Args: { p_query: string }
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+        }[]
+      }
+      admin_set_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["admin_role_type"]
+          p_user_id: string
+        }
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          id: string
+          is_active: boolean
+        }[]
+      }
+      admin_status_of: {
+        Args: { p_user_id: string }
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          is_admin: boolean
+        }[]
+      }
+      admin_whoami: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          is_admin: boolean
+          role: Database["public"]["Enums"]["admin_role_type"]
+        }[]
+      }
       approve_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string }
         Returns: string

@@ -9,6 +9,52 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · pre-5c tooling): **The test and seed scripts now create, change and check admins through `admin.admin_users` instead of `profiles.is_admin` / `profiles.admin_role`, so the role-matrix harness keeps working after the Phase 5c column drop. The role matrix was re-proved unchanged against live while the columns still exist.**
+  - **Repointed (7 scripts).**
+    - `seed-test-admins.sql` keeps the profiles `email` write; the grant becomes an `admin.admin_users` upsert, plus `admin.shadow_admin_columns()`, so the legacy columns agree until 5c (a no-op after it).
+    - `drop-test-admins.sql` deletes the admin_users rows explicitly. Its tally reports `prof_leftover`, `au_leftover` and `real_admins` from admin_users.
+    - `invite-tests-cleanup.sql` un-promotes the demo users through admin_users + the shadow helper.
+    - In `rls-matrix.mjs`, the escalation cell is now `admin_set_role(self, super_admin)`.
+    - In `rls-superadmin.mjs`, role change, demote and promote-back use `admin_set_role`, `admin_revoke` and `admin_grant`.
+    - In `chat-pipeline-matrix.mjs`, T7.6c self-grant goes through `admin_set_role`.
+    - `invite-branches-test.mjs` reads admin state via `admin_list_admins`.
+  - **Proof, against live, with the columns present.** The fixtures were seeded with the repointed seed. The pre-repoint (committed) and repointed harnesses were each run on the same fixtures and compared cell by cell:
+
+    | Harness | Result | Cells differing |
+    |---|---|---|
+    | rls-matrix | 60/60 → 60/60 | 0 |
+    | rls-superadmin | 11/11 → 11/11 | 0 |
+    | chat-pipeline-matrix | 72/72 → 72/72 | 0 (identical per case) |
+    | invite-tests | 9/9 | – |
+    | chat-moderation-behaviour | all passed | – |
+    | chat-moderation-matrix | all passed | – |
+
+    The five escalation cells are still refused with 42501, now by the RPC instead of the trigger.
+  - **Not run live, on purpose:** `invite-branches-test.mjs` and `invite-send-test.mjs`. They send real emails and create real auth users at the owner's inbox, and the branch test's `haspw` / `+cosora-otp` fixtures are seeded by nothing, so every branch would fall through to "new user". Both are repointed and syntax-checked only.
+  - **Two teardown gaps found and fixed (pre-existing).**
+    - `drop-chat-fixtures.sql` missed chat-pipeline's `chatfx-… support note` flags, which are written on a fixture conversation whose id is not `cf`-prefixed. They blocked `drop-test-admins.sql` through an FK.
+    - `invite-tests-cleanup.sql` now says to run `drop-test-admins.sql` first. The matrix's flags reference the rlstest accounts, so running it first rolled the whole script back.
+  - **Cleanup verified.**
+    - 0 rlstest / chatfx / +cosora users; 0 leftover profiles; 0 admin_users test rows.
+    - Admins are 3 = 3 with 0/0/0 drift, which is the 5c pre-flight.
+    - Moderation data is back to baseline (patterns 3, reasons 7, reviews 1, suspensions 0, flags 1, notifications 42, demo thread 4 messages).
+  - The seed was run with a locally computed bcrypt hash in place of `crypt(<plaintext>)`, so the fixture password never went through a tool call or SQL logs. The committed files are unchanged in that respect.
+
+- 2026-09-22 (Admin-schema separation · Phase 5b): **The panel and both of this repo's edge functions stopped reading and writing `profiles.is_admin` / `profiles.admin_role`.** No migration.
+  - `useAdminSession` calls `admin_whoami()`. "Signed in but no row" is still a non-admin identity, not an error.
+  - `Admins.tsx` reads the roster through `admin_list_admins` and candidates through `admin_search_candidates`. set-role, promote and demote go through `admin_set_role`, `admin_grant` and `admin_revoke`. They raise on refusal, so `if (error)` replaces `assertWrote`.
+  - The row type lost `is_admin`, and `admin_role` is never null now, so the "No role assigned" option is gone. The React self-edit and last-super_admin guards stay.
+  - The footnote no longer claims the database will let you drop the last super_admin. Since 5a it refuses (42501).
+  - `admin-invite` (v6) and `admin-refund-payment` (v4) authorize the caller through `admin_status_of`. Both fail closed. The pre-deploy check found only comment differences from the deployed versions.
+  - `ResetPassword.tsx`: comment only.
+  - **Exercised in a browser on the dev server, 16/16:** login and shell, whoami, the roster (3), the self-edit guard, search, promote to Support, role change to Ads moderator, demote, and invite. Zero requests read or wrote the profiles columns. A non-admin sees "Not an admin account".
+  - **Edge functions live:** a non-admin gets 403 from invite and refund; a super_admin passes both. The test admin row was deleted.
+  - Typecheck 0 (the probe fires 1); build passes.
+- 2026-09-22 (Admin-schema separation · Phase 5a): **`admin-invite` now grants admin access through the new `admin_grant` RPC (textile-spark-net migration `20260922120000`, mirrored here byte-for-byte) instead of PATCHing `profiles.is_admin/admin_role` and relying on the mirror trigger. Deployed as v5. No panel code changed yet; the caller-authz read moves to `admin_status_of` in 5b.**
+  - `grantAdmin()` makes two writes, in this order: `PATCH profiles {email}`, keeping the old email backfill and its "no profiles row matched" check, then `rpc/admin_grant`. A failure can leave a harmless email backfill but never a half-granted admin. The JSON payloads of all three branches are unchanged.
+  - **Pre-deploy drift check:** deployed v4 differed from the repo only in three comment prefixes.
+  - **Live:** demo-buyer got 403 forbidden. demo-admin promoting demo-vendor (a password account) returned `outcome:"promoted", emailSent:false`, and the roster RPC showed it. `admin_revoke` then removed it and the test row was deleted.
+  - `src/lib/database.types.ts` +64 lines (the 7 RPCs). Typecheck 0 (the injected probe fires 1); build passes.
 - 2026-09-22 (Admin-schema separation · Phase 4c): **The five chat-moderation and suspension tables moved into the `admin` schema (textile-spark-net migration `20260921190000`). The panel needed no code change, because 4b already made it RPC-only; this repo's scripts and types follow the move.**
   - **The production panel was verified after the move** in a real browser on `cosora-admin.vercel.app`. The keywords, patterns, reasons, review queue, chat thread, accounts and vendor-detail screens all load through the RPCs: 6 RPCs at 200, 0 direct table requests, no errors.
   - **Scripts:**

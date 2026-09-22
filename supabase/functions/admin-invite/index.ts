@@ -24,8 +24,8 @@
 // password at /reset-password (the redirectTo below).
 //
 // Authorization mirrors admin-refund-payment: verify_jwt=true validated the
-// token signature, so `sub` is trustworthy; we then read that user's profiles
-// row with the service role and require admin_role = 'super_admin'. Hiding the
+// token signature, so `sub` is trustworthy; we then ask admin_status_of() for
+// that user (service role) and require admin_role = 'super_admin'. Hiding the
 // form in React is irrelevant to this path - the service role bypasses RLS, so
 // this check IS the gate.
 //
@@ -100,11 +100,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const callerId = callerIdFromJwt(req);
   if (!callerId) return json({ error: "unauthenticated" }, 401);
 
-  const profResp = await fetch(`${url}/rest/v1/profiles?id=eq.${callerId}&select=is_admin,admin_role`, {
+  // admin_status_of() reads admin.admin_users, the source of truth since
+  // admin-schema separation Phase 5 (service_role only). Any failure leaves
+  // caller null, which is a 403: this fails closed.
+  const statusResp = await fetch(`${url}/rest/v1/rpc/admin_status_of`, {
+    method: "POST",
     headers: REST(serviceKey),
+    body: JSON.stringify({ p_user_id: callerId }),
   });
-  const profRows = profResp.ok ? await profResp.json() : [];
-  const caller = Array.isArray(profRows) && profRows.length ? profRows[0] : null;
+  const statusRows = statusResp.ok ? await statusResp.json() : [];
+  const caller = Array.isArray(statusRows) && statusRows.length ? statusRows[0] : null;
   if (!caller?.is_admin || caller?.admin_role !== "super_admin") {
     return json(
       { error: "forbidden", detail: "Inviting or promoting admins requires the super_admin role" },
@@ -168,18 +173,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
     hasPassword = (await pwResp.json()) === true;
   }
 
-  // Stamp admin fields on the profiles row (service role bypasses
-  // enforce_admin_grants, which only gates `authenticated` callers - this
-  // function did its own super_admin check above).
+  // Grant through admin_grant(), which writes admin.admin_users (the source of
+  // truth). It admits this call because auth.role() is 'service_role'; this
+  // function did its own super_admin check above. Admin-schema separation 5a:
+  // this used to PATCH profiles {is_admin, admin_role} and rely on the
+  // profiles -> admin_users mirror trigger, which Phase 5c removes.
+  //
+  // Two writes, in this order:
+  //   1. profiles.email backfill. This is not an admin field, and the old PATCH
+  //      carried it. It also proves the profiles row exists, as the old
+  //      "no profiles row matched" check did.
+  //   2. admin_grant. If it fails, the only thing left behind is a harmless email
+  //      backfill, never a half-granted admin.
   async function grantAdmin(userId: string): Promise<string | null> {
     const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}`, {
       method: "PATCH",
       headers: { ...REST(serviceKey), prefer: "return=representation" },
-      body: JSON.stringify({ is_admin: true, admin_role: role, email }),
+      body: JSON.stringify({ email }),
     });
     if (!patch.ok) return (await patch.text()).slice(0, 200);
     const rows = await patch.json();
     if (!Array.isArray(rows) || rows.length === 0) return "no profiles row matched";
+
+    const grant = await fetch(`${url}/rest/v1/rpc/admin_grant`, {
+      method: "POST",
+      headers: REST(serviceKey),
+      body: JSON.stringify({ p_user_id: userId, p_role: role }),
+    });
+    if (!grant.ok) return reason(await grant.text()).slice(0, 200);
+    const granted = await grant.json();
+    if (!Array.isArray(granted) || granted.length === 0 || granted[0]?.is_active !== true) {
+      return "admin_grant returned no active admin row";
+    }
     return null;
   }
 

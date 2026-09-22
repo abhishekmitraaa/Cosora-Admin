@@ -13,9 +13,9 @@
 //     is never marked refunded without a refund id from Razorpay.
 //
 //  2. It authorizes the CALLER server-side. verify_jwt=true means the platform has
-//     already validated the token signature, so `sub` is trustworthy; we then read
-//     that user's profiles row with the service role and require
-//     is_admin + admin_role in (super_admin, finance_admin). The admin panel's
+//     already validated the token signature, so `sub` is trustworthy; we then ask
+//     admin_status_of() for that user (service role, reads admin.admin_users) and
+//     require is_admin + admin_role in (super_admin, finance_admin). The admin panel's
 //     hidden buttons are irrelevant here — this is the real check for this path,
 //     since the service role bypasses RLS by design.
 //
@@ -82,12 +82,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const callerId = callerIdFromJwt(req);
   if (!callerId) return json({ error: "unauthenticated" }, 401);
 
-  const profResp = await fetch(
-    `${url}/rest/v1/profiles?id=eq.${callerId}&select=is_admin,admin_role`,
-    { headers: REST(serviceKey) },
-  );
-  const profRows = profResp.ok ? await profResp.json() : [];
-  const caller = Array.isArray(profRows) && profRows.length ? profRows[0] : null;
+  // admin_status_of() reads admin.admin_users, the source of truth since
+  // admin-schema separation Phase 5 (service_role only). Any failure leaves
+  // caller null, which is a 403: this fails closed.
+  const statusResp = await fetch(`${url}/rest/v1/rpc/admin_status_of`, {
+    method: "POST",
+    headers: REST(serviceKey),
+    body: JSON.stringify({ p_user_id: callerId }),
+  });
+  const statusRows = statusResp.ok ? await statusResp.json() : [];
+  const caller = Array.isArray(statusRows) && statusRows.length ? statusRows[0] : null;
   if (!caller?.is_admin || !["super_admin", "finance_admin"].includes(caller?.admin_role)) {
     return json({ error: "forbidden", detail: "Refunds require the super_admin or finance_admin role" }, 403);
   }

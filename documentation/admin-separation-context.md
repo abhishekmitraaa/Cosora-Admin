@@ -13,9 +13,22 @@ PostgREST, revoked from anon/authenticated), with approvals still atomic and DB-
 State before this repo's work: Phase 1 (schema + `admin.admin_users`) ✅, Phase 2 (`is_admin()`/`admin_role()` read
 `admin.admin_users`; `profiles` mirrored into it; Q-17 closed) ✅, Phase 3a (SECURITY DEFINER RPCs over
 `admin_flags` / `ad_review_log`, still in `public`) ✅, migrations in textile-spark-net.
-Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b ✅; 4c below.
+Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b ✅; 4c ✅. Phase 5a ✅, 5b ✅ below.
 
 ---
+
+## 2026-09-22: Phase 5b (repoint). HARD STOP: 5c needs the external gate.
+
+**Branch:** `admin-separation/phase-5b`. useAdminSession → admin_whoami; Admins.tsx → the 5a RPCs; admin-invite v6 and
+admin-refund-payment v4 → admin_status_of. Browser run 16/16 with 0 column requests. In 5c, these scripts still touch the columns:
+chat-moderation-behaviour.mjs, drop-test-admins.sql, invite-branches-test.mjs, invite-tests-cleanup.sql, rls-matrix.mjs,
+rls-superadmin.mjs, seed-test-admins.sql.
+
+## 2026-09-22: Phase 5a (identity RPCs). HARD STOP: 5b needs the external gate.
+
+**Branch:** `admin-separation/phase-5a`. `admin-invite` now grants through `admin_grant` (deployed v5, verified live).
+The migration is canonical in textile-spark-net, with a byte-identical mirror in `supabase/migrations/`. Apply it once, never twice.
+5b will repoint `useAdminSession`, `Admins.tsx`, and the caller-authz reads in admin-invite and admin-refund-payment.
 
 ## 2026-09-22: Phase 4c complete (tables moved). HARD STOP: Phase 4 needs Mitra's independent verification.
 

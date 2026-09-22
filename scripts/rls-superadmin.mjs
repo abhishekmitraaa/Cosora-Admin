@@ -96,17 +96,20 @@ const cases = [
     "subscription.cancel",
     () => db.from("vendor_subscriptions").update({ status: "canceled" }).eq("id", F.subscription).select("id"),
   ],
+  // Part 2 role management goes through the admin_users RPCs since admin-schema
+  // separation Phase 5, exactly as the panel's Admins page does. Each returns the
+  // affected admin_users row, so rows > 0 judges them like a table write.
   [
-    "profiles.change admin_role (Part 2)",
-    () => db.from("profiles").update({ admin_role: "vendor_ops" }).eq("id", F.target).select("id"),
+    "admin_set_role (change role, Part 2)",
+    () => db.rpc("admin_set_role", { p_user_id: F.target, p_role: "vendor_ops" }),
   ],
   [
-    "profiles.demote (is_admin=false)",
-    () => db.from("profiles").update({ is_admin: false, admin_role: null }).eq("id", F.target).select("id"),
+    "admin_revoke (demote)",
+    () => db.rpc("admin_revoke", { p_user_id: F.target }),
   ],
   [
-    "profiles.promote back (is_admin=true)",
-    () => db.from("profiles").update({ is_admin: true, admin_role: "support" }).eq("id", F.target).select("id"),
+    "admin_grant (promote back to support)",
+    () => db.rpc("admin_grant", { p_user_id: F.target, p_role: "support" }),
   ],
 ];
 

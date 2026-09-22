@@ -51,12 +51,17 @@ async function invoke(db, body) {
   return data ?? { error: error?.message ?? "unknown" };
 }
 
-// Read is_admin straight from the DB with the service-less anon client is not
-// possible (RLS), so check via the caller's own admin session (super_admin can
-// read all profiles: profiles_select is `true`).
+// Admin status via the caller's own super_admin session. Since admin-schema
+// separation Phase 5 it lives in admin.admin_users, readable only through
+// admin_list_admins(). The profiles row answers "does the account exist"
+// (profiles_select is `true`). Same shape as before: is_admin null = no such
+// account, false = exists but not an admin.
 async function isAdmin(saDb, email) {
-  const { data } = await saDb.from("profiles").select("is_admin, admin_role").eq("email", email).maybeSingle();
-  return data ?? { is_admin: null, admin_role: null };
+  const { data: prof } = await saDb.from("profiles").select("id").eq("email", email).maybeSingle();
+  if (!prof) return { is_admin: null, admin_role: null };
+  const { data: admins } = await saDb.rpc("admin_list_admins");
+  const row = (admins ?? []).find((a) => a.id === prof.id);
+  return { is_admin: Boolean(row), admin_role: row?.admin_role ?? null };
 }
 
 const results = [];

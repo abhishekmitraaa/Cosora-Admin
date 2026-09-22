@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Mail, TriangleAlert, UserCheck } from "lucide-react";
-import { supabase, assertWrote } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { ALL_ROLES, ROLE_LABELS, type AdminRole } from "@/lib/roles";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import {
@@ -25,12 +25,19 @@ import {
 const SUBTITLE =
   "Grant, change, and revoke admin access. Super admin only, and the database enforces that, not this page.";
 
-interface ProfileRow {
+/** A row of admin_list_admins(). admin.admin_users.admin_role is NOT NULL. */
+interface AdminRow {
   id: string;
   email: string | null;
   full_name: string | null;
-  is_admin: boolean;
-  admin_role: AdminRole | null;
+  admin_role: AdminRole;
+}
+
+/** A row of admin_search_candidates(): a profile with no active admin row. */
+interface CandidateRow {
+  id: string;
+  email: string | null;
+  full_name: string | null;
 }
 
 /** Mirrors the admin-invite edge function's success payload. */
@@ -49,11 +56,14 @@ interface InviteResult {
 /**
  * Part 2 — admin & role management.
  *
- * Every mutation here is a plain `profiles` UPDATE from the signed-in admin's
- * own JWT. The `enforce_admin_grants` BEFORE trigger (textile-spark-net
- * 20260717130000) raises 42501 unless the caller is a super_admin, so a
- * non-super-admin who reaches this page — by URL, by editing the bundle, or by
- * calling PostgREST directly — gets rejected by Postgres, not by React.
+ * Every read and write here goes through a SECURITY DEFINER RPC over
+ * admin.admin_users (admin-schema separation Phase 5; textile-spark-net
+ * migration 20260922120000): admin_list_admins, admin_search_candidates,
+ * admin_set_role, admin_grant, admin_revoke. Each checks the caller itself and
+ * RAISES 42501 on refusal, so a non-super-admin who reaches this page — by URL,
+ * by editing the bundle, or by calling PostgREST directly — is rejected by
+ * Postgres, not by React. Because they raise rather than silently matching zero
+ * rows, a plain `if (error)` is a complete check (like set_account_status).
  */
 export default function Admins() {
   const qc = useQueryClient();
@@ -66,12 +76,9 @@ export default function Admins() {
 
   const admins = useQuery({
     queryKey: ["admins"],
-    queryFn: async (): Promise<ProfileRow[]> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, is_admin, admin_role")
-        .eq("is_admin", true)
-        .order("admin_role", { ascending: true });
+    queryFn: async (): Promise<AdminRow[]> => {
+      // Ordered by admin_role (enum order), then email.
+      const { data, error } = await supabase.rpc("admin_list_admins");
       if (error) throw new Error(error.message);
       return data ?? [];
     },
@@ -81,13 +88,9 @@ export default function Admins() {
   const candidates = useQuery({
     queryKey: ["promote-candidates", search],
     enabled: search.trim().length >= 3,
-    queryFn: async (): Promise<ProfileRow[]> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, is_admin, admin_role")
-        .eq("is_admin", false)
-        .ilike("email", `%${search.trim()}%`)
-        .limit(10);
+    queryFn: async (): Promise<CandidateRow[]> => {
+      // Same match as before: email ilike %search%, 10 rows, 3+ characters.
+      const { data, error } = await supabase.rpc("admin_search_candidates", { p_query: search.trim() });
       if (error) throw new Error(error.message);
       return data ?? [];
     },
@@ -95,10 +98,8 @@ export default function Admins() {
 
   const setRole = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: AdminRole }) => {
-      assertWrote(
-        await supabase.from("profiles").update({ admin_role: role }).eq("id", id).select("id"),
-        "change admin role",
-      );
+      const { error } = await supabase.rpc("admin_set_role", { p_user_id: id, p_role: role });
+      if (error) throw new Error(`Couldn't change admin role: ${error.message}`);
     },
     onSuccess: () => {
       toast.success("Role updated");
@@ -109,14 +110,8 @@ export default function Admins() {
 
   const promote = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: AdminRole }) => {
-      assertWrote(
-        await supabase
-          .from("profiles")
-          .update({ is_admin: true, admin_role: role })
-          .eq("id", id)
-          .select("id"),
-        "grant admin access",
-      );
+      const { error } = await supabase.rpc("admin_grant", { p_user_id: id, p_role: role });
+      if (error) throw new Error(`Couldn't grant admin access: ${error.message}`);
     },
     onSuccess: () => {
       toast.success("Admin access granted");
@@ -129,14 +124,8 @@ export default function Admins() {
 
   const demote = useMutation({
     mutationFn: async (id: string) => {
-      assertWrote(
-        await supabase
-          .from("profiles")
-          .update({ is_admin: false, admin_role: null })
-          .eq("id", id)
-          .select("id"),
-        "remove admin access",
-      );
+      const { error } = await supabase.rpc("admin_revoke", { p_user_id: id });
+      if (error) throw new Error(`Couldn't remove admin access: ${error.message}`);
     },
     onSuccess: () => {
       toast.success("Admin access removed");
@@ -231,11 +220,10 @@ export default function Admins() {
                 <td className="px-3 py-2">
                   <Select
                     aria-label={`Role for ${a.email ?? "this admin"}`}
-                    value={a.admin_role ?? ""}
+                    value={a.admin_role}
                     disabled={isSelf || setRole.isPending}
                     onChange={(e) => setRole.mutate({ id: a.id, role: e.target.value as AdminRole })}
                   >
-                    {a.admin_role === null && <option value="">No role assigned</option>}
                     {ALL_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
@@ -261,14 +249,17 @@ export default function Admins() {
         </Table>
 
         {/*
-          Self-edit is blocked here purely as a footgun guard — the database will
-          happily let a super_admin demote themselves or drop the last one. Said
-          plainly so nobody mistakes this for an enforced invariant.
+          Two different guards, said plainly so nobody mistakes one for the other:
+          - self-edit is blocked HERE only, as a footgun guard; the database lets a
+            super_admin change their own role while another super_admin remains;
+          - leaving zero active super_admins IS a database rule since Phase 5a:
+            admin_set_role / admin_revoke / admin_grant raise 42501. Only direct
+            SQL as postgres on admin.admin_users can still do it.
         */}
         <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-          You cannot change your own role, or the last remaining super admin, from this screen. That
-          is a UI guard against locking everyone out, not a database rule: both are still possible
-          via SQL with the service role.
+          You cannot change your own role from this screen, as a guard against locking yourself out.
+          Removing or downgrading the last remaining super admin is refused by the database itself;
+          only direct SQL on the admin schema can still do that.
         </p>
       </Panel>
 
