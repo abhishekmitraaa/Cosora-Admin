@@ -9,6 +9,11 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · Phase 5a): **`admin-invite` now grants admin access through the new `admin_grant` RPC (textile-spark-net migration `20260922120000`, mirrored here byte-for-byte) instead of PATCHing `profiles.is_admin/admin_role` and relying on the mirror trigger. Deployed as v5. No panel code changed yet; the caller-authz read moves to `admin_status_of` in 5b.**
+  - `grantAdmin()` makes two writes, in this order: `PATCH profiles {email}`, keeping the old email backfill and its "no profiles row matched" check, then `rpc/admin_grant`. A failure can leave a harmless email backfill but never a half-granted admin. The JSON payloads of all three branches are unchanged.
+  - **Pre-deploy drift check:** deployed v4 differed from the repo only in three comment prefixes.
+  - **Live:** demo-buyer got 403 forbidden. demo-admin promoting demo-vendor (a password account) returned `outcome:"promoted", emailSent:false`, and the roster RPC showed it. `admin_revoke` then removed it and the test row was deleted.
+  - `src/lib/database.types.ts` +64 lines (the 7 RPCs). Typecheck 0 (the injected probe fires 1); build passes.
 - 2026-09-22 (Admin-schema separation · Phase 4c): **The five chat-moderation and suspension tables moved into the `admin` schema (textile-spark-net migration `20260921190000`). The panel needed no code change, because 4b already made it RPC-only; this repo's scripts and types follow the move.**
   - **The production panel was verified after the move** in a real browser on `cosora-admin.vercel.app`. The keywords, patterns, reasons, review queue, chat thread, accounts and vendor-detail screens all load through the RPCs: 6 RPCs at 200, 0 direct table requests, no errors.
   - **Scripts:**

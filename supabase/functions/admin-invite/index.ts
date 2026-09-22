@@ -168,18 +168,38 @@ Deno.serve(async (req: Request): Promise<Response> => {
     hasPassword = (await pwResp.json()) === true;
   }
 
-  // Stamp admin fields on the profiles row (service role bypasses
-  // enforce_admin_grants, which only gates `authenticated` callers - this
-  // function did its own super_admin check above).
+  // Grant through admin_grant(), which writes admin.admin_users (the source of
+  // truth). It admits this call because auth.role() is 'service_role'; this
+  // function did its own super_admin check above. Admin-schema separation 5a:
+  // this used to PATCH profiles {is_admin, admin_role} and rely on the
+  // profiles -> admin_users mirror trigger, which Phase 5c removes.
+  //
+  // Two writes, in this order:
+  //   1. profiles.email backfill. This is not an admin field, and the old PATCH
+  //      carried it. It also proves the profiles row exists, as the old
+  //      "no profiles row matched" check did.
+  //   2. admin_grant. If it fails, the only thing left behind is a harmless email
+  //      backfill, never a half-granted admin.
   async function grantAdmin(userId: string): Promise<string | null> {
     const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}`, {
       method: "PATCH",
       headers: { ...REST(serviceKey), prefer: "return=representation" },
-      body: JSON.stringify({ is_admin: true, admin_role: role, email }),
+      body: JSON.stringify({ email }),
     });
     if (!patch.ok) return (await patch.text()).slice(0, 200);
     const rows = await patch.json();
     if (!Array.isArray(rows) || rows.length === 0) return "no profiles row matched";
+
+    const grant = await fetch(`${url}/rest/v1/rpc/admin_grant`, {
+      method: "POST",
+      headers: REST(serviceKey),
+      body: JSON.stringify({ p_user_id: userId, p_role: role }),
+    });
+    if (!grant.ok) return reason(await grant.text()).slice(0, 200);
+    const granted = await grant.json();
+    if (!Array.isArray(granted) || granted.length === 0 || granted[0]?.is_active !== true) {
+      return "admin_grant returned no active admin row";
+    }
     return null;
   }
 
