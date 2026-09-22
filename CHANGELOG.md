@@ -9,6 +9,13 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · Phase 5c, IRREVERSIBLE): **`profiles.is_admin` / `profiles.admin_role` were dropped (textile-spark-net migration `20260922180000`, mirrored here byte-for-byte; live `20260922171801`). The panel needed no code change: production already used `admin_whoami` and the admin_* RPCs.**
+  - `src/lib/database.types.ts` regenerated: −6 lines (the profiles fields). Typecheck 0; the probe fires 1.
+  - **Verified live on `cosora-admin.vercel.app` after the drop, 16/16:** sign-in and identity via `rpc/admin_whoami`, roster, self-edit guard, search, promote, role change, demote, invite. No request named the dropped columns. A non-admin sees "Not an admin account".
+  - admin-invite and admin-refund-payment: a non-admin gets 403, a super_admin passes.
+  - The repointed harnesses give the same results as the Phase-A baseline: rls-matrix 60/60, rls-superadmin 11/11, chat-pipeline 72/72, invite-tests 9/9. The committed seed and cleanup scripts ran clean after the drop.
+  - README sign-in and authorization notes now name `admin.admin_users`.
+
 - 2026-09-22 (Admin-schema separation · pre-5c tooling): **The test and seed scripts now create, change and check admins through `admin.admin_users` instead of `profiles.is_admin` / `profiles.admin_role`, so the role-matrix harness keeps working after the Phase 5c column drop. The role matrix was re-proved unchanged against live while the columns still exist.**
   - **Repointed (7 scripts).**
     - `seed-test-admins.sql` keeps the profiles `email` write; the grant becomes an `admin.admin_users` upsert, plus `admin.shadow_admin_columns()`, so the legacy columns agree until 5c (a no-op after it).

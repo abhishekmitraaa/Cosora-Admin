@@ -13,9 +13,14 @@ PostgREST, revoked from anon/authenticated), with approvals still atomic and DB-
 State before this repo's work: Phase 1 (schema + `admin.admin_users`) ✅, Phase 2 (`is_admin()`/`admin_role()` read
 `admin.admin_users`; `profiles` mirrored into it; Q-17 closed) ✅, Phase 3a (SECURITY DEFINER RPCs over
 `admin_flags` / `ad_review_log`, still in `public`) ✅, migrations in textile-spark-net.
-Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b ✅; 4c ✅. Phase 5a ✅, 5b ✅ below.
+Phase 3 (3b panel, 3c move) ✅. Phase 4a (RPCs over the five chat/suspension tables) ✅; 4b ✅; 4c ✅. Phase 5a ✅, 5b ✅, 5c ✅ (columns dropped). Build complete.
 
 ---
+
+## 2026-09-22: Phase 5c. profiles.is_admin/admin_role DROPPED; admin_users is the sole truth.
+
+**Branch:** `admin-separation/phase-5c`. This repo: the mirrored migration file, types −6, README, CHANGELOG. The production panel passed 16/16
+after the drop, with 0 column requests. The canonical record is in textile-spark-net's context file.
 
 ## 2026-09-22: Phase 5b (repoint). HARD STOP: 5c needs the external gate.
 

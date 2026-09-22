@@ -30,8 +30,9 @@ Anon key only, by design. There is no service-role key in this app: every reques
 carries the signed-in admin's JWT so RLS applies. The only privileged code is the
 `admin-refund-payment` edge function, which runs server-side.
 
-Sign in with an account whose `profiles.is_admin = true`. `profiles.admin_role`
-then decides which sections render.
+Sign in with an account that has an active row in `admin.admin_users` (grant it from the Admins
+page or `admin-invite`, or directly as postgres). Its `admin_role` then decides which sections
+render. Since admin-schema separation Phase 5c (2026-09-22) `profiles` has no admin columns.
 
 ```bash
 npm run typecheck   # tsc --noEmit --skipLibCheck
@@ -47,8 +48,10 @@ Three layers, only the last two of which are real:
 1. **`src/lib/roles.ts`** — decides which nav items and buttons render. **UX only.**
 2. **RLS policies** — decide *which admin may write a row at all*.
 3. **`BEFORE` triggers** — decide *which column may change* (`products.status`,
-   `vendor_profiles.is_verified` / `account_status`, `profiles.is_admin` /
-   `admin_role`, `advertisements.status`, and the moderation reason columns).
+   `vendor_profiles.is_verified` / `account_status`, `advertisements.status`, and the
+   moderation reason columns). Admin grants and roles are not a column any more. They live in
+   `admin.admin_users`, and only the super_admin/service-role RPCs `admin_grant` / `admin_set_role` /
+   `admin_revoke` change them.
    RLS cannot see "which column changed", so column gates are triggers.
 
 ### The one non-obvious thing: RLS denials are silent

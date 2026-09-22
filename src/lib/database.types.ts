@@ -1090,39 +1090,33 @@ export type Database = {
         Row: {
           account_status: Database["public"]["Enums"]["account_status_type"]
           active_role: string
-          admin_role: Database["public"]["Enums"]["admin_role_type"] | null
           avatar_url: string | null
           created_at: string
           email: string | null
           full_name: string | null
           id: string
-          is_admin: boolean
           onboarded: boolean
           phone: string | null
         }
         Insert: {
           account_status?: Database["public"]["Enums"]["account_status_type"]
           active_role?: string
-          admin_role?: Database["public"]["Enums"]["admin_role_type"] | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id: string
-          is_admin?: boolean
           onboarded?: boolean
           phone?: string | null
         }
         Update: {
           account_status?: Database["public"]["Enums"]["account_status_type"]
           active_role?: string
-          admin_role?: Database["public"]["Enums"]["admin_role_type"] | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
-          is_admin?: boolean
           onboarded?: boolean
           phone?: string | null
         }
