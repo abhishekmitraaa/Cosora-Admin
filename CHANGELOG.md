@@ -9,6 +9,16 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · Phase 5b): **The panel and both of this repo's edge functions stopped reading and writing `profiles.is_admin` / `profiles.admin_role`.** No migration.
+  - `useAdminSession` calls `admin_whoami()`. "Signed in but no row" is still a non-admin identity, not an error.
+  - `Admins.tsx` reads the roster through `admin_list_admins` and candidates through `admin_search_candidates`. set-role, promote and demote go through `admin_set_role`, `admin_grant` and `admin_revoke`. They raise on refusal, so `if (error)` replaces `assertWrote`.
+  - The row type lost `is_admin`, and `admin_role` is never null now, so the "No role assigned" option is gone. The React self-edit and last-super_admin guards stay.
+  - The footnote no longer claims the database will let you drop the last super_admin. Since 5a it refuses (42501).
+  - `admin-invite` (v6) and `admin-refund-payment` (v4) authorize the caller through `admin_status_of`. Both fail closed. The pre-deploy check found only comment differences from the deployed versions.
+  - `ResetPassword.tsx`: comment only.
+  - **Exercised in a browser on the dev server, 16/16:** login and shell, whoami, the roster (3), the self-edit guard, search, promote to Support, role change to Ads moderator, demote, and invite. Zero requests read or wrote the profiles columns. A non-admin sees "Not an admin account".
+  - **Edge functions live:** a non-admin gets 403 from invite and refund; a super_admin passes both. The test admin row was deleted.
+  - Typecheck 0 (the probe fires 1); build passes.
 - 2026-09-22 (Admin-schema separation · Phase 5a): **`admin-invite` now grants admin access through the new `admin_grant` RPC (textile-spark-net migration `20260922120000`, mirrored here byte-for-byte) instead of PATCHing `profiles.is_admin/admin_role` and relying on the mirror trigger. Deployed as v5. No panel code changed yet; the caller-authz read moves to `admin_status_of` in 5b.**
   - `grantAdmin()` makes two writes, in this order: `PATCH profiles {email}`, keeping the old email backfill and its "no profiles row matched" check, then `rpc/admin_grant`. A failure can leave a harmless email backfill but never a half-granted admin. The JSON payloads of all three branches are unchanged.
   - **Pre-deploy drift check:** deployed v4 differed from the repo only in three comment prefixes.

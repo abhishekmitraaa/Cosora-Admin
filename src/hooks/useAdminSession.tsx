@@ -24,13 +24,15 @@ interface AdminSessionValue {
 const Ctx = createContext<AdminSessionValue | null>(null);
 
 /**
- * Reads is_admin / admin_role straight from `profiles` for the signed-in user on
- * every session change — never from JWT claims or localStorage, which the client
+ * Reads the signed-in user's admin identity from `admin_whoami()` on every
+ * session change — never from JWT claims or localStorage, which the client
  * controls and which go stale the moment a super_admin changes someone's role.
  *
- * This read is also subject to RLS, so it can only ever return the caller's own
- * row. It gates what the UI RENDERS; it does not gate what the user can DO —
- * that is Postgres's job on each write (see lib/roles.ts).
+ * admin_whoami() reads admin.admin_users (the only source of truth since
+ * admin-schema separation Phase 5), joined to profiles for email / full_name,
+ * and only ever for auth.uid(), so it can only return the caller's own row. It
+ * gates what the UI RENDERS; it does not gate what the user can DO — that is
+ * Postgres's job on each write (see lib/roles.ts).
  */
 export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -45,11 +47,10 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    const { data, error: dbError } = await supabase
-      .from("profiles")
-      .select("id, email, full_name, is_admin, admin_role")
-      .eq("id", current.user.id)
-      .maybeSingle();
+    const { data: rows, error: dbError } = await supabase.rpc("admin_whoami");
+    // One row for a user with a profile (is_admin=false / role=null when there is
+    // no active admin_users row); no row at all when there is no profile.
+    const data = rows?.[0] ?? null;
 
     if (dbError) {
       setError(dbError.message);
@@ -70,7 +71,7 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
         email: data.email,
         fullName: data.full_name,
         isAdmin: data.is_admin,
-        role: data.admin_role,
+        role: data.role,
       });
       setError(null);
     }

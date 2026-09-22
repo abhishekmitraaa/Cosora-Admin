@@ -24,8 +24,8 @@
 // password at /reset-password (the redirectTo below).
 //
 // Authorization mirrors admin-refund-payment: verify_jwt=true validated the
-// token signature, so `sub` is trustworthy; we then read that user's profiles
-// row with the service role and require admin_role = 'super_admin'. Hiding the
+// token signature, so `sub` is trustworthy; we then ask admin_status_of() for
+// that user (service role) and require admin_role = 'super_admin'. Hiding the
 // form in React is irrelevant to this path - the service role bypasses RLS, so
 // this check IS the gate.
 //
@@ -100,11 +100,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const callerId = callerIdFromJwt(req);
   if (!callerId) return json({ error: "unauthenticated" }, 401);
 
-  const profResp = await fetch(`${url}/rest/v1/profiles?id=eq.${callerId}&select=is_admin,admin_role`, {
+  // admin_status_of() reads admin.admin_users, the source of truth since
+  // admin-schema separation Phase 5 (service_role only). Any failure leaves
+  // caller null, which is a 403: this fails closed.
+  const statusResp = await fetch(`${url}/rest/v1/rpc/admin_status_of`, {
+    method: "POST",
     headers: REST(serviceKey),
+    body: JSON.stringify({ p_user_id: callerId }),
   });
-  const profRows = profResp.ok ? await profResp.json() : [];
-  const caller = Array.isArray(profRows) && profRows.length ? profRows[0] : null;
+  const statusRows = statusResp.ok ? await statusResp.json() : [];
+  const caller = Array.isArray(statusRows) && statusRows.length ? statusRows[0] : null;
   if (!caller?.is_admin || caller?.admin_role !== "super_admin") {
     return json(
       { error: "forbidden", detail: "Inviting or promoting admins requires the super_admin role" },

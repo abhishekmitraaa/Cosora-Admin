@@ -116,7 +116,7 @@ export default function ResetPassword() {
       setBusy(false);
       return;
     }
-    // Re-read is_admin / admin_role now onboarding is done, so the shell renders
+    // Re-read the admin identity (admin_whoami) now onboarding is done, so the shell renders
     // the right sections immediately, then drop them into the panel.
     await refresh();
     setDone(true);
