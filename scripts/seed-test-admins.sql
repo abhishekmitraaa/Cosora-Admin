@@ -6,9 +6,12 @@
 -- scripts/drop-test-admins.sql. These are admin logins with a known password —
 -- never leave them sitting in a live database.
 --
--- Run as the service role / SQL editor (NOT as an authenticated client): the
--- moderation triggers deliberately bypass when current_user <> 'authenticated',
--- which is what lets this file stamp admin_role directly.
+-- Run as the service role / SQL editor (NOT as an authenticated client). Admin
+-- identity lives in admin.admin_users (admin-schema separation Phase 5), which no
+-- client role can reach, so this file grants each test admin there directly.
+-- admin.shadow_admin_columns() keeps the legacy profiles.is_admin/admin_role equal
+-- while those columns still exist (until Phase 5c), and is a no-op afterwards, so
+-- this file is valid on both sides of the column drop.
 --
 -- Note the empty-string token columns. GoTrue's login query fails with
 -- "Database error querying schema" if confirmation_token / recovery_token /
@@ -67,10 +70,13 @@ begin
       'email', r.email, now(), now(), now()
     );
 
-    -- handle_new_user() already created the profiles row.
-    update public.profiles
-       set is_admin = true, admin_role = r.role::public.admin_role_type, email = r.email
-     where id = uid;
+    -- handle_new_user() already created the profiles row. The email stays on
+    -- profiles; the admin grant goes to admin.admin_users.
+    update public.profiles set email = r.email where id = uid;
+    insert into admin.admin_users (id, admin_role, is_active)
+    values (uid, r.role::public.admin_role_type, true)
+    on conflict (id) do update set admin_role = excluded.admin_role, is_active = true;
+    perform admin.shadow_admin_columns(uid, true, r.role::public.admin_role_type);
   end loop;
 end $$;
 

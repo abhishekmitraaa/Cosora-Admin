@@ -113,9 +113,14 @@ const ACTIONS = {
     run: (db) => db.from("vendor_subscriptions").update({ plan_id: "gold" }).eq("id", F.subscription).select("id"),
     revert: (db) => db.from("vendor_subscriptions").update({ plan_id: "basic" }).eq("id", F.subscription).select("id"),
   },
-  "profiles.admin_role (grant)": {
+  // Self-escalation. Since admin-schema separation Phase 5 admin identity lives in
+  // admin.admin_users and the only write path is the admin_set_role /
+  // admin_grant / admin_revoke RPCs (super_admin or service_role), which RAISE
+  // 42501 for everyone else. This replaces the old profiles.admin_role UPDATE,
+  // which enforce_admin_grants refused; the column goes in Phase 5c.
+  "admin_set_role self -> super_admin (grant)": {
     allowed: "__super_admin_only__",
-    run: (db, ctx) => db.from("profiles").update({ admin_role: "super_admin" }).eq("id", ctx.selfId).select("id"),
+    run: (db, ctx) => db.rpc("admin_set_role", { p_user_id: ctx.selfId, p_role: "super_admin" }),
     revert: null, // never succeeds for these roles; nothing to undo
   },
 };

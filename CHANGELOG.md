@@ -9,6 +9,37 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-22 (Admin-schema separation · pre-5c tooling): **The test and seed scripts now create, change and check admins through `admin.admin_users` instead of `profiles.is_admin` / `profiles.admin_role`, so the role-matrix harness keeps working after the Phase 5c column drop. The role matrix was re-proved unchanged against live while the columns still exist.**
+  - **Repointed (7 scripts).**
+    - `seed-test-admins.sql` keeps the profiles `email` write; the grant becomes an `admin.admin_users` upsert, plus `admin.shadow_admin_columns()`, so the legacy columns agree until 5c (a no-op after it).
+    - `drop-test-admins.sql` deletes the admin_users rows explicitly. Its tally reports `prof_leftover`, `au_leftover` and `real_admins` from admin_users.
+    - `invite-tests-cleanup.sql` un-promotes the demo users through admin_users + the shadow helper.
+    - In `rls-matrix.mjs`, the escalation cell is now `admin_set_role(self, super_admin)`.
+    - In `rls-superadmin.mjs`, role change, demote and promote-back use `admin_set_role`, `admin_revoke` and `admin_grant`.
+    - In `chat-pipeline-matrix.mjs`, T7.6c self-grant goes through `admin_set_role`.
+    - `invite-branches-test.mjs` reads admin state via `admin_list_admins`.
+  - **Proof, against live, with the columns present.** The fixtures were seeded with the repointed seed. The pre-repoint (committed) and repointed harnesses were each run on the same fixtures and compared cell by cell:
+
+    | Harness | Result | Cells differing |
+    |---|---|---|
+    | rls-matrix | 60/60 → 60/60 | 0 |
+    | rls-superadmin | 11/11 → 11/11 | 0 |
+    | chat-pipeline-matrix | 72/72 → 72/72 | 0 (identical per case) |
+    | invite-tests | 9/9 | – |
+    | chat-moderation-behaviour | all passed | – |
+    | chat-moderation-matrix | all passed | – |
+
+    The five escalation cells are still refused with 42501, now by the RPC instead of the trigger.
+  - **Not run live, on purpose:** `invite-branches-test.mjs` and `invite-send-test.mjs`. They send real emails and create real auth users at the owner's inbox, and the branch test's `haspw` / `+cosora-otp` fixtures are seeded by nothing, so every branch would fall through to "new user". Both are repointed and syntax-checked only.
+  - **Two teardown gaps found and fixed (pre-existing).**
+    - `drop-chat-fixtures.sql` missed chat-pipeline's `chatfx-… support note` flags, which are written on a fixture conversation whose id is not `cf`-prefixed. They blocked `drop-test-admins.sql` through an FK.
+    - `invite-tests-cleanup.sql` now says to run `drop-test-admins.sql` first. The matrix's flags reference the rlstest accounts, so running it first rolled the whole script back.
+  - **Cleanup verified.**
+    - 0 rlstest / chatfx / +cosora users; 0 leftover profiles; 0 admin_users test rows.
+    - Admins are 3 = 3 with 0/0/0 drift, which is the 5c pre-flight.
+    - Moderation data is back to baseline (patterns 3, reasons 7, reviews 1, suspensions 0, flags 1, notifications 42, demo thread 4 messages).
+  - The seed was run with a locally computed bcrypt hash in place of `crypt(<plaintext>)`, so the fixture password never went through a tool call or SQL logs. The committed files are unchanged in that respect.
+
 - 2026-09-22 (Admin-schema separation · Phase 5b): **The panel and both of this repo's edge functions stopped reading and writing `profiles.is_admin` / `profiles.admin_role`.** No migration.
   - `useAdminSession` calls `admin_whoami()`. "Signed in but no row" is still a non-admin identity, not an error.
   - `Admins.tsx` reads the roster through `admin_list_admins` and candidates through `admin_search_candidates`. set-role, promote and demote go through `admin_set_role`, `admin_grant` and `admin_revoke`. They raise on refusal, so `if (error)` replaces `assertWrote`.

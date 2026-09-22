@@ -44,6 +44,10 @@ delete from public.conversations
 -- Anything the tests wrote through the fixtures.
 -- admin_flags lives in the admin schema since admin-schema separation Phase 3c.
 delete from admin.admin_flags where entity_id::text like 'cf00000%';
+-- chat-pipeline-matrix also writes '<TAG> support note' flags on a fixture
+-- CONVERSATION, whose id is not cf-prefixed; they reference the rlstest support
+-- account, so drop-test-admins.sql cannot delete that profile until they go.
+delete from admin.admin_flags where note like 'chatfx-%';
 delete from admin.keyword_blocklist where term like 'chatfx-%';
 delete from admin.flag_patterns where label like 'chatfx-%';
 -- chat-moderation-matrix.mjs's throwaway super_admin reasons: there is no client

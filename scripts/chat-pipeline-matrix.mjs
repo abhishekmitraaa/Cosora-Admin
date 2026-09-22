@@ -713,8 +713,9 @@ try {
         convUp.error ? `raised ${convUp.error.code}, ${stBefore} -> ${stAfter}` : `${convUp.data?.length ?? 0} rows, ${stBefore} -> ${stAfter}`,
         stAfter === stBefore, "Critical", convUp.error?.message ?? "");
 
-      const grant = await S.ads_moderator.db.from("profiles")
-        .update({ admin_role: "super_admin" }).eq("id", S.ads_moderator.id).select("id");
+      // Phase 5: admin identity is admin.admin_users; the only grant path is the
+      // admin_set_role / admin_grant RPCs, which raise 42501 for a non-super_admin.
+      const grant = await S.ads_moderator.db.rpc("admin_set_role", { p_user_id: S.ads_moderator.id, p_role: "super_admin" });
       rec("T7.6c", "n/a", "DB", "a non-super_admin admin grants themselves super_admin",
         "refused", grant.error ? `raised ${grant.error.code}` : `${grant.data?.length ?? 0} rows`,
         Boolean(grant.error) || (grant.data?.length ?? 0) === 0, "Critical", grant.error?.message ?? "");
