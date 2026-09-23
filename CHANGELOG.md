@@ -9,6 +9,11 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-24 (My Profile brief · deploy, MPF-19): **Live on `cosora-admin.vercel.app` (`main` `106f84c`), and the interim grant is revoked.**
+  - The live bundle, `index-BzKTnSmz.js` (was `index-B920YuHP.js`), calls `admin_profile_search()` and `admin_profile_emails()` and no longer selects `email`.
+  - textile-spark-net then revoked the interim signed-in grant (`20260923190354`). No client role can read `profiles.email` or `profiles.phone` now; this panel reads them only through the two admin functions.
+  - **Verified against the live panel after the revoke:** textile-spark-net's `tests/profile-contact-privacy.spec.ts` found demo-buyer by email on Accounts, and the account history named the admin. The Chats search, a thread and the review queue resolved people.
+
 - 2026-09-23 (My Profile brief · Phase 12, MPF-2): **Types only.** `database.types.ts` gains `log_call()`, now the only write path to `public.calls` (textile-spark-net migration `20260923182259`). This panel neither reads nor writes `calls`, so nothing else changes. `npx tsc --noEmit --skipLibCheck` 0.
 
 - 2026-09-23 (My Profile brief · Phase 11, MPF-3): **Accounts, Chats, chat participants and suspension-history actors read emails through admin-gated RPCs. `profiles.email` and `profiles.phone` are no longer client-selectable, because they were readable with the public anon key.**
