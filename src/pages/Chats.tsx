@@ -67,18 +67,12 @@ export default function Chats() {
     refetchOnWindowFocus: true,
     queryFn: async () => {
       // Search resolves to participant ids first: the searchable identity lives
-      // on `profiles`, not on the conversation.
+      // on `profiles`, not on the conversation. admin_profile_search() matches
+      // name or email (contains) or an exact id; it is an admin-gated RPC
+      // because profiles.email is not client-selectable (MPF-3).
       let matchedIds: string[] | null = null;
       if (term.length >= 2) {
-        const filters = [`full_name.ilike.%${term}%`, `email.ilike.%${term}%`];
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term)) {
-          filters.push(`id.eq.${term}`);
-        }
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id")
-          .or(filters.join(","))
-          .limit(500);
+        const { data, error } = await supabase.rpc("admin_profile_search", { p_term: term, p_limit: 500 });
         if (error) throw new Error(error.message);
         matchedIds = (data ?? []).map((p) => p.id);
         if (matchedIds.length === 0) return { rows: [] as ConversationRow[], people: new Map<string, Participant>() };

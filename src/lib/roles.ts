@@ -40,6 +40,10 @@ export type Section =
   | "chat-keywords"
   | "chat-patterns"
   | "chat-reasons"
+  // Buyer Help / seller registration / subscription FAQs (2026-09-23). REAL
+  // DATA: public.faqs, written only through admin_faq_* RPCs. The first
+  // admin-editable content that is not dev-seed ("content" still is).
+  | "faqs"
   // Account suspension, generalised. Not part of "vendors": buyers get
   // suspended too, and the role gate is different (support/super_admin via
   // set_account_status, NOT vendor_ops).
@@ -132,6 +136,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // `admin_role() in ('support','super_admin')`, so that was simply wrong, and
   // it hid the page from the role that uses its vocabulary daily.
   "chat-reasons": ["super_admin", "support"],
+  // admin_faq_list() admits support + super_admin, the same audience as block
+  // reasons. Support answers the questions buyers ask, so it reads what the FAQ says.
+  faqs: ["super_admin", "support"],
   accounts: ["super_admin", "support"],
 
   // ── Phase-4 sections ───────────────────────────────────────────────────
@@ -191,6 +198,10 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
+  // admin_faq_add / update / delete / reorder are super_admin only. Whether support
+  // should also edit FAQ content is an open question for the owner (2026-09-23).
+  // Widening it means changing the RPC gates AND this line; either alone is wrong.
+  faqs: ["super_admin"],
   // set_account_status() gates itself to these two, so vendor_ops sees the page
   // (it is reachable from a vendor) but not the actions.
   accounts: ["super_admin", "support"],

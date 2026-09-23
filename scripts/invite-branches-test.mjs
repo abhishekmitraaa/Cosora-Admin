@@ -53,11 +53,15 @@ async function invoke(db, body) {
 
 // Admin status via the caller's own super_admin session. Since admin-schema
 // separation Phase 5 it lives in admin.admin_users, readable only through
-// admin_list_admins(). The profiles row answers "does the account exist"
-// (profiles_select is `true`). Same shape as before: is_admin null = no such
-// account, false = exists but not an admin.
+// admin_list_admins(). admin_profile_search() answers "does the account exist":
+// profiles.email is not client-selectable or filterable since MPF-3, so an
+// `.eq("email", …)` would be refused, and ignoring that error would read as
+// "no such account". Same shape as before: is_admin null = no such account,
+// false = exists but not an admin.
 async function isAdmin(saDb, email) {
-  const { data: prof } = await saDb.from("profiles").select("id").eq("email", email).maybeSingle();
+  const { data: found, error } = await saDb.rpc("admin_profile_search", { p_term: email, p_limit: 50 });
+  if (error) throw new Error(`admin_profile_search failed: ${error.message}`);
+  const prof = (found ?? []).find((p) => (p.email ?? "").toLowerCase() === email.toLowerCase());
   if (!prof) return { is_admin: null, admin_role: null };
   const { data: admins } = await saDb.rpc("admin_list_admins");
   const row = (admins ?? []).find((a) => a.id === prof.id);

@@ -606,6 +606,53 @@ export type Database = {
           },
         ]
       }
+      faqs: {
+        Row: {
+          active: boolean
+          answer: string
+          category_label: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          position: number
+          question: string
+          surface: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          answer: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          question: string
+          surface: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          answer?: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          question?: string
+          surface?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faqs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -2389,6 +2436,64 @@ export type Database = {
           videos_missing: number
         }[]
       }
+      admin_faq_add: {
+        Args: {
+          p_answer: string
+          p_category_label: string
+          p_position?: number
+          p_question: string
+          p_surface: string
+        }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          id: string
+          position: number
+          question: string
+          surface: string
+        }[]
+      }
+      admin_faq_delete: { Args: { p_id: string }; Returns: { id: string }[] }
+      admin_faq_list: {
+        Args: { p_surface?: string }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          created_at: string
+          created_by: string
+          creator_email: string
+          creator_full_name: string
+          id: string
+          position: number
+          question: string
+          surface: string
+          updated_at: string
+        }[]
+      }
+      admin_faq_reorder: {
+        Args: { p_id: string; p_position: number }
+        Returns: { id: string; position: number }[]
+      }
+      admin_faq_update: {
+        Args: {
+          p_active?: boolean
+          p_answer?: string
+          p_category_label?: string
+          p_id: string
+          p_question?: string
+        }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          id: string
+          position: number
+          question: string
+          surface: string
+        }[]
+      }
       admin_flag_add: {
         Args: { p_entity_id: string; p_entity_type: string; p_note: string }
         Returns: {
@@ -2496,6 +2601,25 @@ export type Database = {
           id: string
         }[]
       }
+      admin_profile_emails: {
+        Args: { p_ids: string[] }
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+        }[]
+      }
+      admin_profile_search: {
+        Args: { p_limit?: number; p_term: string }
+        Returns: {
+          account_status: Database["public"]["Enums"]["account_status_type"]
+          active_role: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+        }[]
+      }
       admin_revoke: {
         Args: { p_user_id: string }
         Returns: {
@@ -2570,6 +2694,13 @@ export type Database = {
       cache_query_embedding: {
         Args: { p_embedding: string; p_query: string }
         Returns: boolean
+      }
+      call_buyer_contact: {
+        Args: { p_buyer_id: string }
+        Returns: {
+          full_name: string
+          phone: string
+        }[]
       }
       certificate_apply: {
         Args: {
@@ -2699,6 +2830,10 @@ export type Database = {
         Args: { p_since: string; p_vendor: string }
         Returns: number
       }
+      log_call: {
+        Args: { p_product_context?: string; p_vendor_id: string }
+        Returns: Json
+      }
       log_engagement_event: {
         Args: {
           p_ad_id?: string
@@ -2751,6 +2886,13 @@ export type Database = {
         Returns: {
           distance: number
           id: string
+        }[]
+      }
+      my_contact_info: {
+        Args: never
+        Returns: {
+          email: string
+          phone: string
         }[]
       }
       next_invoice_number: { Args: never; Returns: string }
