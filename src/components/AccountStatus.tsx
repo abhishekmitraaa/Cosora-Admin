@@ -94,10 +94,8 @@ export default function AccountStatus({
       ] as string[];
       const actors = new Map<string, string>();
       if (actorIds.length > 0) {
-        const { data: people } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", actorIds);
+        // An RPC, not a profiles select: email is not client-selectable (MPF-3).
+        const { data: people } = await supabase.rpc("admin_profile_emails", { p_ids: actorIds });
         for (const p of people ?? []) actors.set(p.id, p.full_name || p.email || p.id.slice(0, 8));
       }
       return { rows, actors };

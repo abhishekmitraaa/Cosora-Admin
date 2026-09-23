@@ -136,6 +136,10 @@ three entry points — the Accounts page, the vendor screen, and the review
 queue's block action — call the same `set_account_status()`; only `source`
 and `conversation_review_id` differ.
 
+Account and chat search go through `admin_profile_search()`, and participant and actor emails
+through `admin_profile_emails()`. Clients can't select `profiles.email` or `profiles.phone`
+since MPF-3 (2026-09-23), and both functions admit any active admin.
+
 **There is exactly one `account_status`, and it is on `profiles`:**
 
 | Column | Written by | Gated to | Audited |
@@ -158,7 +162,7 @@ and `vendor_profiles` has one admin field left: `is_verified`.
 ### FAQs (2026-09-23)
 
 `/faqs` edits `public.faqs`, the FAQ content on the buyer Help page (`/profile/help` and
-`/help`), the vendor Subscription page, and (once it's placed) seller registration. It's the
+`/help`), the vendor Subscription page, and the seller landing page (`/seller`). It's the
 panel's first real content editor; **Site content** is still dev-seed.
 
 | Role | FAQs |
@@ -570,7 +574,8 @@ silent and expensive:
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
 | Phase 3 — Chat moderation (7 screens) | **Working.** Review queue with pending + four audit tabs, thread transcript with the flagged-items log, keyword blocklist, flag patterns (with a live Postgres-side pattern test), block reasons, and Accounts. `resolve_conversation_review()` is applied and verified end to end against the live project (16/16). Support/super_admin only; verified with real logins by `scripts/chat-moderation-matrix.mjs`. |
 | Phase 4 — Design system + eight new sections | **UI complete.** Every existing screen redesigned onto one token set with a real dark mode, and **zero behaviour change**, verified by extracting all 340 data-layer statements across the 26 touched files before and after and comparing them (identical, bar one em-dash inside an error string). `scripts/theme-contrast-check.mjs` passes 91 checks in both modes after fixing four real WCAG failures it found; `scripts/copy-audit.mjs` passes. **Real data, working now:** Ads → Monitoring and Geography. **UI only, on a development fixture until Phase 2 creates their tables:** Site content, Payments, Certificates, Discounts, Customers — all gated, routed and navigable now, and empty in a production build (verified by grepping the bundle). **Live Activity** is an external Clarity link and needs `VITE_CLARITY_PROJECT_ID` plus the snippet on the buyer site. **Certificates is built pending Andy's confirmation** that the certificate is physical. Not yet exercised with a real login: no admin credentials were available this session, so the role gates on the new sections are asserted from `roles.ts` rather than driven in a browser — run `scripts/smoke.mjs` after seeding throwaway admins to close that. |
-| My Profile Phase 9 — FAQs | **Working.** `/faqs` add / edit / reorder / deactivate / delete on all three surfaces, verified end to end by textile-spark-net's `tests/faqs-admin-editable.spec.ts` as demo-admin (the buyer and vendor pages follow, no deploy). Non-admin and anon RPC calls are refused with 42501. Seller Registration has no content and no page yet, pending Andy. The support read-only view is not yet exercised with a real support login. |
+| My Profile Phase 9 — FAQs | **Working.** `/faqs` add / edit / reorder / deactivate / delete on all three surfaces, verified end to end by textile-spark-net's `tests/faqs-admin-editable.spec.ts` as demo-admin (the buyer and vendor pages follow, no deploy). Non-admin and anon RPC calls are refused with 42501. Andy's content is loaded, and Seller Registration shows on the buyer app's `/seller` (2026-09-23). The arrows step past hidden rows. The support read-only view is not yet exercised with a real support login. |
+| My Profile Phase 11 — MPF-3 | **Working in this code:** Accounts, Chats, participants and actors read emails through the admin RPCs. **Production (`cosora-admin.vercel.app`) needs this deployed** before textile-spark-net revokes the interim signed-in grant (MPF-19) |
 
 ## Inviting admins by email (`admin-invite`)
 

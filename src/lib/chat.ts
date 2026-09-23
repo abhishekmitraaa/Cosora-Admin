@@ -34,13 +34,18 @@ export async function fetchParticipants(ids: string[]): Promise<Map<string, Part
   const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Map();
 
-  const [profiles, vendors] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, account_status").in("id", unique),
+  // Email through the admin-gated RPC: profiles.email is not client-selectable
+  // (MPF-3). Every other column is still a plain select.
+  const [profiles, emails, vendors] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, account_status").in("id", unique),
+    supabase.rpc("admin_profile_emails", { p_ids: unique }),
     supabase.from("vendor_profiles").select("id, brand_name").in("id", unique),
   ]);
   if (profiles.error) throw new Error(profiles.error.message);
+  if (emails.error) throw new Error(emails.error.message);
   if (vendors.error) throw new Error(vendors.error.message);
 
+  const emailOf = new Map((emails.data ?? []).map((e) => [e.id, e.email]));
   const brands = new Map((vendors.data ?? []).map((v) => [v.id, v.brand_name]));
 
   return new Map(
@@ -49,7 +54,7 @@ export async function fetchParticipants(ids: string[]): Promise<Map<string, Part
       {
         id: p.id,
         full_name: p.full_name,
-        email: p.email,
+        email: emailOf.get(p.id) ?? null,
         account_status: p.account_status,
         isVendor: brands.has(p.id),
         brand_name: brands.get(p.id) ?? null,

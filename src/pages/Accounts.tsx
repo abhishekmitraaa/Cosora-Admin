@@ -71,15 +71,11 @@ export default function Accounts() {
     queryKey: ["accounts", trimmed],
     enabled: trimmed.length >= MIN_QUERY,
     queryFn: async (): Promise<AccountRow[]> => {
-      // `or` with two ilike filters rather than a text-search index: the table
-      // is small, and adding an index is a migration this screen does not need.
-      const pattern = `%${trimmed}%`;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, account_status, active_role, created_at")
-        .or(`full_name.ilike.${pattern},email.ilike.${pattern}`)
-        .order("created_at", { ascending: false })
-        .limit(LIMIT);
+      // admin_profile_search(): name or email contains the term (two ilikes, no
+      // text-search index: the table is small), or the id equals it; newest
+      // first. An RPC because profiles.email is not client-selectable (MPF-3,
+      // migration 20260923171821); the function is admin-gated instead.
+      const { data, error } = await supabase.rpc("admin_profile_search", { p_term: trimmed, p_limit: LIMIT });
       if (error) throw new Error(error.message);
 
       const rows = data ?? [];

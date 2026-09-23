@@ -43,8 +43,8 @@ type Surface = "buyer_help" | "subscription" | "seller_registration";
 
 const SURFACES: { id: Surface; label: string; where: string; grouped: boolean }[] = [
   { id: "buyer_help", label: "Buyer Help", where: "the buyer Help page (/profile/help and /help), grouped by category", grouped: true },
-  { id: "subscription", label: "Subscription", where: "the vendor Subscription page, above the Contact us button", grouped: false },
-  { id: "seller_registration", label: "Seller Registration", where: "not shown anywhere yet. Its placement on the vendor onboarding flow is still to be confirmed", grouped: false },
+  { id: "subscription", label: "Subscription", where: "the vendor Subscription page (/subscription), above the Contact us button", grouped: false },
+  { id: "seller_registration", label: "Seller Registration", where: "the seller landing page (/seller), which signed-out visitors see before registering", grouped: false },
 ];
 
 const SUBTITLE = "Questions and answers shown on the buyer Help page and vendor pages. Super admin edits; support can read.";
@@ -261,9 +261,13 @@ export default function Faqs() {
           <div key={g.label || "all"} className="mb-4">
             {meta.grouped && <p className="mb-1.5 text-2xs font-semibold uppercase tracking-wider text-ink-faint">{g.label}</p>}
             <Table head={["Order", "Question", "State", "Updated", ""]}>
-              {g.rows.map((r, i) => {
-                const prev = g.rows[i - 1];
-                const next = g.rows[i + 1];
+              {g.rows.map((r) => {
+                // Step past rows of the other visibility: swapping a live row with a
+                // hidden one would change nothing on the live page.
+                const peers = g.rows.filter((x) => x.active === r.active);
+                const j = peers.indexOf(r);
+                const prev = peers[j - 1];
+                const next = peers[j + 1];
                 return (
                   <tr key={r.id} className={r.active ? ROW_HOVER : `opacity-60 ${ROW_HOVER}`}>
                     <td className="px-3 py-2">

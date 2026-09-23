@@ -9,6 +9,31 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-23 (My Profile brief · Phase 12, MPF-2): **Types only.** `database.types.ts` gains `log_call()`, now the only write path to `public.calls` (textile-spark-net migration `20260923182259`). This panel neither reads nor writes `calls`, so nothing else changes. `npx tsc --noEmit --skipLibCheck` 0.
+
+- 2026-09-23 (My Profile brief · Phase 11, MPF-3): **Accounts, Chats, chat participants and suspension-history actors read emails through admin-gated RPCs. `profiles.email` and `profiles.phone` are no longer client-selectable, because they were readable with the public anon key.**
+  - `Accounts.tsx`: the search is `admin_profile_search(term, 50)`: the name or email contains the term, or the id equals it. Searching by exact id now works here too.
+  - `Chats.tsx`: the search resolves ids through `admin_profile_search(term, 500)`. Its own uuid check is gone, because the function matches ids.
+  - `lib/chat.ts` `fetchParticipants()`: names and status from `profiles`, emails from `admin_profile_emails(ids)`.
+  - `AccountStatus.tsx`: suspension-history actors through `admin_profile_emails()`.
+  - `scripts/invite-branches-test.mjs`: finds the account through `admin_profile_search()`. Its old `.eq("email", …)` would now be refused, and because it ignored the error, it would have reported "no such account".
+  - `database.types.ts`: the four new functions.
+  - The functions admit any active admin: the same access every role had through the column. The migrations live in textile-spark-net: `20260923171821`, and the interim `20260923174653`.
+  - **Production:** `cosora-admin.vercel.app` runs the old code, which was refused once the columns closed. The interim migration grants them back to signed-in users until this code is deployed; then textile-spark-net revokes it (MPF-19).
+  - **Verified:**
+    - textile-spark-net's `tests/profile-contact-privacy.spec.ts` drives this panel: Accounts finds demo-buyer by email, the account drawer's history names "Demo Admin", and the Chats search, a thread and the review queue resolve people, with every contact read returning 200.
+    - `npx tsc --noEmit --skipLibCheck` 0.
+
+- 2026-09-23 (My Profile brief · Phase 9, content): **FAQs page: the up/down arrows now step past hidden rows, and the Seller Registration tab says where its FAQs appear (`/seller`).** Andy's Seller Registration and Subscription FAQ content was loaded through this page's RPCs; see textile-spark-net's changelog.
+  - **Reorder fix:**
+    - A row's neighbour used to be the previous or next row in the table, hidden or not. A live FAQ could "move" past a deactivated one, and nothing changed on the live page.
+    - The Subscription tab now has two deactivated rows (the answers Andy's content replaced), which is where this would have bitten.
+    - Neighbours are now the previous or next row of the same visibility, within the group.
+  - **Tab notes:** Seller Registration now reads "the seller landing page (/seller)…", and Subscription names `/subscription`.
+  - **Verified:**
+    - textile-spark-net's `tests/faqs-admin-editable.spec.ts`, whose Subscription reorder crosses those hidden rows: 5 consecutive passes after one unexplained failure.
+    - `npx tsc --noEmit --skipLibCheck` 0.
+
 - 2026-09-23 (My Profile brief · Phase 9): **New FAQs page (`/faqs`). A super_admin edits the FAQs on the buyer Help page and the vendor Subscription page, and changes go live with no deploy. It's the panel's first real (non-seed) content editor: Site content (`Content.tsx`) is still a dev-seed mock with no table.** The schema lives in textile-spark-net, in `20260923144549_faqs_admin_editable.sql` and `20260923150408_faqs_hide_created_by_from_clients.sql`, and is logged there.
   - **`src/pages/Faqs.tsx`**, built like `ChatReasons.tsx`: TanStack Query against the `admin_faq_*` RPCs, with every mutation through `assertWrote`. There's no raw table access, and clients have no write grant on `faqs`.
     - **Tabs:** one per surface with a count (Buyer Help, Subscription, Seller Registration). Each says where its rows appear, and Seller Registration says it isn't on a page yet.
