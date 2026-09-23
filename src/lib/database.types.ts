@@ -606,6 +606,53 @@ export type Database = {
           },
         ]
       }
+      faqs: {
+        Row: {
+          active: boolean
+          answer: string
+          category_label: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          position: number
+          question: string
+          surface: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          answer: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          question: string
+          surface: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          answer?: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          question?: string
+          surface?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faqs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -2387,6 +2434,64 @@ export type Database = {
           status: string
           vault_secret_ok: boolean
           videos_missing: number
+        }[]
+      }
+      admin_faq_add: {
+        Args: {
+          p_answer: string
+          p_category_label: string
+          p_position?: number
+          p_question: string
+          p_surface: string
+        }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          id: string
+          position: number
+          question: string
+          surface: string
+        }[]
+      }
+      admin_faq_delete: { Args: { p_id: string }; Returns: { id: string }[] }
+      admin_faq_list: {
+        Args: { p_surface?: string }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          created_at: string
+          created_by: string
+          creator_email: string
+          creator_full_name: string
+          id: string
+          position: number
+          question: string
+          surface: string
+          updated_at: string
+        }[]
+      }
+      admin_faq_reorder: {
+        Args: { p_id: string; p_position: number }
+        Returns: { id: string; position: number }[]
+      }
+      admin_faq_update: {
+        Args: {
+          p_active?: boolean
+          p_answer?: string
+          p_category_label?: string
+          p_id: string
+          p_question?: string
+        }
+        Returns: {
+          active: boolean
+          answer: string
+          category_label: string
+          id: string
+          position: number
+          question: string
+          surface: string
         }[]
       }
       admin_flag_add: {

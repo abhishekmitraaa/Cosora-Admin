@@ -155,6 +155,26 @@ resolve vendor badges through `lib/vendors.ts`, in the same `queryFn` as their
 own list) failed to load outright. `lib/accounts.ts` is now the single reader,
 and `vendor_profiles` has one admin field left: `is_verified`.
 
+### FAQs (2026-09-23)
+
+`/faqs` edits `public.faqs`, the FAQ content on the buyer Help page (`/profile/help` and
+`/help`), the vendor Subscription page, and (once it's placed) seller registration. It's the
+panel's first real content editor; **Site content** is still dev-seed.
+
+| Role | FAQs |
+|---|---|
+| `super_admin` | **write** (add, edit, reorder, deactivate, delete) |
+| `support` | read |
+| everyone else | – |
+
+- Every write is an `admin_faq_*` RPC (SECURITY DEFINER, gated inside the function).
+  Clients can read active rows, anon included, but have no write grant on the table.
+- Clients can't read `created_by` either (a column grant), because it names the admin who
+  wrote the row. The page gets creator names through `admin_faq_list()`.
+- Whether `support` should write is open. Widening it means changing the four write RPCs'
+  gates in a textile-spark-net migration **and** `SECTION_WRITE.faqs` here; either alone is
+  wrong.
+
 ---
 
 ## Phase-4 sections
@@ -550,6 +570,7 @@ silent and expensive:
 | 7 — Reporting + flagged-items log | **Working**, from real rows |
 | Phase 3 — Chat moderation (7 screens) | **Working.** Review queue with pending + four audit tabs, thread transcript with the flagged-items log, keyword blocklist, flag patterns (with a live Postgres-side pattern test), block reasons, and Accounts. `resolve_conversation_review()` is applied and verified end to end against the live project (16/16). Support/super_admin only; verified with real logins by `scripts/chat-moderation-matrix.mjs`. |
 | Phase 4 — Design system + eight new sections | **UI complete.** Every existing screen redesigned onto one token set with a real dark mode, and **zero behaviour change**, verified by extracting all 340 data-layer statements across the 26 touched files before and after and comparing them (identical, bar one em-dash inside an error string). `scripts/theme-contrast-check.mjs` passes 91 checks in both modes after fixing four real WCAG failures it found; `scripts/copy-audit.mjs` passes. **Real data, working now:** Ads → Monitoring and Geography. **UI only, on a development fixture until Phase 2 creates their tables:** Site content, Payments, Certificates, Discounts, Customers — all gated, routed and navigable now, and empty in a production build (verified by grepping the bundle). **Live Activity** is an external Clarity link and needs `VITE_CLARITY_PROJECT_ID` plus the snippet on the buyer site. **Certificates is built pending Andy's confirmation** that the certificate is physical. Not yet exercised with a real login: no admin credentials were available this session, so the role gates on the new sections are asserted from `roles.ts` rather than driven in a browser — run `scripts/smoke.mjs` after seeding throwaway admins to close that. |
+| My Profile Phase 9 — FAQs | **Working.** `/faqs` add / edit / reorder / deactivate / delete on all three surfaces, verified end to end by textile-spark-net's `tests/faqs-admin-editable.spec.ts` as demo-admin (the buyer and vendor pages follow, no deploy). Non-admin and anon RPC calls are refused with 42501. Seller Registration has no content and no page yet, pending Andy. The support read-only view is not yet exercised with a real support login. |
 
 ## Inviting admins by email (`admin-invite`)
 

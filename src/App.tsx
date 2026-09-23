@@ -26,6 +26,7 @@ import ChatReview from "@/pages/ChatReview";
 import ChatKeywords from "@/pages/ChatKeywords";
 import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
+import Faqs from "@/pages/Faqs";
 // Phase-4 sections. Geography reads real vendor rows; the five below it render
 // from a development-only seed (src/lib/devSeed/) until Phase 2 creates their
 // tables, and Live Activity is an external link with no Cosora query at all.
@@ -68,6 +69,7 @@ function Landing() {
         "chat-keywords",
         "chat-patterns",
         "chat-reasons",
+        "faqs",
         "payments",
         "certificates",
         "discounts",
@@ -203,6 +205,14 @@ export default function App() {
                 element={
                   <RequireSection section="chat-reasons">
                     <ChatReasons />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/faqs"
+                element={
+                  <RequireSection section="faqs">
+                    <Faqs />
                   </RequireSection>
                 }
               />

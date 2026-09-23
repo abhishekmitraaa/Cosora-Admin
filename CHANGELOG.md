@@ -9,6 +9,29 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-23 (My Profile brief · Phase 9): **New FAQs page (`/faqs`). A super_admin edits the FAQs on the buyer Help page and the vendor Subscription page, and changes go live with no deploy. It's the panel's first real (non-seed) content editor: Site content (`Content.tsx`) is still a dev-seed mock with no table.** The schema lives in textile-spark-net, in `20260923144549_faqs_admin_editable.sql` and `20260923150408_faqs_hide_created_by_from_clients.sql`, and is logged there.
+  - **`src/pages/Faqs.tsx`**, built like `ChatReasons.tsx`: TanStack Query against the `admin_faq_*` RPCs, with every mutation through `assertWrote`. There's no raw table access, and clients have no write grant on `faqs`.
+    - **Tabs:** one per surface with a count (Buyer Help, Subscription, Seller Registration). Each says where its rows appear, and Seller Registration says it isn't on a page yet.
+    - **Add form:** Question and Answer. Buyer Help also has a required Category with suggestions from existing categories; the other surfaces are flat lists. A new row goes last on its surface.
+    - **Tables:** one per category on Buyer Help, one table elsewhere. Each row has:
+      - up/down arrows: a swap with the neighbour via `admin_faq_reorder`, disabled at a group's edges;
+      - Edit, in a modal;
+      - Deactivate/Reactivate: hidden from the apps, kept here;
+      - Delete, with a confirm.
+    - **Updated column:** the date and who created the row ("seeded" for the 17 migrated rows).
+  - **`roles.ts`:** new section `faqs`.
+    - SECTION_READ is super_admin + support, matching `admin_faq_list()`'s gate.
+    - SECTION_WRITE is super_admin, matching the four write RPCs. Whether support should write is an open question for Andy. Widening it means changing the RPC gates and this line together.
+    - Support gets the page with the standard read-only banner and disabled controls.
+  - **`App.tsx`:** route `/faqs` behind `RequireSection section="faqs"`, and `faqs` added to the Landing order after `chat-reasons`.
+  - **`Shell.tsx`:** an "FAQs" item (CircleHelp) in the Settings group, after Block reasons.
+  - **`src/lib/database.types.ts`:** the `faqs` table and the five `admin_faq_*` functions.
+  - **Verified:**
+    - textile-spark-net's `tests/faqs-admin-editable.spec.ts` drives this page as demo-admin (super_admin) on :5174. It adds, edits, reorders, deactivates and deletes on all three tabs, and checks that the buyer and vendor pages follow: 1/1, twice.
+    - `npx tsc --noEmit --skipLibCheck` 0.
+    - **Not exercised with a support login,** because none was available. The read-only view follows from `canWrite`, and the database gate (42501 for non-admins) is proven.
+  - README: a new "FAQs" section and a status row.
+
 - 2026-09-22 (Admin-schema separation · Phase 5c, IRREVERSIBLE): **`profiles.is_admin` / `profiles.admin_role` were dropped (textile-spark-net migration `20260922180000`, mirrored here byte-for-byte; live `20260922171801`). The panel needed no code change: production already used `admin_whoami` and the admin_* RPCs.**
   - `src/lib/database.types.ts` regenerated: −6 lines (the profiles fields). Typecheck 0; the probe fires 1.
   - **Verified live on `cosora-admin.vercel.app` after the drop, 16/16:** sign-in and identity via `rpc/admin_whoami`, roster, self-edit guard, search, promote, role change, demote, invite. No request named the dropped columns. A non-admin sees "Not an admin account".
