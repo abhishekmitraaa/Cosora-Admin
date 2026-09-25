@@ -9,6 +9,7 @@ export const ALL_ROLES: AdminRole[] = [
   "ads_moderator",
   "finance_admin",
   "support",
+  "manager",
 ];
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
@@ -18,6 +19,9 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   ads_moderator: "Ads moderator",
   finance_admin: "Finance admin",
   support: "Support (read-only)",
+  // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. It sees no
+  // moderation or commerce section, only the Admin Log and the all-role pages.
+  manager: "Manager",
 };
 
 export type Section =
@@ -92,7 +96,10 @@ export type Section =
   // suspension only.
   | "customers"
   // Third-party website analytics. An external link, not a built feature.
-  | "traction";
+  | "traction"
+  // Every admin's changes and sign-ins, with date and time (MPF-26). Mirrors
+  // admin_audit_log_list(), which admits super_admin and manager only.
+  | "admin-log";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +183,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // matching `reports` - this panel already shows all-time revenue to all six
   // roles, so site traffic is not a narrower secret than what is on that page.
   traction: ALL_ROLES,
+  // admin_audit_log_list() and admin_audit_log_actors() admit exactly these two.
+  "admin-log": ["super_admin", "manager"],
 };
 
 /**
@@ -198,10 +207,12 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
-  // admin_faq_add / update / delete / reorder are super_admin only. Whether support
-  // should also edit FAQ content is an open question for the owner (2026-09-23).
-  // Widening it means changing the RPC gates AND this line; either alone is wrong.
-  faqs: ["super_admin"],
+  // admin_faq_add / update / delete / reorder admit support + super_admin, the
+  // same predicate as admin_faq_list (migration 20260924170736; Mitra's answer to
+  // the 2026-09-23 open question). Support answers buyers' questions, so it keeps
+  // the answers current. Changing this means changing the RPC gates AND this line;
+  // either alone is wrong.
+  faqs: ["super_admin", "support"],
   // set_account_status() gates itself to these two, so vendor_ops sees the page
   // (it is reachable from a vendor) but not the actions.
   accounts: ["super_admin", "support"],
@@ -226,6 +237,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   customers: [],
   // An external link. There is nothing here to write.
   traction: [],
+  // Append-only, written by the database itself: nobody edits the log.
+  "admin-log": [],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

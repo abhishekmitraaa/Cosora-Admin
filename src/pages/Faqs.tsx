@@ -33,10 +33,17 @@ import {
  *
  * Structured like ChatReasons: reads through admin_faq_list(), and every write
  * through an admin_faq_* RPC routed via assertWrote(), never raw table access.
- * The RPCs are the gate (super_admin writes; support may read). The page mirrors
- * it with canWrite() so a support admin sees a read-only view, not buttons that fail.
+ * The RPCs are the gate: support and super_admin read and write, and every other
+ * role is refused. The page still checks canWrite(), so a role that could read but
+ * not write would get a read-only view rather than buttons that fail. Today the
+ * read and write lists in roles.ts are the same.
  *
- * Changes show on the live pages with no deploy: the apps read public.faqs directly.
+ * Changes show on the live pages with no deploy, within about a minute. Every write
+ * rebuilds a JSON snapshot per surface on the Storage CDN (trg_faqs_snapshot → the
+ * faqs-snapshot edge function) and the apps read that. The CDN's copy is invalidated
+ * by the rebuild; measured, every visitor has the new file ~47 s after the edit. If
+ * a snapshot can't be read, the apps read public.faqs directly (textile-spark-net
+ * Phase 23).
  */
 
 type Surface = "buyer_help" | "subscription" | "seller_registration";
@@ -47,7 +54,7 @@ const SURFACES: { id: Surface; label: string; where: string; grouped: boolean }[
   { id: "seller_registration", label: "Seller Registration", where: "the seller landing page (/seller), which signed-out visitors see before registering", grouped: false },
 ];
 
-const SUBTITLE = "Questions and answers shown on the buyer Help page and vendor pages. Super admin edits; support can read.";
+const SUBTITLE = "Questions and answers shown on the buyer Help page and vendor pages. Support and super admin can edit them.";
 
 interface FaqRow {
   id: string;
@@ -203,7 +210,7 @@ export default function Faqs() {
       />
 
       <Note className="mb-4">
-        Shown on {meta.where}. Changes go live as soon as they&rsquo;re saved, with no deploy.{" "}
+        Shown on {meta.where}. Changes reach the live page within about a minute of saving, with no deploy.{" "}
         <span className="font-medium text-ink">Deactivate</span> hides a question and keeps it here;{" "}
         <span className="font-medium text-ink">Delete</span> removes it for good. Order with the arrows.
       </Note>

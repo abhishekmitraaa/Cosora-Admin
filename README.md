@@ -168,18 +168,49 @@ panel's first real content editor; **Site content** is still dev-seed.
 | Role | FAQs |
 |---|---|
 | `super_admin` | **write** (add, edit, reorder, deactivate, delete) |
-| `support` | read |
-| everyone else | – |
+| `support` | **write** (the same; since 2026-09-24) |
+| everyone else | – (no nav entry; the RPCs refuse with 42501) |
 
 - Every write is an `admin_faq_*` RPC (SECURITY DEFINER, gated inside the function).
   Clients can read active rows, anon included, but have no write grant on the table.
 - Clients can't read `created_by` either (a column grant), because it names the admin who
   wrote the row. The page gets creator names through `admin_faq_list()`.
-- Whether `support` should write is open. Widening it means changing the four write RPCs'
-  gates in a textile-spark-net migration **and** `SECTION_WRITE.faqs` here; either alone is
-  wrong.
+- Support has written since 2026-09-24 (My Profile Phase 22; textile-spark-net migration
+  `20260924170736`). Changing who writes means changing the four write RPCs' gates **and**
+  `SECTION_WRITE.faqs` here; either alone is wrong.
+- Every add, edit, reorder, deactivation and delete is in the **Admin Log** (below), with the
+  text before and after (since 2026-09-25, MPF-26). The FAQ table's "Updated" column still
+  shows the creator; the Admin Log shows who changed what.
+- **Changes reach the live pages within about a minute, not instantly** (since 2026-09-24,
+  My Profile Phase 23). Every write rebuilds a JSON snapshot per surface on the Storage CDN,
+  which the site reads first. Measured: the edge has the new file everywhere ~47 s after the
+  save. If a snapshot can't be read, the site reads the table directly.
 
 ---
+
+### Admin Log (2026-09-25)
+
+`/admin-log` lists every change an admin makes in the panel, every sign-in and sign-out, and
+the invite and refund edge functions' actions, newest first, with IST date and time and the
+changed fields before → after. Filters: admin, area, action, date range.
+
+| Role | Admin Log |
+|---|---|
+| `super_admin` | read |
+| `manager` | read (and nothing else but Reports and Live Activity) |
+| everyone else | – (no nav entry; the RPCs refuse with 42501) |
+
+- The database writes it, not this app (textile-spark-net migration `20260925174031`):
+  - `trg_admin_audit` on each table the panel writes records the admin from the JWT,
+    whichever page or RPC made the change;
+  - `admin_audit_session()` records sign-in (`Login.tsx`) and sign-out
+    (`useAdminSession`);
+  - `admin-invite` and `admin-refund-payment` call `admin_audit_record()`.
+- Append-only: no client can write it, and a trigger refuses UPDATE and DELETE for everyone.
+- **A new page that writes a new table** needs `trg_admin_audit` on that table, or its
+  changes won't appear. Counters and derived columns are excluded on purpose.
+- **Manager** (`manager`, textile-spark-net migration `20260925173658`) is granted on the
+  Admins page like any role.
 
 ## Phase-4 sections
 
@@ -576,6 +607,9 @@ silent and expensive:
 | Phase 4 — Design system + eight new sections | **UI complete.** Every existing screen redesigned onto one token set with a real dark mode, and **zero behaviour change**, verified by extracting all 340 data-layer statements across the 26 touched files before and after and comparing them (identical, bar one em-dash inside an error string). `scripts/theme-contrast-check.mjs` passes 91 checks in both modes after fixing four real WCAG failures it found; `scripts/copy-audit.mjs` passes. **Real data, working now:** Ads → Monitoring and Geography. **UI only, on a development fixture until Phase 2 creates their tables:** Site content, Payments, Certificates, Discounts, Customers — all gated, routed and navigable now, and empty in a production build (verified by grepping the bundle). **Live Activity** is an external Clarity link and needs `VITE_CLARITY_PROJECT_ID` plus the snippet on the buyer site. **Certificates is built pending Andy's confirmation** that the certificate is physical. Not yet exercised with a real login: no admin credentials were available this session, so the role gates on the new sections are asserted from `roles.ts` rather than driven in a browser — run `scripts/smoke.mjs` after seeding throwaway admins to close that. |
 | My Profile Phase 9 — FAQs | **Working.** `/faqs` add / edit / reorder / deactivate / delete on all three surfaces, verified end to end by textile-spark-net's `tests/faqs-admin-editable.spec.ts` as demo-admin (the buyer and vendor pages follow, no deploy). Non-admin and anon RPC calls are refused with 42501. Andy's content is loaded, and Seller Registration shows on the buyer app's `/seller` (2026-09-23). The arrows step past hidden rows. The support read-only view is not yet exercised with a real support login. |
 | My Profile Phase 11 — MPF-3 | **Working, and live** since 2026-09-24 (`main` `106f84c`, bundle `index-BzKTnSmz.js`). Accounts, Chats, participants and actors read emails through the admin RPCs. textile-spark-net has revoked the interim signed-in grant (MPF-19), and its `profile-contact-privacy.spec.ts` passed against the live panel afterwards |
+| My Profile Phase 15 — MPF-5 | **Working in this code** (2026-09-24). `account_status` is shown by one `AccountStatusBadge` on Accounts, Vendors and the Account status card. `deleted` is a grey badge, with no Suspend or Reinstate, because `set_account_status()` refuses a deleted account. Verified by textile-spark-net's `tests/admin-deleted-status.spec.ts` with the status rewritten in the browser: no deleted account exists, and deletion can't be undone. **Needs a deploy to reach `cosora-admin.vercel.app`** |
+| My Profile Phase 22 — support writes FAQs | **Working in this code and in the database** (2026-09-24). The RPC gates are live (migration `20260924170736`). The live panel still shows support the read-only view until this repo is deployed. Verified by textile-spark-net's `tests/faqs-support-write.spec.ts` (2/2) on :5174: support adds, edits, reorders, deactivates and deletes on all three tabs; product_moderator has no FAQs entry and gets 42501 from every RPC |
+| My Profile Phase 23 — FAQ read path on the CDN | **Working** (2026-09-24). No change to how this page writes. Every FAQ write now also rebuilds the site's CDN snapshots (a database trigger in textile-spark-net), and the page says changes reach the live page "within about a minute". Verified by textile-spark-net's `tests/faqs-snapshot.spec.ts` and `faqs-admin-editable.spec.ts` against this panel |
 
 ## Inviting admins by email (`admin-invite`)
 

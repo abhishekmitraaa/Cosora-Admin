@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
-import AccountStatus from "@/components/AccountStatus";
+import AccountStatus, { AccountStatusBadge } from "@/components/AccountStatus";
 import {
   Badge,
   Card,
@@ -178,15 +178,7 @@ export default function Accounts() {
                   {r.isVendor ? <Badge tone="info">vendor</Badge> : <Badge>buyer</Badge>}
                 </td>
                 <td className="px-3 py-2">
-                  {r.account_status === "suspended" ? (
-                    <Badge tone="critical" dot>
-                      suspended
-                    </Badge>
-                  ) : (
-                    <Badge tone="positive" dot>
-                      active
-                    </Badge>
-                  )}
+                  <AccountStatusBadge status={r.account_status} />
                   {/*
                     A mismatch here is a real signal, not noise: the flag and the
                     ledger are written in the same function, so if they disagree
@@ -209,7 +201,8 @@ export default function Accounts() {
                     className="text-xs text-ink-muted underline hover:text-ink"
                     onClick={() => setSelected(selected?.id === r.id ? null : r)}
                   >
-                    {selected?.id === r.id ? "Hide" : "Manage"}
+                    {/* A deleted account has nothing to manage, only history to read. */}
+                    {selected?.id === r.id ? "Hide" : r.account_status === "deleted" ? "View" : "Manage"}
                   </button>
                   {r.isVendor && (
                     <Link

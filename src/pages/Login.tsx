@@ -20,6 +20,9 @@ export default function Login() {
     setError(null);
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) setError(authError.message);
+    // Admin Log (MPF-26): record the sign-in. The database records it only for an
+    // active admin, and a failed record never blocks signing in.
+    else await supabase.rpc("admin_audit_session", { p_action: "sign_in" }).then(() => undefined, () => undefined);
     setBusy(false);
     // On success the auth listener in AdminSessionProvider re-reads the profile
     // and the router redirects; nothing to do here.

@@ -112,6 +112,9 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       await loadIdentity(data.session);
     },
     signOut: async () => {
+      // Admin Log (MPF-26): record the sign-out while the session still exists.
+      // Best effort: a failed record never blocks signing out.
+      await supabase.rpc("admin_audit_session", { p_action: "sign_out" }).then(() => undefined, () => undefined);
       await supabase.auth.signOut();
       setIdentity(null);
     },

@@ -6,6 +6,7 @@ import { fetchAccountStatuses } from "@/lib/accounts";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
+import { AccountStatusBadge } from "@/components/AccountStatus";
 import {
   Badge,
   Empty,
@@ -143,11 +144,7 @@ export default function Vendors() {
                   )}
                 </td>
                 <td className="px-3 py-2">
-                  {v.account_status === "suspended" ? (
-                    <Badge tone="critical" dot>suspended</Badge>
-                  ) : (
-                    <Badge tone="positive" dot>active</Badge>
-                  )}
+                  <AccountStatusBadge status={v.account_status} />
                 </td>
                 <td className="px-3 py-2">{s.any ? <Badge tone="info">seal</Badge> : <Badge>none</Badge>}</td>
                 <td className="px-3 py-2 text-xs">

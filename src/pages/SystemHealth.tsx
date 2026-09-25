@@ -39,7 +39,25 @@ import {
  *
  * Read-only. There is no mutation on this page — the correct response to a bad
  * status is to go and fix the pipeline, not to dismiss a row.
+ *
+ * REFUSED ANALYTICS EVENTS (MPF-23, 2026-09-25). log_engagement_event() used to
+ * swallow every error, so an event with a bad type or source vanished without a
+ * trace. It now records each such failure in admin.engagement_event_failures, one
+ * row per hour per error with a count, and this page lists the last 7 days through
+ * admin_engagement_event_failures() (same super_admin/vendor_ops gate). An unknown
+ * product, ad or vendor id stays quiet: that is junk a client can send.
  */
+
+interface FailureRow {
+  hour: string;
+  error_code: string;
+  constraint_name: string;
+  count: number;
+  message: string | null;
+  last_event_type: string | null;
+  last_source: string | null;
+  last_at: string;
+}
 
 interface HealthRow {
   checked_at: string;
@@ -91,6 +109,18 @@ export default function SystemHealth() {
     refetchInterval: 5 * 60_000,
   });
 
+  const failures = useQuery({
+    queryKey: ["admin_engagement_event_failures"],
+    queryFn: async (): Promise<FailureRow[]> => {
+      const { data, error } = await supabase.rpc("admin_engagement_event_failures", { p_days: 7 });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as FailureRow[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const failureRows = failures.data ?? [];
+  const refused = failureRows.reduce((n, r) => n + r.count, 0);
+
   const rows = data ?? [];
   const latest = rows[0];
   // "Has this been unhealthy at all recently?" is the question this page is for,
@@ -102,7 +132,7 @@ export default function SystemHealth() {
     <Page>
       <PageHeader
         title="System Health"
-        subtitle="Embedding pipeline status, sampled every 10 minutes. Read-only."
+        subtitle="Embedding pipeline status, sampled every 10 minutes, and analytics events that couldn't be recorded. Read-only."
         actions={
           latest ? (
             <Badge tone={toneFor(latest.status)} dot>
@@ -183,6 +213,39 @@ export default function SystemHealth() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-ink-muted">{r.reason ?? "—"}</td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Panel>
+
+        <Panel
+          title="Analytics events refused"
+          description={
+            refused > 0
+              ? `${refused} event${refused === 1 ? "" : "s"} in the last 7 days couldn't be recorded. Vendors' view and click counts are missing them.`
+              : "Events log_engagement_event() couldn't record, last 7 days. An unknown product, ad or vendor id is not counted here."
+          }
+        >
+          {failures.error ? (
+            <ErrorNote message={(failures.error as Error).message} />
+          ) : failures.isPending ? (
+            <SkeletonList rows={2} height="h-10" />
+          ) : failureRows.length === 0 ? (
+            <Empty>None in the last 7 days.</Empty>
+          ) : (
+            <Table head={["Hour", "Error", "Count", "Last event type / source", "Message"]}>
+              {failureRows.map((r) => (
+                <tr key={`${r.hour}-${r.error_code}-${r.constraint_name}`}>
+                  <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{fmt(r.hour)}</td>
+                  <td className="px-3 py-2">
+                    <Badge tone="caution">{r.constraint_name || r.error_code}</Badge>
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">{r.count}</td>
+                  <td className="px-3 py-2 font-mono text-2xs">
+                    {r.last_event_type ?? "—"} / {r.last_source ?? "—"}
+                  </td>
+                  <td className="px-3 py-2 text-ink-muted">{r.message ?? "—"}</td>
                 </tr>
               ))}
             </Table>

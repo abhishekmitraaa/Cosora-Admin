@@ -11,6 +11,7 @@ import {
   CreditCard,
   Award,
   HeartPulse,
+  History,
   LogOut,
   Map,
   Megaphone,
@@ -101,6 +102,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
       { to: "/faqs", section: "faqs", label: "FAQs", icon: CircleHelp },
       { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
+      { to: "/admin-log", section: "admin-log", label: "Admin Log", icon: History },
     ],
   },
 ];
