@@ -208,10 +208,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return null;
   }
 
+  // Admin Log (MPF-26). The grant is written with the service-role key, so the
+  // audit trigger can't tell who asked; record it for the super_admin whose token
+  // was checked above. Best effort: a failed record is logged, never a failed invite.
+  const recordInvite = async (userId: string, changes: Record<string, unknown>): Promise<void> => {
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/admin_audit_record`, {
+        method: "POST",
+        headers: REST(serviceKey),
+        body: JSON.stringify({
+          p_actor: callerId, p_action: "invite", p_target_table: "admin.admin_users",
+          p_target_id: userId, p_changes: { email, admin_role: role, ...changes }, p_source: "edge:admin-invite",
+        }),
+      });
+      if (!r.ok) console.error("admin-invite: Admin Log record failed", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("admin-invite: Admin Log record failed", String(e));
+    }
+  };
+
   // Branch 3: exists AND has a password -> grant only, no email
   if (existing && hasPassword) {
     const err = await grantAdmin(existing.id);
     if (err) return json({ error: "grant_failed", detail: err }, 500);
+    await recordInvite(existing.id, { outcome: "promoted", email_sent: false });
     return json({
       ok: true,
       outcome: "promoted",
@@ -240,6 +260,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: REST(serviceKey),
       body: JSON.stringify({ email }),
     });
+    await recordInvite(existing.id, { outcome: "invited", email_sent: recoverResp.ok });
 
     if (!recoverResp.ok) {
       // The admin grant stands (they ARE an admin now), but they still can't log
@@ -318,6 +339,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       500,
     );
   }
+  await recordInvite(invited.id, { outcome: "invited", created: true, email_sent: true });
 
   return json({
     ok: true,

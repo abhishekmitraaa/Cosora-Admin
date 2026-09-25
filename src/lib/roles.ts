@@ -9,6 +9,7 @@ export const ALL_ROLES: AdminRole[] = [
   "ads_moderator",
   "finance_admin",
   "support",
+  "manager",
 ];
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
@@ -18,6 +19,9 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   ads_moderator: "Ads moderator",
   finance_admin: "Finance admin",
   support: "Support (read-only)",
+  // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. It sees no
+  // moderation or commerce section, only the Admin Log and the all-role pages.
+  manager: "Manager",
 };
 
 export type Section =
@@ -92,7 +96,10 @@ export type Section =
   // suspension only.
   | "customers"
   // Third-party website analytics. An external link, not a built feature.
-  | "traction";
+  | "traction"
+  // Every admin's changes and sign-ins, with date and time (MPF-26). Mirrors
+  // admin_audit_log_list(), which admits super_admin and manager only.
+  | "admin-log";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +183,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // matching `reports` - this panel already shows all-time revenue to all six
   // roles, so site traffic is not a narrower secret than what is on that page.
   traction: ALL_ROLES,
+  // admin_audit_log_list() and admin_audit_log_actors() admit exactly these two.
+  "admin-log": ["super_admin", "manager"],
 };
 
 /**
@@ -228,6 +237,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   customers: [],
   // An external link. There is nothing here to write.
   traction: [],
+  // Append-only, written by the database itself: nobody edits the log.
+  "admin-log": [],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

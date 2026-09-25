@@ -168,6 +168,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "refund_in_progress", detail: "Another refund attempt is already in flight." }, 409);
   }
 
+  // Admin Log (MPF-26). The invoice is written with the service-role key, so the
+  // audit trigger can't tell who asked; record each attempt from here on, success
+  // or failure, for the admin whose token was checked above. Best effort: a failed
+  // record is logged, and never changes the refund's outcome.
+  const recordRefund = async (outcome: Record<string, unknown>): Promise<void> => {
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/admin_audit_record`, {
+        method: "POST",
+        headers: REST(serviceKey),
+        body: JSON.stringify({
+          p_actor: callerId, p_action: "refund", p_target_table: "public.subscription_invoices",
+          p_target_id: invoice.id,
+          p_changes: { vendor_id: invoice.vendor_id, amount_paise: amountPaise, ...outcome },
+          p_source: "edge:admin-refund-payment",
+        }),
+      });
+      if (!r.ok) console.error("admin-refund-payment: Admin Log record failed", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("admin-refund-payment: Admin Log record failed", String(e));
+    }
+  };
+
   // ── The real Razorpay call ────────────────────────────────────────────────
   let refund: { id?: string; status?: string; amount?: number };
   try {
@@ -195,6 +217,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         headers: { ...REST(serviceKey), prefer: "return=minimal" },
         body: JSON.stringify({ refund_status: "failed" }),
       });
+      await recordRefund({ refund_status: "failed", error: bodyText.slice(0, 200) });
       return json({ error: "refund_failed", detail: bodyText.slice(0, 400) }, 502);
     }
     refund = JSON.parse(bodyText);
@@ -204,6 +227,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: { ...REST(serviceKey), prefer: "return=minimal" },
       body: JSON.stringify({ refund_status: "failed" }),
     });
+    await recordRefund({ refund_status: "failed", error: String(e).slice(0, 200) });
     return json({ error: "request_failed", detail: String(e) }, 502);
   }
 
@@ -213,6 +237,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       headers: { ...REST(serviceKey), prefer: "return=minimal" },
       body: JSON.stringify({ refund_status: "failed" }),
     });
+    await recordRefund({ refund_status: "failed", error: "Razorpay returned no refund id" });
     return json({ error: "refund_failed", detail: "Razorpay returned no refund id" }, 502);
   }
 
@@ -237,6 +262,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     headers: { ...REST(serviceKey), prefer: "return=minimal" },
     body: JSON.stringify(patch),
   });
+  await recordRefund({ refund_status: gatewayStatus, razorpay_refund_id: refund.id, refunded_amount: patch.refunded_amount });
 
   return json({
     ok: true,

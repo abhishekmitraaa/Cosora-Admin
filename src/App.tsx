@@ -19,6 +19,7 @@ import Ads from "@/pages/Ads";
 import Subscriptions from "@/pages/Subscriptions";
 import Reports from "@/pages/Reports";
 import Admins from "@/pages/Admins";
+import AdminLog from "@/pages/AdminLog";
 import Accounts from "@/pages/Accounts";
 import Chats from "@/pages/Chats";
 import ChatThread from "@/pages/ChatThread";
@@ -303,6 +304,14 @@ export default function App() {
                 element={
                   <RequireSection section="admins">
                     <Admins />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/admin-log"
+                element={
+                  <RequireSection section="admin-log">
+                    <AdminLog />
                   </RequireSection>
                 }
               />

@@ -9,6 +9,20 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-25 (My Profile flag-fix pass · MPF-26, MPF-23): **An Admin Log, for super admins and a new Manager role, and a System Health panel for analytics events that couldn't be recorded.**
+  - **`pages/AdminLog.tsx`** (`/admin-log`):
+    - every admin change, panel sign-in and sign-out, invite and refund, newest first;
+    - who and their role, IST date and time, what (area and id), and each changed field before → after;
+    - filters for admin, area, action and dates, and older entries on demand;
+    - an "Admin Log" nav item under Settings.
+  - **`lib/roles.ts`:** the `manager` role ("Manager") and the `admin-log` section, readable by super_admin and manager, written by nobody. A manager sees the Admin Log and the all-role Reports and Live Activity, nothing else.
+  - **`Login.tsx`** and **`hooks/useAdminSession.tsx`** record sign-in and sign-out through `admin_audit_session()`, best effort.
+  - **`supabase/functions/admin-invite`** (deployed v7) and **`admin-refund-payment`** (v5) record each invite and each refund attempt through `admin_audit_record()`, because they write with the service-role key. Deployed sources were compared first: invite matched HEAD, and refund differed only by two em dashes in error strings.
+  - **`pages/SystemHealth.tsx`:** an "Analytics events refused" panel from `admin_engagement_event_failures()`, last 7 days.
+  - **`lib/database.types.ts`:** `manager`, and the five new functions.
+  - **The database does the recording** (textile-spark-net migrations `20260925173658` and `20260925174031`): a trigger on every table this panel writes, append-only.
+  - **Verified:** `admin-log.spec.ts` 3/3 (super_admin, manager, product_moderator); it fails when the manager's access is removed. `npm run typecheck` 0, `npm run build` 0.
+
 - 2026-09-24 (My Profile brief · Phase 23, Phase 9 Q2): **The FAQ page no longer says changes go live "as soon as they're saved". The site now reads FAQs from a CDN snapshot, so it says "within about a minute".**
   - `pages/Faqs.tsx`: that one sentence, and the header comment explaining why.
   - **Nothing about writing changed:** the same `admin_faq_*` RPCs. Each write now also fires `trg_faqs_snapshot` in the database, which rebuilds the three snapshot files through textile-spark-net's `faqs-snapshot` edge function (migration `20260924174051`).

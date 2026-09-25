@@ -2367,6 +2367,41 @@ export type Database = {
           reviewer_id: string
         }[]
       }
+      admin_audit_log_actors: {
+        Args: never
+        Returns: {
+          actor_id: string
+          actor_name: string
+          actor_role: Database["public"]["Enums"]["admin_role_type"]
+          entries: number
+          last_at: string
+        }[]
+      }
+      admin_audit_log_list: {
+        Args: {
+          p_action?: string
+          p_actor?: string
+          p_before_id?: number
+          p_from?: string
+          p_limit?: number
+          p_table?: string
+          p_to?: string
+        }
+        Returns: {
+          action: string
+          actor_id: string
+          actor_name: string
+          actor_role: Database["public"]["Enums"]["admin_role_type"]
+          at: string
+          changes: Json
+          id: number
+          own_row: boolean
+          source: string
+          target_id: string
+          target_table: string
+        }[]
+      }
+      admin_audit_session: { Args: { p_action: string }; Returns: undefined }
       admin_block_reason_add: {
         Args: { p_reason: string }
         Returns: {
@@ -2434,6 +2469,20 @@ export type Database = {
           status: string
           vault_secret_ok: boolean
           videos_missing: number
+        }[]
+      }
+      admin_engagement_event_failures: {
+        Args: { p_days?: number }
+        Returns: {
+          constraint_name: string
+          count: number
+          error_code: string
+          first_at: string
+          hour: string
+          last_at: string
+          last_event_type: string
+          last_source: string
+          message: string
         }[]
       }
       admin_faq_add: {
@@ -3058,6 +3107,7 @@ export type Database = {
         | "ads_moderator"
         | "finance_admin"
         | "support"
+        | "manager"
       product_status: "draft" | "under_review" | "live" | "rejected"
       quote_status: "pending" | "shortlisted" | "accepted" | "rejected"
       rfq_status: "active" | "closed"
@@ -3196,6 +3246,7 @@ export const Constants = {
         "ads_moderator",
         "finance_admin",
         "support",
+        "manager",
       ],
       product_status: ["draft", "under_review", "live", "rejected"],
       quote_status: ["pending", "shortlisted", "accepted", "rejected"],

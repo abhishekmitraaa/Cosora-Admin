@@ -178,14 +178,39 @@ panel's first real content editor; **Site content** is still dev-seed.
 - Support has written since 2026-09-24 (My Profile Phase 22; textile-spark-net migration
   `20260924170736`). Changing who writes means changing the four write RPCs' gates **and**
   `SECTION_WRITE.faqs` here; either alone is wrong.
-- `created_by` records who added a row, and nothing records later edits. The "Updated" column
-  shows the creator (textile-spark-net `myprofileflags.md` MPF-26).
+- Every add, edit, reorder, deactivation and delete is in the **Admin Log** (below), with the
+  text before and after (since 2026-09-25, MPF-26). The FAQ table's "Updated" column still
+  shows the creator; the Admin Log shows who changed what.
 - **Changes reach the live pages within about a minute, not instantly** (since 2026-09-24,
   My Profile Phase 23). Every write rebuilds a JSON snapshot per surface on the Storage CDN,
   which the site reads first. Measured: the edge has the new file everywhere ~47 s after the
   save. If a snapshot can't be read, the site reads the table directly.
 
 ---
+
+### Admin Log (2026-09-25)
+
+`/admin-log` lists every change an admin makes in the panel, every sign-in and sign-out, and
+the invite and refund edge functions' actions, newest first, with IST date and time and the
+changed fields before → after. Filters: admin, area, action, date range.
+
+| Role | Admin Log |
+|---|---|
+| `super_admin` | read |
+| `manager` | read (and nothing else but Reports and Live Activity) |
+| everyone else | – (no nav entry; the RPCs refuse with 42501) |
+
+- The database writes it, not this app (textile-spark-net migration `20260925174031`):
+  - `trg_admin_audit` on each table the panel writes records the admin from the JWT,
+    whichever page or RPC made the change;
+  - `admin_audit_session()` records sign-in (`Login.tsx`) and sign-out
+    (`useAdminSession`);
+  - `admin-invite` and `admin-refund-payment` call `admin_audit_record()`.
+- Append-only: no client can write it, and a trigger refuses UPDATE and DELETE for everyone.
+- **A new page that writes a new table** needs `trg_admin_audit` on that table, or its
+  changes won't appear. Counters and derived columns are excluded on purpose.
+- **Manager** (`manager`, textile-spark-net migration `20260925173658`) is granted on the
+  Admins page like any role.
 
 ## Phase-4 sections
 
