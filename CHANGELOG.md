@@ -9,6 +9,41 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-24 (My Profile brief · Phase 23, Phase 9 Q2): **The FAQ page no longer says changes go live "as soon as they're saved". The site now reads FAQs from a CDN snapshot, so it says "within about a minute".**
+  - `pages/Faqs.tsx`: that one sentence, and the header comment explaining why.
+  - **Nothing about writing changed:** the same `admin_faq_*` RPCs. Each write now also fires `trg_faqs_snapshot` in the database, which rebuilds the three snapshot files through textile-spark-net's `faqs-snapshot` edge function (migration `20260924174051`).
+  - **Measured:** the rebuilt file is at the origin 2–3 s after a save, and every visitor gets it within ~47 s.
+  - **Verified:** textile-spark-net's `faqs-admin-editable.spec.ts` 1/1 against this panel (each of its 18 writes rebuilt the snapshots, all 200). `npm run typecheck` 0.
+
+- 2026-09-24 (My Profile brief · Phase 22, Phase 9 Q3): **Support can add, edit, deactivate, reorder and delete FAQs, not just read them.**
+  - `lib/roles.ts`: `SECTION_WRITE.faqs` is `["super_admin", "support"]`, matching the RPC gates.
+  - `pages/Faqs.tsx`: the subtitle says support and super admin edit, and the header comment no longer says support reads only.
+  - **The gate is in the database:** textile-spark-net migration `20260924170736_faqs_support_can_write.sql` (applied 2026-09-24) gives `admin_faq_add`, `_update`, `_delete` and `_reorder` the same support + super_admin predicate as `admin_faq_list`. This file only decides which buttons show.
+  - **Verified:** textile-spark-net's new `tests/faqs-support-write.spec.ts`, 2/2 against this panel on :5174:
+    - as support, on all three tabs: add, edit, move up and down, deactivate and delete, each call returning 200 and checked in the database;
+    - as product_moderator: no FAQs nav entry, "Section not available" on `/faqs`, and 42501 from every `admin_faq_*` call;
+    - with `SECTION_WRITE.faqs` put back to super_admin only, the support test fails;
+    - `faqs-admin-editable.spec.ts` (super_admin) still 1/1. `npm run typecheck` 0.
+  - **Until this repo is deployed,** the database allows support's writes but the live panel still shows support the read-only view.
+  - **Not built:** an edit history. Nothing records who changed an FAQ after it was added, and the "Updated" column shows the creator (textile-spark-net MPF-26).
+
+- 2026-09-24 (My Profile brief · Phase 15, MPF-5): **A deleted account shows as "deleted", not "active", and is offered no Suspend or Reinstate.** `'deleted'` (set only by `anonymize_account()` when a buyer's deletion cooling-off ends) is terminal: `set_account_status()` refuses it with 42501. Every screen here tested `=== "suspended"` and called anything else active.
+  - `components/AccountStatus.tsx` exports `AccountStatusBadge`, now the one place `account_status` gets a label and a tone: active green, suspended red, deleted neutral grey, and any other value shown as itself.
+  - It is used in `pages/Accounts.tsx`, the `<AccountStatus>` card and `pages/Vendors.tsx`. The Vendors list had the same bug; the brief named the other two.
+  - `<AccountStatus>` for a deleted account:
+    - no Suspend or Reinstate button;
+    - a note that the account was deleted and anonymized, and that `set_account_status()` refuses any change;
+    - no "What suspending actually stops" notice;
+    - the ledger still shows.
+  - The card is also on the vendor page. An Accounts row for a deleted account says "View", not "Manage".
+  - `database.types.ts`: `account_status_type` gains `'deleted'`, matching the live enum.
+  - Badges that appear only for suspended accounts (Ads, Products, Videos, Chats) were already right.
+  - **Verified:**
+    - textile-spark-net's new `tests/admin-deleted-status.spec.ts`, 2/2, against this panel. It rewrites demo accounts' status in the browser only, because no account is deleted and deletion can't be undone;
+    - it fails against the previous code;
+    - `profile-contact-privacy.spec.ts`'s panel test passes;
+    - `npx tsc --noEmit --skipLibCheck` 0.
+
 - 2026-09-24 (My Profile brief · deploy, MPF-19): **Live on `cosora-admin.vercel.app` (`main` `106f84c`), and the interim grant is revoked.**
   - The live bundle, `index-BzKTnSmz.js` (was `index-B920YuHP.js`), calls `admin_profile_search()` and `admin_profile_emails()` and no longer selects `email`.
   - textile-spark-net then revoked the interim signed-in grant (`20260923190354`). No client role can read `profiles.email` or `profiles.phone` now; this panel reads them only through the two admin functions.

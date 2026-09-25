@@ -198,10 +198,12 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
-  // admin_faq_add / update / delete / reorder are super_admin only. Whether support
-  // should also edit FAQ content is an open question for the owner (2026-09-23).
-  // Widening it means changing the RPC gates AND this line; either alone is wrong.
-  faqs: ["super_admin"],
+  // admin_faq_add / update / delete / reorder admit support + super_admin, the
+  // same predicate as admin_faq_list (migration 20260924170736; Mitra's answer to
+  // the 2026-09-23 open question). Support answers buyers' questions, so it keeps
+  // the answers current. Changing this means changing the RPC gates AND this line;
+  // either alone is wrong.
+  faqs: ["super_admin", "support"],
   // set_account_status() gates itself to these two, so vendor_ops sees the page
   // (it is reachable from a vendor) but not the actions.
   accounts: ["super_admin", "support"],

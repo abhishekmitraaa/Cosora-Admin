@@ -21,6 +21,29 @@ interface SuspensionRow {
 }
 
 /**
+ * `profiles.account_status` as a badge: the one place its values get a label and
+ * a tone (Accounts, Vendors and this card).
+ *
+ * Three values. 'deleted' is set only by anonymize_account(), when a buyer's
+ * "Delete my account" cooling-off ends, and it is terminal. Every place used to
+ * test `=== "suspended"` and call anything else active, so a deleted account
+ * showed a green "active" (MPF-5). An unknown value is shown as itself, not as
+ * active.
+ */
+export function AccountStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case "active":
+      return <Badge tone="positive" dot>active</Badge>;
+    case "suspended":
+      return <Badge tone="critical" dot>suspended</Badge>;
+    case "deleted":
+      return <Badge tone="neutral" dot>deleted</Badge>;
+    default:
+      return <Badge tone="neutral" dot>{status}</Badge>;
+  }
+}
+
+/**
  * Suspend / reinstate one account — buyer or vendor, they share
  * `profiles.account_status` and this one control.
  *
@@ -132,17 +155,16 @@ export default function AccountStatus({
   if (!account.data) return <Card><ErrorNote message="No profiles row for this account." /></Card>;
 
   const suspended = account.data.account_status === "suspended";
+  // Terminal: set_account_status() refuses any change to a deleted account
+  // (42501), so no action is offered rather than one that is bound to fail.
+  const deleted = account.data.account_status === "deleted";
   const noun = kind === "account" ? "account" : `${kind} account`;
 
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">Account status</h2>
-        {suspended ? (
-          <Badge tone="critical" dot>suspended</Badge>
-        ) : (
-          <Badge tone="positive" dot>active</Badge>
-        )}
+        <AccountStatusBadge status={account.data.account_status} />
       </div>
 
       <p className="mb-3 text-xs leading-relaxed text-ink-muted">
@@ -157,16 +179,25 @@ export default function AccountStatus({
         suspension is really enforced now, just not everywhere. Narrow the claim
         when the remaining surfaces are gated; do not broaden it before.
       */}
-      <Notice tone="caution" title="What suspending actually stops" className="mb-3 text-xs">
-        Chat and calling, for real and server-side:{" "}
-        <span className="font-mono text-2xs">messages_insert</span> requires the sender's account to
-        be active, so a suspended account cannot send a message even with the UI bypassed, and the
-        call gate refuses in both directions. It does <span className="font-semibold">not</span> yet
-        stop them posting RFQs, submitting quotes, uploading products or running ads: those inserts
-        are not gated on account status.
-      </Notice>
+      {!deleted && (
+        <Notice tone="caution" title="What suspending actually stops" className="mb-3 text-xs">
+          Chat and calling, for real and server-side:{" "}
+          <span className="font-mono text-2xs">messages_insert</span> requires the sender's account to
+          be active, so a suspended account cannot send a message even with the UI bypassed, and the
+          call gate refuses in both directions. It does <span className="font-semibold">not</span> yet
+          stop them posting RFQs, submitting quotes, uploading products or running ads: those inserts
+          are not gated on account status.
+        </Notice>
+      )}
 
-      {writable ? (
+      {deleted ? (
+        <Note>
+          This account was deleted by its owner and anonymized when the cooling-off period ended.
+          Deletion is final, so there is nothing to suspend or reinstate:{" "}
+          <span className="font-mono text-2xs">set_account_status()</span> refuses any change to a
+          deleted account.
+        </Note>
+      ) : writable ? (
         <Button
           variant={suspended ? "outline" : "danger"}
           disabled={setStatus.isPending}
