@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Mail, TriangleAlert, UserCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { ALL_ROLES, ROLE_LABELS, type AdminRole } from "@/lib/roles";
+import { ROLE_LABELS, TEAM_ROLES, assignableRoles, type AdminRole } from "@/lib/roles";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import {
   Badge,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui";
 
 const SUBTITLE =
-  "Grant, change, and revoke admin access. Super admin only, and the database enforces that, not this page.";
+  "Grant, change, and revoke admin access. Super admins manage everyone; managers manage teammates in the team roles. The database enforces that, not this page.";
 
 /** A row of admin_list_admins(). admin.admin_users.admin_role is NOT NULL. */
 interface AdminRow {
@@ -60,14 +60,22 @@ interface InviteResult {
  * admin.admin_users (admin-schema separation Phase 5; textile-spark-net
  * migration 20260922120000): admin_list_admins, admin_search_candidates,
  * admin_set_role, admin_grant, admin_revoke. Each checks the caller itself and
- * RAISES 42501 on refusal, so a non-super-admin who reaches this page — by URL,
- * by editing the bundle, or by calling PostgREST directly — is rejected by
+ * RAISES 42501 on refusal, so a caller who reaches this page — by URL, by
+ * editing the bundle, or by calling PostgREST directly — is rejected by
  * Postgres, not by React. Because they raise rather than silently matching zero
  * rows, a plain `if (error)` is a complete check (like set_account_status).
+ *
+ * Managers (Mitra, 2026-09-26; migration 20260925210601) add, change and remove
+ * teammates in TEAM_ROLES only. For a manager this page offers only those roles,
+ * and shows super admins, other managers and their own row read-only; the
+ * database refuses the rest anyway.
  */
 export default function Admins() {
   const qc = useQueryClient();
   const { identity } = useAdminSession();
+  const myRole = identity?.role ?? null;
+  const isManager = myRole === "manager";
+  const assignable = assignableRoles(myRole);
   const [search, setSearch] = useState("");
   const [promoteRole, setPromoteRole] = useState<AdminRole>("support");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -206,6 +214,8 @@ export default function Admins() {
           {(admins.data ?? []).map((a) => {
             const isSelf = a.id === identity?.id;
             const isLastSuperAdmin = a.admin_role === "super_admin" && superAdminCount === 1;
+            // A manager changes teammates only: not a super admin, another manager or themselves.
+            const managerReadOnly = isManager && (isSelf || !TEAM_ROLES.includes(a.admin_role));
             return (
               <tr key={a.id} className={ROW_HOVER}>
                 <td className="px-3 py-2 text-ink">
@@ -218,24 +228,31 @@ export default function Admins() {
                 </td>
                 <td className="px-3 py-2 text-ink-muted">{a.email}</td>
                 <td className="px-3 py-2">
-                  <Select
-                    aria-label={`Role for ${a.email ?? "this admin"}`}
-                    value={a.admin_role}
-                    disabled={isSelf || setRole.isPending}
-                    onChange={(e) => setRole.mutate({ id: a.id, role: e.target.value as AdminRole })}
-                  >
-                    {ALL_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </Select>
+                  {managerReadOnly ? (
+                    <span className="flex flex-wrap items-center gap-1.5 text-ink" data-role-readonly={a.admin_role}>
+                      {ROLE_LABELS[a.admin_role]}
+                      {!isSelf && <Badge tone="neutral">Super admin only</Badge>}
+                    </span>
+                  ) : (
+                    <Select
+                      aria-label={`Role for ${a.email ?? "this admin"}`}
+                      value={a.admin_role}
+                      disabled={isSelf || setRole.isPending}
+                      onChange={(e) => setRole.mutate({ id: a.id, role: e.target.value as AdminRole })}
+                    >
+                      {assignable.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABELS[r]}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <Button
                     variant="danger"
                     size="sm"
-                    disabled={isSelf || isLastSuperAdmin || demote.isPending}
+                    disabled={isSelf || isLastSuperAdmin || managerReadOnly || demote.isPending}
                     onClick={() => {
                       if (confirm(`Remove admin access for ${a.email}?`)) demote.mutate(a.id);
                     }}
@@ -257,9 +274,20 @@ export default function Admins() {
             SQL as postgres on admin.admin_users can still do it.
         */}
         <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-          You cannot change your own role from this screen, as a guard against locking yourself out.
-          Removing or downgrading the last remaining super admin is refused by the database itself;
-          only direct SQL on the admin schema can still do that.
+          {isManager ? (
+            <>
+              As a manager you add, change and remove teammates in the team roles:{" "}
+              {TEAM_ROLES.map((r) => ROLE_LABELS[r]).join(", ")}. Super admins, managers and your own
+              access are changed by a super admin only, and the database refuses anything else.
+            </>
+          ) : (
+            <>
+              You cannot change your own role from this screen, as a guard against locking yourself out.
+              Removing or downgrading the last remaining super admin is refused by the database itself;
+              only direct SQL on the admin schema can still do that. Managers can add, change and remove
+              teammates in the team roles, and no one else.
+            </>
+          )}
         </p>
       </Panel>
 
@@ -297,7 +325,7 @@ export default function Admins() {
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as AdminRole)}
             >
-              {ALL_ROLES.map((r) => (
+              {assignable.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABELS[r]}
                 </option>
@@ -343,7 +371,7 @@ export default function Admins() {
               value={promoteRole}
               onChange={(e) => setPromoteRole(e.target.value as AdminRole)}
             >
-              {ALL_ROLES.map((r) => (
+              {assignable.map((r) => (
                 <option key={r} value={r}>
                   {ROLE_LABELS[r]}
                 </option>

@@ -25,11 +25,16 @@
 //
 // Authorization mirrors admin-refund-payment: verify_jwt=true validated the
 // token signature, so `sub` is trustworthy; we then ask admin_status_of() for
-// that user (service role) and require admin_role = 'super_admin'. Hiding the
-// form in React is irrelevant to this path - the service role bypasses RLS, so
-// this check IS the gate.
+// that user (service role) and require admin_role 'super_admin' or 'manager'.
+// A manager (Mitra, 2026-09-26) invites teammates to the five team roles only,
+// and never changes a super admin's, another manager's or their own access. That
+// is checked here BEFORE any account is created or email sent, and again by
+// admin_grant(), which runs with the caller's own token (not the service role)
+// so the database's rule is the final gate. Hiding the form in React is
+// irrelevant to this path.
 //
-// Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional:
+// Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY (all three
+// are set by Supabase for every function). Optional:
 // ADMIN_INVITE_REDIRECT_URL (overrides the client-supplied redirect).
 
 const corsHeaders = {
@@ -63,6 +68,10 @@ const REST = (key: string) => ({
   "content-type": "application/json",
 });
 
+// The roles a manager may give, the same five as admin.is_team_role() in
+// migration 20260925210601. The database re-checks every grant.
+const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support"];
+
 // Interpolated into a PostgREST filter and handed to GoTrue - reject anything
 // exotic rather than trying to escape it.
 const EMAIL_RE = /^[^\s@,()<>]+@[^\s@,()<>]+\.[^\s@,()<>]+$/;
@@ -94,28 +103,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) return json({ error: "server_misconfigured" }, 500);
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !serviceKey || !anonKey) return json({ error: "server_misconfigured" }, 500);
 
-  // 1. Authorize: super_admin only
+  // 1. Authorize: super_admin, or a manager for the team roles
   const callerId = callerIdFromJwt(req);
   if (!callerId) return json({ error: "unauthenticated" }, 401);
+  const callerAuth = req.headers.get("Authorization") ?? "";
 
   // admin_status_of() reads admin.admin_users, the source of truth since
-  // admin-schema separation Phase 5 (service_role only). Any failure leaves
-  // caller null, which is a 403: this fails closed.
-  const statusResp = await fetch(`${url}/rest/v1/rpc/admin_status_of`, {
-    method: "POST",
-    headers: REST(serviceKey),
-    body: JSON.stringify({ p_user_id: callerId }),
-  });
-  const statusRows = statusResp.ok ? await statusResp.json() : [];
-  const caller = Array.isArray(statusRows) && statusRows.length ? statusRows[0] : null;
-  if (!caller?.is_admin || caller?.admin_role !== "super_admin") {
+  // admin-schema separation Phase 5 (service_role only). Any failure leaves the
+  // answer null, which is a 403: this fails closed.
+  const adminStatus = async (userId: string): Promise<{ is_admin?: boolean; admin_role?: string } | null> => {
+    const r = await fetch(`${url}/rest/v1/rpc/admin_status_of`, {
+      method: "POST",
+      headers: REST(serviceKey),
+      body: JSON.stringify({ p_user_id: userId }),
+    });
+    const rows = r.ok ? await r.json() : [];
+    return Array.isArray(rows) && rows.length ? rows[0] : null;
+  };
+  const caller = await adminStatus(callerId);
+  const isManager = caller?.is_admin === true && caller.admin_role === "manager";
+  if (!caller?.is_admin || (caller.admin_role !== "super_admin" && !isManager)) {
     return json(
-      { error: "forbidden", detail: "Inviting or promoting admins requires the super_admin role" },
+      { error: "forbidden", detail: "Inviting or promoting admins requires the super_admin or manager role" },
       403,
     );
   }
+  const managerRefusal = (detail: string) => json({ error: "forbidden", detail }, 403);
 
   // 2. Validate input
   let payload: { email?: string; admin_role?: string; redirectTo?: string };
@@ -145,6 +161,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!validRoles.includes(role)) {
     return json({ error: "bad_role", detail: `admin_role must be one of: ${validRoles.join(", ")}` }, 400);
   }
+  if (isManager && !TEAM_ROLES.includes(role)) {
+    return managerRefusal(`A manager can invite teammates to these roles only: ${TEAM_ROLES.join(", ")}.`);
+  }
 
   const redirectTo = Deno.env.get("ADMIN_INVITE_REDIRECT_URL") || payload.redirectTo || undefined;
 
@@ -160,6 +179,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const users: AuthUser[] = Array.isArray(lookupBody?.users) ? lookupBody.users : [];
   const existing = users.find((u) => (u.email ?? "").toLowerCase() === email) ?? null;
 
+  // A manager may not use an invite to change their own access, or a super
+  // admin's or another manager's. Checked before anything is granted or emailed.
+  if (isManager && existing) {
+    if (existing.id === callerId) return managerRefusal("You can't change your own admin access.");
+    const target = await adminStatus(existing.id);
+    if (target?.is_admin && !TEAM_ROLES.includes(target.admin_role ?? "")) {
+      return managerRefusal("This person is a super admin or manager. Only a super admin can change their access.");
+    }
+  }
+
   let hasPassword = false;
   if (existing) {
     const pwResp = await fetch(`${url}/rest/v1/rpc/user_has_password`, {
@@ -174,8 +203,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // Grant through admin_grant(), which writes admin.admin_users (the source of
-  // truth). It admits this call because auth.role() is 'service_role'; this
-  // function did its own super_admin check above. Admin-schema separation 5a:
+  // truth). It runs with the CALLER's token (2026-09-26), not the service role,
+  // so admin_grant applies its own rule: a super admin grants any role, a
+  // manager only team roles to teammates. The checks above make a refusal there
+  // unlikely; this makes the database the final word. Admin-schema separation 5a:
   // this used to PATCH profiles {is_admin, admin_role} and rely on the
   // profiles -> admin_users mirror trigger, which Phase 5c removes.
   //
@@ -185,7 +216,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   //      "no profiles row matched" check did.
   //   2. admin_grant. If it fails, the only thing left behind is a harmless email
   //      backfill, never a half-granted admin.
-  async function grantAdmin(userId: string): Promise<string | null> {
+  const grantAdmin = async (userId: string): Promise<string | null> => {
     const patch = await fetch(`${url}/rest/v1/profiles?id=eq.${userId}`, {
       method: "PATCH",
       headers: { ...REST(serviceKey), prefer: "return=representation" },
@@ -197,7 +228,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const grant = await fetch(`${url}/rest/v1/rpc/admin_grant`, {
       method: "POST",
-      headers: REST(serviceKey),
+      headers: { apikey: anonKey, authorization: callerAuth, "content-type": "application/json" },
       body: JSON.stringify({ p_user_id: userId, p_role: role }),
     });
     if (!grant.ok) return reason(await grant.text()).slice(0, 200);
@@ -206,11 +237,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return "admin_grant returned no active admin row";
     }
     return null;
-  }
+  };
 
-  // Admin Log (MPF-26). The grant is written with the service-role key, so the
-  // audit trigger can't tell who asked; record it for the super_admin whose token
-  // was checked above. Best effort: a failed record is logged, never a failed invite.
+  // Admin Log (MPF-26). The grant itself is logged by the audit trigger, since it
+  // runs with the caller's token; this adds the invite's outcome (created, email
+  // sent) for the admin whose token was checked above. Best effort: a failed
+  // record is logged, never a failed invite.
   const recordInvite = async (userId: string, changes: Record<string, unknown>): Promise<void> => {
     try {
       const r = await fetch(`${url}/rest/v1/rpc/admin_audit_record`, {

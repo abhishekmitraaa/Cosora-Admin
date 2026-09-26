@@ -19,10 +19,26 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   ads_moderator: "Ads moderator",
   finance_admin: "Finance admin",
   support: "Support (read-only)",
-  // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. It sees no
-  // moderation or commerce section, only the Admin Log and the all-role pages.
+  // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. Since
+  // 2026-09-26 it also adds, changes and removes teammates in TEAM_ROLES on the
+  // Admins page. It sees no moderation or commerce section.
   manager: "Manager",
 };
+
+/**
+ * The roles a manager may give teammates (Mitra, 2026-09-26). The same five as
+ * admin.is_team_role() in migration 20260925210601, which is what enforces it:
+ * admin_set_role / admin_grant / admin_revoke refuse a manager anything else,
+ * and refuse any change to a super admin, another manager, or the manager.
+ */
+export const TEAM_ROLES: AdminRole[] = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support"];
+
+/** The roles this admin may hand out on the Admins page. */
+export function assignableRoles(role: AdminRole | null): AdminRole[] {
+  if (role === "super_admin") return ALL_ROLES;
+  if (role === "manager") return TEAM_ROLES;
+  return [];
+}
 
 export type Section =
   | "products"
@@ -130,7 +146,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   ads: ["super_admin", "ads_moderator", "support"],
   subscriptions: ["super_admin", "finance_admin", "support"],
   reports: ALL_ROLES,
-  admins: ["super_admin"],
+  // A manager manages teammates in TEAM_ROLES (admin_set_role and friends).
+  admins: ["super_admin", "manager"],
   chats: ["super_admin", "support"],
   "chat-review": ["super_admin", "support"],
   "chat-keywords": ["super_admin", "support"],
@@ -200,7 +217,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   ads: ["super_admin", "ads_moderator"],
   subscriptions: ["super_admin", "finance_admin"],
   reports: [],
-  admins: ["super_admin"],
+  // For a manager, only teammates in TEAM_ROLES; the Admins page offers no more.
+  admins: ["super_admin", "manager"],
   // The chats overview is oversight only — every action lives in the queue.
   chats: [],
   "chat-review": ["super_admin", "support"],

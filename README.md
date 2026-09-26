@@ -75,6 +75,7 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 | `ads_moderator` | – | – | – | write | – | read | – |
 | `finance_admin` | – | – | – | – | write | read | – |
 | `support` | read | read | read | read | read | read | – |
+| `manager` | – | – | – | – | – | read | **write**, teammates in the team roles only |
 
 `support` can additionally write the flagged-items log (`admin_flags`).
 
@@ -197,7 +198,7 @@ changed fields before → after. Filters: admin, area, action, date range.
 | Role | Admin Log |
 |---|---|
 | `super_admin` | read |
-| `manager` | read (and nothing else but Reports and Live Activity) |
+| `manager` | read (plus Admins, for teammates, and Reports and Live Activity) |
 | everyone else | – (no nav entry; the RPCs refuse with 42501) |
 
 - The database writes it, not this app (textile-spark-net migration `20260925174031`):
@@ -210,7 +211,9 @@ changed fields before → after. Filters: admin, area, action, date range.
 - **A new page that writes a new table** needs `trg_admin_audit` on that table, or its
   changes won't appear. Counters and derived columns are excluded on purpose.
 - **Manager** (`manager`, textile-spark-net migration `20260925173658`) is granted on the
-  Admins page like any role.
+  Admins page like any role. Since 2026-09-26 (migration `20260925210601`) a manager adds,
+  changes and removes teammates in the five team roles (`TEAM_ROLES` in `roles.ts`), and
+  nothing else: not a super admin, another manager or their own access.
 
 ## Phase-4 sections
 
@@ -614,7 +617,8 @@ silent and expensive:
 ## Inviting admins by email (`admin-invite`)
 
 The Admins screen can bring in someone who has **never used Cosora**. Deployed as
-the `admin-invite` edge function (`verify_jwt: true`), `super_admin`-only,
+the `admin-invite` edge function (`verify_jwt: true`), for `super_admin` and, since
+2026-09-26, `manager` (the five team roles only, checked before anything is created),
 verified server-side exactly like `admin-refund-payment` — a `support` session
 calling it directly gets a real `403 forbidden`, not a hidden button.
 

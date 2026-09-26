@@ -9,6 +9,13 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-26 (managers assign teammates): **A Manager now adds, changes and removes teammates on the Admins page, in the five team roles only.** Mitra: "I'll assign the manager roles and then manager roles can assign teammates roles".
+  - `roles.ts`: `TEAM_ROLES` (Product moderator, Vendor ops, Ads moderator, Finance admin, Support) and `assignableRoles()`. The `admins` section now reads and writes for `manager`.
+  - `Admins.tsx`: every role picker offers what the signed-in admin may give. For a manager, super admins, other managers and their own row are read-only ("Super admin only"), with Remove disabled.
+  - `admin-invite` v8: admits a manager. It refuses a non-team role, or an existing super admin, manager or self, before creating an account or sending an email. It calls `admin_grant` with the caller's token, so the database decides and the Admin Log records the grant as the caller's. `grantAdmin` is an arrow function now, which clears its two type errors.
+  - The rule itself is in the database: textile-spark-net migration `20260925210601`.
+  - Verified in textile-spark-net: rehearsal 28/28, live check 35/35 (`scripts/manager-team-roles-check.mjs`), specs `admins-manager` 2/2 and `admin-log` 3/3, with a mutation check. Typecheck 0, build 0.
+
 - 2026-09-25 (My Profile flag-fix pass · MPF-26, MPF-23): **An Admin Log, for super admins and a new Manager role, and a System Health panel for analytics events that couldn't be recorded.**
   - **`pages/AdminLog.tsx`** (`/admin-log`):
     - every admin change, panel sign-in and sign-out, invite and refund, newest first;
