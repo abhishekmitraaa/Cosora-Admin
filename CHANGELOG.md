@@ -9,6 +9,8 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-26 (scheduled jobs removed, in textile-spark-net): **Every scheduled database job was deleted, on Mitra's instruction.** Nothing in this panel changed. What those jobs kept current now changes only when someone acts: subscription expiry, ad schedules, the embedding pipeline's health history and alarm, and account-deletion processing. See textile-spark-net `documentation/ToDo.md`, "Restore the scheduled jobs".
+
 - 2026-09-26 (managers assign teammates): **A Manager now adds, changes and removes teammates on the Admins page, in the five team roles only.** Mitra: "I'll assign the manager roles and then manager roles can assign teammates roles".
   - `roles.ts`: `TEAM_ROLES` (Product moderator, Vendor ops, Ads moderator, Finance admin, Support) and `assignableRoles()`. The `admins` section now reads and writes for `manager`.
   - `Admins.tsx`: every role picker offers what the signed-in admin may give. For a manager, super admins, other managers and their own row are read-only ("Super admin only"), with Remove disabled.
