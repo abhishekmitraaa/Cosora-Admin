@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { Activity } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -46,6 +47,13 @@ import {
  * row per hour per error with a count, and this page lists the last 7 days through
  * admin_engagement_event_failures() (same super_admin/vendor_ops gate). An unknown
  * product, ad or vendor id stays quiet: that is junk a client can send.
+ *
+ * SCHEDULED JOBS (admin completion, Phase 2, 2026-09-27). Every pg_cron job was
+ * deleted on 2026-09-26 and the essential ones came back on 2026-09-27 (textile-spark-net
+ * migration 20260927153142). This page shows each job's last run and its last 24 hours
+ * through admin_cron_status() (same super_admin/vendor_ops gate), and warns when the
+ * health history itself has gone quiet, because a sample that stops arriving looks
+ * exactly like a healthy one that hasn't changed.
  */
 
 interface FailureRow {
@@ -58,6 +66,40 @@ interface FailureRow {
   last_source: string | null;
   last_at: string;
 }
+
+interface CronRow {
+  jobname: string;
+  schedule: string;
+  active: boolean;
+  last_status: string | null;
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_message: string | null;
+  runs_24h: number;
+  failures_24h: number;
+}
+
+/**
+ * What each job is for, and how long a gap between runs is still normal. The gap
+ * is twice the schedule, so one missed tick is noticed without every delayed run
+ * turning the badge amber. A job not listed here shows its status and nothing else.
+ */
+const JOBS: Record<string, { purpose: string; maxGapMinutes: number }> = {
+  "ads-schedule-sweep": { purpose: "Starts scheduled campaigns and ends finished ones", maxGapMinutes: 10 },
+  "embedding-health-log": { purpose: "Samples the embedding pipeline for this page", maxGapMinutes: 20 },
+  "faq-snapshots-refresh": { purpose: "Rebuilds the FAQ files the site reads", maxGapMinutes: 120 },
+  "subscription-expiry-sweep": { purpose: "Expires subscriptions past their end date", maxGapMinutes: 48 * 60 },
+  "account-deletion-sweep": { purpose: "Anonymizes accounts past their 14-day cooling-off", maxGapMinutes: 48 * 60 },
+  "account-deletion-sweep-alarm": {
+    purpose: "Fails loudly if the deletion sweep cannot authenticate",
+    maxGapMinutes: 48 * 60,
+  },
+  "fx-rates-refresh": { purpose: "Refreshes display-currency rates", maxGapMinutes: 48 * 60 },
+  "cron-history-prune": { purpose: "Deletes job history older than 14 days", maxGapMinutes: 48 * 60 },
+};
+
+/** Minutes between now and an ISO instant. */
+const minutesSince = (iso: string) => (Date.now() - new Date(iso).getTime()) / 60_000;
 
 interface HealthRow {
   checked_at: string;
@@ -91,15 +133,7 @@ export default function SystemHealth() {
   const { data, isPending, error } = useQuery({
     queryKey: ["admin_embedding_pipeline_health"],
     queryFn: async (): Promise<HealthRow[]> => {
-      // `database.types.ts` is generated and predates this RPC, so the typed
-      // client does not know the name yet. Cast at the boundary only, matching
-      // the pattern already used in ChatKeywords / FlagLog / AccountStatus —
-      // HealthRow above is the contract, and it mirrors the function's declared
-      // RETURNS TABLE exactly.
-      const { data, error } = await supabase.rpc(
-        "admin_embedding_pipeline_health" as never,
-        { p_limit: 60 } as never,
-      );
+      const { data, error } = await supabase.rpc("admin_embedding_pipeline_health", { p_limit: 60 });
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as HealthRow[];
     },
@@ -118,6 +152,18 @@ export default function SystemHealth() {
     },
     staleTime: 5 * 60_000,
   });
+  const cron = useQuery({
+    queryKey: ["admin_cron_status"],
+    queryFn: async (): Promise<CronRow[]> => {
+      const { data, error } = await supabase.rpc("admin_cron_status");
+      if (error) throw new Error(error.message);
+      return (data ?? []) as CronRow[];
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const cronRows = cron.data ?? [];
+
   const failureRows = failures.data ?? [];
   const refused = failureRows.reduce((n, r) => n + r.count, 0);
 
@@ -127,12 +173,16 @@ export default function SystemHealth() {
   // and it is not answered by the newest row alone — a pipeline that failed for
   // an hour and recovered still needs looking at.
   const unhealthy = rows.filter((r) => r.status !== "OK");
+  // A sample that stops arriving looks like a healthy one that hasn't changed.
+  // embedding-health-log runs every 10 minutes; past 20, say so.
+  const sampleAge = latest ? minutesSince(latest.checked_at) : null;
+  const stale = sampleAge !== null && sampleAge > 20;
 
   return (
     <Page>
       <PageHeader
         title="System Health"
-        subtitle="Embedding pipeline status, sampled every 10 minutes, and analytics events that couldn't be recorded. Read-only."
+        subtitle="Scheduled jobs, the embedding pipeline (sampled every 10 minutes) and analytics events that couldn't be recorded. Read-only."
         actions={
           latest ? (
             <Badge tone={toneFor(latest.status)} dot>
@@ -164,6 +214,13 @@ export default function SystemHealth() {
               <Stat label="Videos missing" value={String(latest.videos_missing ?? 0)} />
             </div>
           )}
+          {latest && stale && (
+            <Note className="mt-4">
+              <strong>No new sample for {Math.round(sampleAge!)} minutes.</strong> The
+              embedding-health-log job samples every 10 minutes, so this status may be out of date.
+              Check its last run under Scheduled jobs below.
+            </Note>
+          )}
           {latest && (
             <Note className="mt-4">
               {latest.reason ?? "no reason reported"} — checked {fmt(latest.checked_at)}.
@@ -176,6 +233,85 @@ export default function SystemHealth() {
                 </>
               )}
             </Note>
+          )}
+        </Panel>
+
+        <Panel
+          title="Scheduled jobs"
+          description="Database jobs that run on a timer. The every-minute embedding worker is off until OpenAI billing is on, so the pipeline above reports its queue growing."
+        >
+          {cron.error ? (
+            <ErrorNote message={(cron.error as Error).message} />
+          ) : cron.isPending ? (
+            <SkeletonList rows={4} height="h-10" />
+          ) : cronRows.length === 0 ? (
+            <Empty>No scheduled jobs exist.</Empty>
+          ) : (
+            <Table head={["Job", "Schedule (UTC)", "Last run", "Last 24 h", "Last message"]}>
+              {cronRows.map((j) => {
+                const info = JOBS[j.jobname];
+                const late =
+                  info !== undefined &&
+                  j.last_started_at !== null &&
+                  minutesSince(j.last_started_at) > info.maxGapMinutes;
+                return (
+                  <tr key={j.jobname}>
+                    <td className="px-3 py-2">
+                      <span className="font-mono text-xs text-ink">{j.jobname}</span>
+                      {info && <span className="block text-2xs text-ink-faint">{info.purpose}</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-2xs text-ink-muted">
+                      {j.schedule}
+                      {!j.active && (
+                        <span className="ml-2">
+                          <Badge tone="caution">paused</Badge>
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {j.last_started_at === null ? (
+                        <span className="text-ink-faint">not run yet</span>
+                      ) : (
+                        <>
+                          <Badge
+                            tone={
+                              j.last_status === "succeeded"
+                                ? "positive"
+                                : j.last_status === "failed"
+                                  ? "critical"
+                                  : "neutral"
+                            }
+                            dot
+                          >
+                            {j.last_status ?? "unknown"}
+                          </Badge>
+                          <span
+                            className={`ml-2 text-2xs ${late ? "font-medium text-caution-fg" : "text-ink-faint"}`}
+                          >
+                            {formatDistanceToNow(new Date(j.last_started_at), { addSuffix: true })}
+                            {late && " (overdue)"}
+                          </span>
+                        </>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-muted">
+                      {j.runs_24h}
+                      {j.failures_24h > 0 && (
+                        <span className="ml-2">
+                          <Badge tone="critical">{j.failures_24h} failed</Badge>
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      className="max-w-[20rem] truncate px-3 py-2 text-2xs text-ink-muted"
+                      title={j.last_message ?? undefined}
+                    >
+                      {j.last_message || "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </Table>
           )}
         </Panel>
 

@@ -46,6 +46,8 @@ type LogRow = {
   own_row: boolean;
   changes: Json;
   source: string;
+  /** Why, when the admin RPC that made the change had to say (admin completion, Phase 3b). */
+  reason: string | null;
 };
 
 /** What each audited table is called here. */
@@ -69,6 +71,7 @@ const AREAS: Record<string, string> = {
   "public.vendor_profiles": "Vendor profile",
   "public.vendor_subscriptions": "Subscription",
   "public.subscription_invoices": "Invoice (refund)",
+  "public.subscription_plans": "Subscription plan",
 };
 
 const ACTIONS: Record<string, { label: string; tone: Tone }> = {
@@ -135,6 +138,11 @@ function Details({ row }: { row: LogRow }) {
 
   return (
     <div className="space-y-0.5">
+      {row.reason && (
+        <div className="mb-1 break-words text-xs text-ink">
+          <span className="font-medium">Reason:</span> {row.reason}
+        </div>
+      )}
       {lines.map((l) => (
         <div key={l} className="break-words font-mono text-2xs text-ink">{l}</div>
       ))}

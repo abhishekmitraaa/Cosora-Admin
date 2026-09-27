@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
+import { reasonLabel, useAdReasonCodes, type AdReasonCode } from "@/lib/adReasons";
 import FlagLog from "@/components/FlagLog";
 import AdsMonitoring from "@/components/AdsMonitoring";
 import AdReviewQueue from "@/components/AdReviewQueue";
@@ -20,12 +21,14 @@ import {
   Card,
   Empty,
   ErrorNote,
+  Field,
   Modal,
   Note,
   Notice,
   Page,
   PageHeader,
   ReadOnlyBanner,
+  Select,
   SkeletonList,
   StatusBadge,
   Tabs,
@@ -95,7 +98,11 @@ export default function Ads() {
   const [view, setView] = useState<View>("review");
   const [tab, setTab] = useState<AdStatus>("active");
   const [action, setAction] = useState<{ ad: AdRow; next: "paused" | "rejected" } | null>(null);
-  const [reason, setReason] = useState("");
+  // A takedown carries a listed reason code and an optional note for the vendor,
+  // the same vocabulary as the review queue (admin completion, Phase 3a).
+  const [reasonCode, setReasonCode] = useState("");
+  const [note, setNote] = useState("");
+  const reasons = useAdReasonCodes();
 
   const ads = useQuery({
     queryKey: ["ads", tab],
@@ -130,17 +137,29 @@ export default function Ads() {
    * is_ad_eligible(), which requires status='active'.
    */
   const moderate = useMutation({
-    mutationFn: async ({ id, next, why }: { id: string; next: "paused" | "rejected"; why: string }) => {
+    mutationFn: async ({
+      id,
+      next,
+      code,
+      text,
+    }: {
+      id: string;
+      next: "paused" | "rejected";
+      code: string;
+      text: string;
+    }) => {
+      const args = { p_ad_id: id, p_reason_code: code, p_note: text.trim() || undefined };
       const { error } =
         next === "paused"
-          ? await supabase.rpc("pause_ad_campaign_by_admin", { p_ad_id: id, p_reason_code: why })
-          : await supabase.rpc("reject_ad_campaign", { p_ad_id: id, p_reason_code: why });
+          ? await supabase.rpc("pause_ad_campaign_by_admin", args)
+          : await supabase.rpc("reject_ad_campaign", args);
       if (error) throw new Error(error.message);
     },
     onSuccess: (_d, vars) => {
       toast.success(vars.next === "paused" ? "Campaign paused" : "Campaign rejected");
       setAction(null);
-      setReason("");
+      setReasonCode("");
+      setNote("");
       void qc.invalidateQueries({ queryKey: ["ads"] });
       void qc.invalidateQueries({ queryKey: ["ad-review"] });
     },
@@ -242,9 +261,11 @@ export default function Ads() {
               vendor={vendors.get(a.vendor_id)}
               writable={writable}
               busy={moderate.isPending || restore.isPending}
+              reasons={reasons.data}
               onAct={(next) => {
                 setAction({ ad: a, next });
-                setReason("");
+                setReasonCode("");
+                setNote("");
               }}
               onRestore={() => restore.mutate(a.id)}
             />
@@ -261,22 +282,44 @@ export default function Ads() {
           {action?.next === "paused"
             ? "Pausing stops serving now. The vendor can resume this campaign themselves."
             : "Rejecting stops serving now. The vendor cannot reactivate it."}{" "}
-          A reason is required and is recorded on the campaign.
+          The reason is recorded on the campaign and in its decision history.
         </p>
-        <Textarea
-          rows={4}
-          autoFocus
-          value={reason}
-          placeholder="Why is this campaign being taken down?"
-          onChange={(e) => setReason(e.target.value)}
-        />
+        <Field label="Reason" htmlFor="takedown-reason">
+          <Select
+            id="takedown-reason"
+            autoFocus
+            value={reasonCode}
+            onChange={(e) => setReasonCode(e.target.value)}
+          >
+            <option value="">Select a reason…</option>
+            {(reasons.data ?? []).map((r) => (
+              <option key={r.code} value={r.code}>
+                {r.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label="Note to the vendor"
+          htmlFor="takedown-note"
+          hint="Optional. This is what the vendor reads; without it they see the reason's label."
+        >
+          <Textarea
+            id="takedown-note"
+            rows={3}
+            value={note}
+            placeholder="What should the vendor know?"
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </Field>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => setAction(null)}>Cancel</Button>
           <Button
             variant="danger"
-            disabled={!reason.trim() || moderate.isPending}
+            disabled={!reasonCode || moderate.isPending}
             onClick={() =>
-              action && moderate.mutate({ id: action.ad.id, next: action.next, why: reason.trim() })
+              action &&
+              moderate.mutate({ id: action.ad.id, next: action.next, code: reasonCode, text: note })
             }
           >
             {action?.next === "paused" ? "Pause campaign" : "Reject campaign"}
@@ -320,6 +363,7 @@ function AdCard({
   vendor,
   writable,
   busy,
+  reasons,
   onAct,
   onRestore,
 }: {
@@ -327,6 +371,7 @@ function AdCard({
   vendor: VendorSummary | undefined;
   writable: boolean;
   busy: boolean;
+  reasons: AdReasonCode[] | undefined;
   onAct: (next: "paused" | "rejected") => void;
   onRestore: () => void;
 }) {
@@ -360,7 +405,8 @@ function AdCard({
 
           {a.moderation_reason && (
             <Notice tone="critical" className="mt-2.5 text-xs">
-              <span className="font-semibold">Takedown reason.</span> {a.moderation_reason}
+              <span className="font-semibold">Takedown reason.</span>{" "}
+              {describeModerationReason(a.moderation_reason, reasons)}
               {a.moderated_at && (
                 <span className="opacity-80">
                   {" "}
@@ -418,4 +464,17 @@ function AdCard({
       )}
     </Card>
   );
+}
+
+/**
+ * ad_apply_decision() stores moderation_reason as "<code> <note>". Show the code's
+ * label in its place, so an admin reads "Image or copy quality: …", not
+ * "poor_creative …". Text that doesn't start with a listed code is shown as it is.
+ */
+function describeModerationReason(text: string, reasons: AdReasonCode[] | undefined): string {
+  const [first, ...rest] = text.split(" ");
+  const label = reasonLabel(reasons, first);
+  if (!reasons?.some((r) => r.code === first)) return text;
+  const note = rest.join(" ").trim();
+  return note ? `${label}: ${note}` : (label ?? text);
 }

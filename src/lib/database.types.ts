@@ -23,6 +23,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          expires_at: string
+          request_id: string
+          sent_at: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          expires_at: string
+          request_id: string
+          sent_at?: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          expires_at?: string
+          request_id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_deletion_otps_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "account_deletion_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          channel: string
+          code_expires_at: string | null
+          codes_sent: number
+          completed_at: string | null
+          confirmed_at: string | null
+          id: string
+          last_code_sent_at: string | null
+          last_error: string | null
+          requested_at: string
+          scheduled_for: string | null
+          status: string
+          storage_cleaned_at: string | null
+          storage_error: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          channel?: string
+          code_expires_at?: string | null
+          codes_sent?: number
+          completed_at?: string | null
+          confirmed_at?: string | null
+          id?: string
+          last_code_sent_at?: string | null
+          last_error?: string | null
+          requested_at?: string
+          scheduled_for?: string | null
+          status?: string
+          storage_cleaned_at?: string | null
+          storage_error?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          channel?: string
+          code_expires_at?: string | null
+          codes_sent?: number
+          completed_at?: string | null
+          confirmed_at?: string | null
+          id?: string
+          last_code_sent_at?: string | null
+          last_error?: string | null
+          requested_at?: string
+          scheduled_for?: string | null
+          status?: string
+          storage_cleaned_at?: string | null
+          storage_error?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_deletion_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_orders: {
         Row: {
           amount: number
@@ -685,6 +779,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      fx_rates: {
+        Row: {
+          base_currency: string
+          rates: Json
+          rates_date: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          base_currency?: string
+          rates: Json
+          rates_date: string
+          source: string
+          updated_at?: string
+        }
+        Update: {
+          base_currency?: string
+          rates?: Json
+          rates_date?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -2249,7 +2367,20 @@ export type Database = {
       }
     }
     Functions: {
+      account_deletion_blocker: { Args: { p_user: string }; Returns: string }
+      account_deletion_channels: { Args: { p_user: string }; Returns: string[] }
+      account_deletion_sweep_list: {
+        Args: never
+        Returns: {
+          avatar_paths: string[]
+          avatar_url: string
+          phase: string
+          request_id: string
+          user_id: string
+        }[]
+      }
       account_is_active: { Args: { p_id: string }; Returns: boolean }
+      account_not_deleted: { Args: { p_id: string }; Returns: boolean }
       active_ads: {
         Args: {
           filter_categories?: string[]
@@ -2353,6 +2484,13 @@ export type Database = {
           suspended_by_full_name: string
         }[]
       }
+      admin_ad_reason_codes: {
+        Args: never
+        Returns: {
+          code: string
+          label: string
+        }[]
+      }
       admin_ad_review_log_list: {
         Args: { p_ad_id: string }
         Returns: {
@@ -2396,10 +2534,22 @@ export type Database = {
           changes: Json
           id: number
           own_row: boolean
+          reason: string
           source: string
           target_id: string
           target_table: string
         }[]
+      }
+      admin_audit_record: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_changes: Json
+          p_source: string
+          p_target_id: string
+          p_target_table: string
+        }
+        Returns: undefined
       }
       admin_audit_session: { Args: { p_action: string }; Returns: undefined }
       admin_block_reason_add: {
@@ -2458,6 +2608,20 @@ export type Database = {
           status: string
         }[]
       }
+      admin_cron_status: {
+        Args: never
+        Returns: {
+          active: boolean
+          failures_24h: number
+          jobname: string
+          last_finished_at: string
+          last_message: string
+          last_started_at: string
+          last_status: string
+          runs_24h: number
+          schedule: string
+        }[]
+      }
       admin_embedding_pipeline_health: {
         Args: { p_limit?: number }
         Returns: {
@@ -2503,7 +2667,12 @@ export type Database = {
           surface: string
         }[]
       }
-      admin_faq_delete: { Args: { p_id: string }; Returns: { id: string }[] }
+      admin_faq_delete: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
       admin_faq_list: {
         Args: { p_surface?: string }
         Returns: {
@@ -2523,7 +2692,10 @@ export type Database = {
       }
       admin_faq_reorder: {
         Args: { p_id: string; p_position: number }
-        Returns: { id: string; position: number }[]
+        Returns: {
+          id: string
+          position: number
+        }[]
       }
       admin_faq_update: {
         Args: {
@@ -2669,6 +2841,10 @@ export type Database = {
           id: string
         }[]
       }
+      admin_report_summary: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: Json
+      }
       admin_revoke: {
         Args: { p_user_id: string }
         Returns: {
@@ -2708,6 +2884,14 @@ export type Database = {
           is_admin: boolean
         }[]
       }
+      admin_subscription_cancel: {
+        Args: { p_reason: string; p_subscription_id: string }
+        Returns: undefined
+      }
+      admin_subscription_change_plan: {
+        Args: { p_plan_id: string; p_reason: string; p_subscription_id: string }
+        Returns: undefined
+      }
       admin_whoami: {
         Args: never
         Returns: {
@@ -2718,6 +2902,7 @@ export type Database = {
           role: Database["public"]["Enums"]["admin_role_type"]
         }[]
       }
+      anonymize_account: { Args: { p_user: string }; Returns: undefined }
       approve_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string }
         Returns: string
@@ -2730,7 +2915,21 @@ export type Database = {
         Args: { target: string }
         Returns: undefined
       }
+      approve_vendor_videos_bulk: {
+        Args: { p_vendor: string }
+        Returns: number
+      }
       archive_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
+      block_account_from_review: {
+        Args: {
+          p_profile_id: string
+          p_reason_id: string
+          p_resume?: boolean
+          p_review_id: string
+          p_side: string
+        }
+        Returns: undefined
+      }
       build_video_search_text: {
         Args: { v: Database["public"]["Tables"]["product_videos"]["Row"] }
         Returns: string
@@ -2751,6 +2950,7 @@ export type Database = {
           phone: string
         }[]
       }
+      cancel_account_deletion: { Args: never; Returns: Json }
       certificate_apply: {
         Args: {
           p_courier?: string
@@ -2788,6 +2988,15 @@ export type Database = {
       certificate_mark_returned: {
         Args: { p_ad_certificate_id: string; p_reason: string }
         Returns: string
+      }
+      complete_account_deletion: {
+        Args: { p_request: string }
+        Returns: string
+      }
+      confirm_account_deletion: { Args: { p_code: string }; Returns: Json }
+      discard_account_deletion_code: {
+        Args: { p_request: string }
+        Returns: undefined
       }
       drain_vendor_catalog_recompute: {
         Args: { p_limit?: number }
@@ -2875,6 +3084,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_conversation_member: { Args: { cid: string }; Returns: boolean }
+      issue_account_deletion_code: {
+        Args: { p_channels: string[]; p_user: string }
+        Returns: Json
+      }
       lead_cap_used: {
         Args: { p_since: string; p_vendor: string }
         Returns: number
@@ -2963,12 +3176,16 @@ export type Database = {
       owns_product: { Args: { pid: string }; Returns: boolean }
       owns_rfq: { Args: { rid: string }; Returns: boolean }
       pause_ad_campaign_by_admin: {
-        Args: { p_ad_id: string; p_reason_code: string }
+        Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
         Returns: undefined
       }
       pause_ad_campaign_by_vendor: {
         Args: { p_ad_id: string; p_reason_code?: string }
         Returns: undefined
+      }
+      process_due_account_deletions: {
+        Args: { p_min_overdue?: string }
+        Returns: number
       }
       prune_search_query_embeddings: {
         Args: {
@@ -2981,6 +3198,10 @@ export type Database = {
       recompute_vendor_catalog_embedding: {
         Args: { v_id: string }
         Returns: undefined
+      }
+      record_account_storage_cleanup: {
+        Args: { p_error?: string; p_request: string }
+        Returns: string
       }
       record_embedding_pipeline_health: { Args: never; Returns: string }
       regex_probe: {
@@ -3022,6 +3243,10 @@ export type Database = {
       }
       resubmit_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
       resume_ad_campaign: { Args: { p_ad_id: string }; Returns: string }
+      rfq_targets_vendor: {
+        Args: { p_rfq: string; p_vendor: string }
+        Returns: boolean
+      }
       search_products: {
         Args: { match_count?: number; query: string }
         Returns: {

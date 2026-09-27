@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -23,6 +24,7 @@ import {
   PageHeader,
   Panel,
   ROW_HOVER,
+  Select,
   SkeletonList,
   Spinner,
   Stack,
@@ -31,13 +33,19 @@ import {
 } from "@/components/ui";
 
 /**
- * Part 7 - reporting, from real rows only.
+ * Part 7 - reporting, from real rows only, computed in the database.
  *
- * Two unit traps are handled here, both verified against the edge functions that
- * write the rows:
- *   - subscription_invoices.amount is RUPEES, ex-GST (gst_amount is separate).
- *   - ad_orders.amount is PAISE (razorpay-create-order does `rupees * 100`).
- * Summing them naively would overstate ad revenue by 100x.
+ * admin_report_summary(from, to) (admin completion, Phase 3c) does the aggregation
+ * and returns one small document. This page used to pull six whole tables into the
+ * browser, which grows with the catalogue and would silently truncate at
+ * PostgREST's row cap. The function handles both unit traps:
+ *   - subscription_invoices.amount is RUPEES, ex-GST (gst_amount is separate);
+ *   - ad_orders.amount is PAISE.
+ * Every money figure it returns is in paise.
+ *
+ * Revenue is shown NET of GST: GST collected is owed to the government, not earned.
+ * The part with no gateway payment id (demo-mode activations) is flagged, because
+ * it is not money received.
  */
 
 /**
@@ -81,116 +89,81 @@ interface ReportData {
   vendorCount: number;
   productsByStatus: { status: string; count: number }[];
   categories: { name: string; count: number }[];
-  revenueByDay: { day: string; subscriptions: number; ads: number; total: number }[];
+  /** Rupees per IST day: subscriptions net of GST plus ads, and the unverified part. */
+  revenueByDay: { day: string; total: number; unverified: number }[];
   subscriptionRevenue: number;
+  gst: number;
+  unverified: number;
   adRevenue: number;
   adOrderCount: number;
   topVendors: { id: string; brand: string; plan: string; boost: number; active: boolean }[];
 }
 
+/** What admin_report_summary() returns. Money is in paise. */
+interface Summary {
+  vendors: number;
+  products_by_status: { status: string; count: number }[];
+  categories: { name: string; count: number }[];
+  revenue_by_day: {
+    day: string;
+    subscriptions_net_paise: number;
+    gst_paise: number;
+    ads_paise: number;
+    unverified_paise: number;
+  }[];
+  totals: {
+    subscriptions_net_paise: number;
+    gst_paise: number;
+    ads_paise: number;
+    ad_orders: number;
+    unverified_paise: number;
+  };
+  vendors_on_plans: { id: string; brand: string; plan: string; boost: number; active: boolean }[];
+}
+
 const SUBTITLE = "Read-only. Every figure is computed from live rows.";
+
+/** The revenue window. Counts of vendors, products and plans are always "now". */
+const RANGES = [
+  { id: "all", label: "All time", days: null },
+  { id: "30", label: "Last 30 days", days: 30 },
+  { id: "90", label: "Last 90 days", days: 90 },
+  { id: "365", label: "Last 12 months", days: 365 },
+] as const;
+type RangeId = (typeof RANGES)[number]["id"];
+
+const rupees = (paise: number) => Math.round(paise / 100);
 
 export default function Reports() {
   const ink = useChartInk();
 
+  const [range, setRange] = useState<RangeId>("all");
+
   const report = useQuery({
-    queryKey: ["reports"],
+    queryKey: ["reports", range],
     queryFn: async (): Promise<ReportData> => {
-      const [vendors, products, cats, invoices, adOrders, plans] = await Promise.all([
-        supabase.from("vendor_profiles").select("id, brand_name, plan_id, plan_expires_at"),
-        supabase.from("products").select("status, category_id"),
-        supabase.from("categories").select("id, name"),
-        supabase.from("subscription_invoices").select("amount, gst_amount, status, created_at"),
-        supabase.from("ad_orders").select("amount, status, paid_at, created_at"),
-        supabase.from("subscription_plans").select("id, name, limits"),
-      ]);
-
-      for (const r of [vendors, products, cats, invoices, adOrders, plans]) {
-        if (r.error) throw new Error(r.error.message);
-      }
-
-      // Products by status
-      const statusCounts = new Map<string, number>();
-      for (const p of products.data ?? []) statusCounts.set(p.status, (statusCounts.get(p.status) ?? 0) + 1);
-      const productsByStatus = ["under_review", "live", "rejected", "draft"]
-        .map((s) => ({ status: s, count: statusCounts.get(s) ?? 0 }))
-        .filter((s) => s.count > 0);
-
-      // Category distribution
-      const catNames = new Map((cats.data ?? []).map((c) => [c.id, c.name]));
-      const catCounts = new Map<string, number>();
-      for (const p of products.data ?? []) {
-        const name = p.category_id ? (catNames.get(p.category_id) ?? "Unknown") : "Uncategorised";
-        catCounts.set(name, (catCounts.get(name) ?? 0) + 1);
-      }
-      const categories = [...catCounts.entries()]
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
-
-      // Revenue - paid rows only, both sources normalised to rupees.
-      const byDay = new Map<string, { subscriptions: number; ads: number }>();
-      const bump = (iso: string, key: "subscriptions" | "ads", rupees: number) => {
-        const day = iso.slice(0, 10);
-        const row = byDay.get(day) ?? { subscriptions: 0, ads: 0 };
-        row[key] += rupees;
-        byDay.set(day, row);
-      };
-
-      let subscriptionRevenue = 0;
-      for (const inv of invoices.data ?? []) {
-        if (inv.status !== "paid") continue;
-        const rupees = inv.amount + (inv.gst_amount ?? 0);
-        subscriptionRevenue += rupees;
-        bump(inv.created_at, "subscriptions", rupees);
-      }
-
-      let adRevenue = 0;
-      let adOrderCount = 0;
-      for (const o of adOrders.data ?? []) {
-        if (o.status !== "paid") continue;
-        adOrderCount += 1;
-        const rupees = o.amount / 100; // ad_orders.amount is paise
-        adRevenue += rupees;
-        bump(o.paid_at ?? o.created_at, "ads", rupees);
-      }
-
-      const revenueByDay = [...byDay.entries()]
-        .map(([day, v]) => ({ day, ...v, total: v.subscriptions + v.ads }))
-        .sort((a, b) => a.day.localeCompare(b.day));
-
-      // Top vendors by plan / search boost tier (boost lives in plans.limits).
-      const planInfo = new Map(
-        (plans.data ?? []).map((p) => [
-          p.id,
-          {
-            name: p.name,
-            boost: Number((p.limits as { search_boost_tier?: number })?.search_boost_tier ?? 0),
-          },
-        ]),
-      );
-      const topVendors = (vendors.data ?? [])
-        .filter((v) => v.plan_id)
-        .map((v) => {
-          const info = planInfo.get(v.plan_id!);
-          return {
-            id: v.id,
-            brand: v.brand_name ?? "Unnamed vendor",
-            plan: info?.name ?? v.plan_id!,
-            boost: info?.boost ?? 0,
-            active: Boolean(v.plan_expires_at && new Date(v.plan_expires_at).getTime() > Date.now()),
-          };
-        })
-        .sort((a, b) => b.boost - a.boost);
+      const days = RANGES.find((r) => r.id === range)?.days ?? null;
+      const { data, error } = await supabase.rpc("admin_report_summary", {
+        p_from: days === null ? undefined : new Date(Date.now() - days * 86_400_000).toISOString(),
+      });
+      if (error) throw new Error(error.message);
+      const r = data as unknown as Summary;
 
       return {
-        vendorCount: (vendors.data ?? []).length,
-        productsByStatus,
-        categories,
-        revenueByDay,
-        subscriptionRevenue,
-        adRevenue,
-        adOrderCount,
-        topVendors,
+        vendorCount: r.vendors,
+        productsByStatus: r.products_by_status,
+        categories: r.categories,
+        revenueByDay: r.revenue_by_day.map((d) => ({
+          day: d.day,
+          total: rupees(d.subscriptions_net_paise + d.ads_paise),
+          unverified: rupees(d.unverified_paise),
+        })),
+        subscriptionRevenue: rupees(r.totals.subscriptions_net_paise),
+        gst: rupees(r.totals.gst_paise),
+        unverified: rupees(r.totals.unverified_paise),
+        adRevenue: rupees(r.totals.ads_paise),
+        adOrderCount: r.totals.ad_orders,
+        topVendors: r.vendors_on_plans,
       };
     },
   });
@@ -231,7 +204,19 @@ export default function Reports() {
 
   return (
     <Page>
-      <PageHeader title="Reports" subtitle={SUBTITLE} />
+      <PageHeader
+        title="Reports"
+        subtitle={SUBTITLE}
+        actions={
+          <Select aria-label="Revenue window" value={range} onChange={(e) => setRange(e.target.value as RangeId)}>
+            {RANGES.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </Select>
+        }
+      />
 
       <Stack>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -243,8 +228,9 @@ export default function Reports() {
           />
           <Stat
             icon={<IndianRupee size={18} />}
-            label="Revenue, all time"
+            label={`Revenue, ${RANGES.find((r) => r.id === range)?.label.toLowerCase()}`}
             value={`₹${totalRevenue.toLocaleString("en-IN")}`}
+            sub={`net of ₹${d.gst.toLocaleString("en-IN")} GST collected`}
           />
           <Stat icon={<Layers size={18} />} label="Categories in use" value={String(d.categories.length)} />
         </div>
@@ -273,7 +259,7 @@ export default function Reports() {
           title="Revenue over time"
           description={
             <>
-              Paid subscription invoices (incl. GST) plus paid ad orders, by day.{" "}
+              Paid subscription invoices (net of GST) plus paid ad orders, by IST day.{" "}
               {d.adOrderCount === 0 && (
                 <span className="font-medium text-caution-fg">
                   No paid ad orders exist yet, so this is subscription revenue only.
@@ -318,9 +304,19 @@ export default function Reports() {
             </div>
           )}
 
-          <div className="mt-4 flex gap-8 border-t border-line pt-3 text-sm">
+          {d.unverified > 0 && (
+            <Note className="mt-4">
+              <span className="font-medium text-ink">
+                ₹{d.unverified.toLocaleString("en-IN")} of this (GST included) has no gateway payment id.
+              </span>{" "}
+              Those invoices came from demo-mode activations while Razorpay was not configured, so no money
+              was received for them.
+            </Note>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-8 border-t border-line pt-3 text-sm">
             <div>
-              <div className="text-xs text-ink-faint">Subscriptions</div>
+              <div className="text-xs text-ink-faint">Subscriptions (net)</div>
               <div className="font-semibold tabular-nums text-ink">
                 ₹{d.subscriptionRevenue.toLocaleString("en-IN")}
               </div>
@@ -330,6 +326,10 @@ export default function Reports() {
               <div className="font-semibold tabular-nums text-ink">
                 ₹{d.adRevenue.toLocaleString("en-IN")}
               </div>
+            </div>
+            <div>
+              <div className="text-xs text-ink-faint">GST collected (not revenue)</div>
+              <div className="font-semibold tabular-nums text-ink-muted">₹{d.gst.toLocaleString("en-IN")}</div>
             </div>
           </div>
         </Panel>

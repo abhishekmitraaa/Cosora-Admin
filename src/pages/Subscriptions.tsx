@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { supabase, assertWrote } from "@/lib/supabase";
-import type { Database } from "@/lib/database.types";
+import { describeWriteError, supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import {
@@ -10,6 +10,9 @@ import {
   Button,
   Empty,
   ErrorNote,
+  Field,
+  Modal,
+  Note,
   Page,
   PageHeader,
   Panel,
@@ -20,9 +23,16 @@ import {
   Stack,
   StatusBadge,
   Table,
+  Textarea,
 } from "@/components/ui";
 
-type SubUpdate = Database["public"]["Tables"]["vendor_subscriptions"]["Update"];
+/** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
+const PAGE = 50;
+
+/** A plan change or a cancel, waiting for its reason. */
+type Pending =
+  | { kind: "plan"; sub: SubRow; planId: string }
+  | { kind: "cancel"; sub: SubRow };
 
 interface SubRow {
   id: string;
@@ -81,27 +91,34 @@ export default function Subscriptions() {
     },
   });
 
-  const subs = useQuery({
+  // Both lists page by created_at, newest first: the next page starts strictly
+  // before the last row shown. vendor_subscriptions.vendor_id FKs vendor_profiles,
+  // so the embed is a real single-hop relationship (unlike products -> vendor).
+  const subs = useInfiniteQuery({
     queryKey: ["subscriptions"],
-    queryFn: async (): Promise<SubRow[]> => {
-      // vendor_subscriptions.vendor_id FKs vendor_profiles, so this embed is a
-      // real single-hop relationship (unlike products -> vendor).
-      const { data, error } = await supabase
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }): Promise<(SubRow & { created_at: string })[]> => {
+      let q = supabase
         .from("vendor_subscriptions")
         .select(
           `id, vendor_id, plan_id, billing_cycle, status, current_period_start,
-           current_period_end, auto_renew, vendor:vendor_profiles(brand_name, city)`,
+           current_period_end, auto_renew, created_at, vendor:vendor_profiles(brand_name, city)`,
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      if (pageParam) q = q.lt("created_at", pageParam);
+      const { data, error } = await q;
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as SubRow[];
+      return (data ?? []) as unknown as (SubRow & { created_at: string })[];
     },
+    getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
   });
 
-  const invoices = useQuery({
+  const invoices = useInfiniteQuery({
     queryKey: ["invoices"],
-    queryFn: async (): Promise<InvoiceRow[]> => {
-      const { data, error } = await supabase
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }): Promise<InvoiceRow[]> => {
+      let q = supabase
         .from("subscription_invoices")
         .select(
           `id, vendor_id, plan_id, amount, gst_amount, currency, status, invoice_number,
@@ -109,25 +126,50 @@ export default function Subscriptions() {
            billing_period_start, billing_period_end, created_at,
            vendor:vendor_profiles(brand_name)`,
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      if (pageParam) q = q.lt("created_at", pageParam);
+      const { data, error } = await q;
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as InvoiceRow[];
     },
+    getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
   });
 
-  /** Plan change / cancel are direct writes, gated by vendor_subscriptions_admin RLS. */
-  const updateSub = useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: SubUpdate }) => {
-      assertWrote(
-        await supabase.from("vendor_subscriptions").update(patch).eq("id", id).select("id"),
-        "update subscription",
-      );
+  /**
+   * Plan changes and cancels go through admin_subscription_change_plan() /
+   * admin_subscription_cancel() (admin completion, Phase 3b). They used to be
+   * direct UPDATEs of vendor_subscriptions with no reason, and they left
+   * vendor_profiles.plan_id / plan_expires_at (the trust seal and search boost) on
+   * the old values. The functions change both in one transaction, record the reason
+   * in the Admin Log, and notify the vendor.
+   */
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [reason, setReason] = useState("");
+
+  const decide = useMutation({
+    mutationFn: async ({ action, why }: { action: Pending; why: string }) => {
+      const { error } =
+        action.kind === "plan"
+          ? await supabase.rpc("admin_subscription_change_plan", {
+              p_subscription_id: action.sub.id,
+              p_plan_id: action.planId,
+              p_reason: why,
+            })
+          : await supabase.rpc("admin_subscription_cancel", {
+              p_subscription_id: action.sub.id,
+              p_reason: why,
+            });
+      if (error) throw new Error(describeWriteError(error));
     },
-    onSuccess: () => {
+    onSuccess: (_d, { action }) => {
+      toast.success(action.kind === "plan" ? "Plan changed" : "Subscription canceled");
+      setPending(null);
+      setReason("");
       void qc.invalidateQueries({ queryKey: ["subscriptions"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
 
   /**
@@ -170,7 +212,7 @@ export default function Subscriptions() {
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
 
-  if (subs.isLoading || invoices.isLoading) {
+  if (subs.isPending || invoices.isPending) {
     return (
       <Page width="wide">
         <PageHeader title="Subscriptions & billing" subtitle={SUBTITLE} />
@@ -181,8 +223,9 @@ export default function Subscriptions() {
   if (subs.error) return <ErrorNote message={(subs.error as Error).message} />;
   if (invoices.error) return <ErrorNote message={(invoices.error as Error).message} />;
 
-  const subRows = subs.data ?? [];
-  const invRows = invoices.data ?? [];
+  const subRows = subs.data?.pages.flat() ?? [];
+  const invRows = invoices.data?.pages.flat() ?? [];
+  const planName = (id: string) => (plans.data ?? []).find((p) => p.id === id)?.name ?? id;
 
   return (
     <Page width="wide">
@@ -205,13 +248,11 @@ export default function Subscriptions() {
                     <Select
                       aria-label={`Plan for ${s.vendor?.brand_name ?? "this vendor"}`}
                       value={s.plan_id}
-                      disabled={!writable || updateSub.isPending}
-                      onChange={(e) =>
-                        updateSub.mutate(
-                          { id: s.id, patch: { plan_id: e.target.value } },
-                          { onSuccess: () => toast.success("Plan changed") },
-                        )
-                      }
+                      disabled={!writable || decide.isPending || s.status === "canceled" || s.status === "expired"}
+                      onChange={(e) => {
+                        setReason("");
+                        setPending({ kind: "plan", sub: s, planId: e.target.value });
+                      }}
                     >
                       {(plans.data ?? []).map((p) => (
                         <option key={p.id} value={p.id}>
@@ -239,13 +280,10 @@ export default function Subscriptions() {
                     <Button
                       variant="danger"
                       size="sm"
-                      disabled={!writable || s.status === "canceled" || updateSub.isPending}
+                      disabled={!writable || s.status === "canceled" || s.status === "expired" || decide.isPending}
                       onClick={() => {
-                        if (!confirm(`Cancel the subscription for ${s.vendor?.brand_name ?? "this vendor"}?`)) return;
-                        updateSub.mutate(
-                          { id: s.id, patch: { status: "canceled", auto_renew: false } },
-                          { onSuccess: () => toast.success("Subscription canceled") },
-                        );
+                        setReason("");
+                        setPending({ kind: "cancel", sub: s });
                       }}
                     >
                       Cancel
@@ -254,6 +292,13 @@ export default function Subscriptions() {
                 </tr>
               ))}
             </Table>
+          )}
+          {subs.hasNextPage && (
+            <div className="mt-3 flex justify-center">
+              <Button size="sm" disabled={subs.isFetchingNextPage} onClick={() => void subs.fetchNextPage()}>
+                {subs.isFetchingNextPage ? "Loading…" : "Load more subscriptions"}
+              </Button>
+            </div>
           )}
         </Panel>
 
@@ -346,8 +391,69 @@ export default function Subscriptions() {
               })}
             </Table>
           )}
+          {invoices.hasNextPage && (
+            <div className="mt-3 flex justify-center">
+              <Button
+                size="sm"
+                disabled={invoices.isFetchingNextPage}
+                onClick={() => void invoices.fetchNextPage()}
+              >
+                {invoices.isFetchingNextPage ? "Loading…" : "Load more invoices"}
+              </Button>
+            </div>
+          )}
         </Panel>
       </Stack>
+
+      <Modal
+        open={pending !== null}
+        title={
+          pending?.kind === "plan"
+            ? `Move ${pending.sub.vendor?.brand_name ?? "this vendor"} to ${planName(pending.planId)}`
+            : `Cancel ${pending?.sub.vendor?.brand_name ?? "this vendor"}'s subscription`
+        }
+        onClose={() => setPending(null)}
+      >
+        {pending && (
+          <>
+            <Note className="mb-3">
+              {pending.kind === "plan" ? (
+                <>
+                  The vendor moves from {planName(pending.sub.plan_id)} to {planName(pending.planId)} now,
+                  with the same period end. No money moves: nothing is charged or refunded. Their trust
+                  seal and search boost follow the new plan while the subscription runs.
+                </>
+              ) : (
+                <>
+                  The plan ends now, with its trust seal and search boost. Nothing is refunded here: refund
+                  a paid invoice from the Invoices list below.
+                </>
+              )}{" "}
+              The vendor is notified, and the reason goes into the Admin Log.
+            </Note>
+            <Field label="Reason" htmlFor="sub-reason" hint="Required. Recorded in the Admin Log, not shown to the vendor.">
+              <Textarea
+                id="sub-reason"
+                rows={3}
+                autoFocus
+                value={reason}
+                placeholder={pending.kind === "plan" ? "Why is this plan changing?" : "Why is this subscription being canceled?"}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button onClick={() => setPending(null)}>Keep as is</Button>
+              <Button
+                variant={pending.kind === "cancel" ? "danger" : "primary"}
+                disabled={!reason.trim() || decide.isPending}
+                onClick={() => decide.mutate({ action: pending, why: reason.trim() })}
+              >
+                {decide.isPending ? "Working…" : pending.kind === "plan" ? "Change plan" : "Cancel subscription"}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </Page>
   );
 }
