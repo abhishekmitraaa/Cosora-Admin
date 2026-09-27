@@ -9,6 +9,30 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-27 (admin completion, Phases 1 and 2): **The database now enforces each admin role's writes, and System Health shows every scheduled job.**
+  - **Phase 1 (database only, textile-spark-net migrations `20260927145549`, `…150304`, `…150657`, `…150904`).** Nothing in this panel changed, but these actions are now refused for roles `roles.ts` never offered them to:
+    - A write policy's admin arm names its roles:
+      - plans → super_admin, finance_admin;
+      - quotes → super_admin;
+      - videos → super_admin, product_moderator;
+      - profiles delete → super_admin;
+      - campaigns → review RPCs only;
+      - KYC documents and buyer profiles → read-only for admins.
+    - Moderators change a listing's or video's status and rejection reason only, and a rejection needs a reason in the database too.
+    - Plan columns → super_admin and finance_admin; the ad badge → super_admin.
+    - Nobody deletes a reviewed campaign; ad counters move only through the ad server.
+    - No admin changes their own account's status, and only a super admin changes another admin's (`AccountStatus` shows the database's refusal).
+    - Chat flag patterns that match ordinary messages (`.*`, `\d+`) are refused with a reason (`ChatPatterns` shows it verbatim).
+    - `certificate_dispatch()` checks the role first.
+    - `admin_list_admins()` → super_admin and manager, the Admins page's audience.
+  - **Phase 2.** All twelve database jobs were deleted on 2026-09-26. The essential ones came back (textile-spark-net `20260927153142`), with a daily 14-day prune of job history:
+    - `pages/SystemHealth.tsx`:
+      - A new **Scheduled jobs** panel from `admin_cron_status()` (`20260927154047`; super_admin and vendor_ops): each job's purpose, schedule, last run (with an "overdue" flag past twice its interval), 24-hour runs and failures, and last message.
+      - A warning when the embedding-health history has had no new sample for 20 minutes. A sample that stops arriving looks exactly like a healthy one that hasn't changed.
+      - The health RPC is now called typed, since the generated types include it.
+    - `lib/database.types.ts`: `admin_cron_status`.
+  - **Verified:** `npm run typecheck` 0, `npm run build` 0. The database side was verified in textile-spark-net: harnesses `scripts/admin-completion/01`–`04` before, in the rehearsal and live; see its `test.md`.
+
 - 2026-09-26 (scheduled jobs removed, in textile-spark-net): **Every scheduled database job was deleted, on Mitra's instruction.** Nothing in this panel changed. What those jobs kept current now changes only when someone acts: subscription expiry, ad schedules, the embedding pipeline's health history and alarm, and account-deletion processing. See textile-spark-net `documentation/ToDo.md`, "Restore the scheduled jobs".
 
 - 2026-09-26 (managers assign teammates): **A Manager now adds, changes and removes teammates on the Admins page, in the five team roles only.** Mitra: "I'll assign the manager roles and then manager roles can assign teammates roles".

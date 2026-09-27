@@ -224,6 +224,7 @@ one is a link to somebody else's product.
 |---|---|---|---|
 | Ads → Monitoring | **real** | *(inherits `ads`)* | *(inherits `ads`)* |
 | `geography` | **real** | `super_admin`, `vendor_ops`, `support` | none |
+| `system-health` | **real**: embedding-pipeline history, refused analytics events, and (since 2026-09-27) every scheduled job's last run via `admin_cron_status()` | `super_admin`, `vendor_ops` | none |
 | `content` | dev-seed | `super_admin` | `super_admin` |
 | `payments` | dev-seed | `super_admin`, `finance_admin`, `support` | `super_admin`, `finance_admin` |
 | `certificates` | dev-seed | `super_admin` *(see below)* | `super_admin` *(see below)* |

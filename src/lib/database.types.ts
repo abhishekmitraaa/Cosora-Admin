@@ -2458,6 +2458,20 @@ export type Database = {
           status: string
         }[]
       }
+      admin_cron_status: {
+        Args: never
+        Returns: {
+          active: boolean
+          failures_24h: number
+          jobname: string
+          last_finished_at: string
+          last_message: string
+          last_started_at: string
+          last_status: string
+          runs_24h: number
+          schedule: string
+        }[]
+      }
       admin_embedding_pipeline_health: {
         Args: { p_limit?: number }
         Returns: {
