@@ -77,8 +77,10 @@ const TABS: { id: Status; label: string }[] = [
  * guard (P0002); the UI supplies it exactly as Products.tsx does — Approve is not
  * rendered for a row that is already live, and each tab holds one status.
  *
- * The vendor-wide button below IS an RPC, because bulk approval has no
- * column-level equivalent to write.
+ * The vendor-wide button below IS an RPC, approve_vendor_videos_bulk() (admin
+ * completion, Phase 3a). It approves that vendor's pending videos, only videos,
+ * and returns how many. The function it replaced, approve_vendor_content_bulk(),
+ * also put their pending products and catalogues live from this screen.
  */
 export default function Videos() {
   const role = useRole();
@@ -147,43 +149,23 @@ export default function Videos() {
   });
 
   /**
-   * `approve_vendor_content_bulk(vendor_id)` — the original vendor-wide function,
-   * renamed in 20260801102505 when per-item approve took its old name. It flips
-   * EVERY under_review row that vendor owns across products, product_videos AND
-   * catalogues, and returns void: nothing to assertWrote, no count to report. So
-   * we re-count this vendor's still-pending videos either side of the call and
-   * report what actually moved, instead of claiming success on a no-op.
+   * approve_vendor_videos_bulk(vendor) approves that vendor's under_review videos
+   * and returns the count it moved, so the toast reports what actually changed.
    */
   const bulkApprove = useMutation({
     mutationFn: async (vendorId: string) => {
-      const pending = () =>
-        supabase
-          .from("product_videos")
-          .select("id", { count: "exact", head: true })
-          .eq("vendor_id", vendorId)
-          .eq("status", "under_review");
-
-      const before = await pending();
-      if (before.error) throw new Error(before.error.message);
-
-      const { error } = await supabase.rpc("approve_vendor_content_bulk", { target: vendorId });
+      const { data, error } = await supabase.rpc("approve_vendor_videos_bulk", { p_vendor: vendorId });
       if (error) throw new Error(describeWriteError(error));
-
-      const after = await pending();
-      if (after.error) throw new Error(after.error.message);
-
-      return (before.count ?? 0) - (after.count ?? 0);
+      return data ?? 0;
     },
     onSuccess: (moved) => {
       toast.success(
         moved === 0
           ? "Nothing was pending for this vendor. No videos changed."
-          : `${moved} video${moved === 1 ? "" : "s"} approved. Any pending products and ` +
-              "catalogues from this vendor went live in the same call.",
+          : `${moved} video${moved === 1 ? "" : "s"} approved.`,
       );
       setBulkFor(null);
       void qc.invalidateQueries({ queryKey: ["videos"] });
-      void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -338,13 +320,13 @@ export default function Videos() {
 
       <Modal
         open={bulkFor !== null}
-        title={`Approve everything pending for ${bulkFor?.label ?? ""}`}
+        title={`Approve every pending video from ${bulkFor?.label ?? ""}`}
         onClose={() => setBulkFor(null)}
       >
         <p className="text-sm text-ink">
-          This does not stop at videos. <strong>Every</strong> item this vendor has waiting
-          (products, video closeups <em>and</em> catalogues) goes live in one call, including items
-          nobody has looked at on this screen.
+          Every Video Closeup this vendor has waiting goes live, including ones nobody has watched on
+          this screen. Their products and catalogues are not touched; those are moderated on their
+          own screens.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
           There is no bulk undo. Reversing it means rejecting each item individually.
@@ -356,7 +338,7 @@ export default function Videos() {
             disabled={bulkApprove.isPending}
             onClick={() => bulkFor && bulkApprove.mutate(bulkFor.vendorId)}
           >
-            Approve all pending
+            Approve all pending videos
           </Button>
         </div>
       </Modal>
@@ -500,9 +482,9 @@ function VideoCard({
               variant="ghost"
               disabled={!writable || busy}
               onClick={onBulk}
-              title="Approves this vendor's pending products, videos and catalogues"
+              title="Approves every pending video from this vendor"
             >
-              Approve all for vendor
+              Approve all videos for vendor
             </Button>
           )}
         </div>

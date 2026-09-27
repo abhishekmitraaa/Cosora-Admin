@@ -114,6 +114,11 @@ const CITIES: Record<string, LatLng> = {
   bombay: { lat: 19.076, lng: 72.877 },
   delhi: { lat: 28.614, lng: 77.209 },
   "new delhi": { lat: 28.614, lng: 77.209 },
+  // The region, as vendors write it (two live vendors said "Delhi NCR", 2026-09-27).
+  // It has no single point, so it takes Delhi's; its cities below keep their own.
+  "delhi ncr": { lat: 28.614, lng: 77.209 },
+  ncr: { lat: 28.614, lng: 77.209 },
+  "national capital region": { lat: 28.614, lng: 77.209 },
   bengaluru: { lat: 12.972, lng: 77.594 },
   bangalore: { lat: 12.972, lng: 77.594 },
   hyderabad: { lat: 17.385, lng: 78.487 },
@@ -186,6 +191,7 @@ const CITIES: Record<string, LatLng> = {
   gurugram: { lat: 28.459, lng: 77.027 },
   gurgaon: { lat: 28.459, lng: 77.027 },
   noida: { lat: 28.535, lng: 77.391 },
+  "greater noida": { lat: 28.474, lng: 77.504 },
   ghaziabad: { lat: 28.669, lng: 77.454 },
   chandigarh: { lat: 30.733, lng: 76.779 },
 

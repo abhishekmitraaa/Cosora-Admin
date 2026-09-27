@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase, describeWriteError } from "@/lib/supabase";
 import { canSuspendAccounts, ROLE_LABELS } from "@/lib/roles";
-import { useRole } from "@/hooks/useAdminSession";
+import { useAdminSession, useRole } from "@/hooks/useAdminSession";
 import ReasonPicker from "./ReasonPicker";
 import { Badge, Button, Card, ErrorNote, Note, Notice, SubHeading, Spinner } from "./ui";
 
@@ -70,6 +70,10 @@ export default function AccountStatus({
   const role = useRole();
   const qc = useQueryClient();
   const writable = canSuspendAccounts(role);
+  // set_account_status() refuses an admin's own account (admin completion, Phase 1c).
+  // Another admin's account is refused unless the caller is a super admin; the panel
+  // can't tell that here, so the database's refusal is shown as it comes back.
+  const ownAccount = useAdminSession().identity?.id === profileId;
   const [picking, setPicking] = useState(false);
 
   const account = useQuery({
@@ -196,6 +200,12 @@ export default function AccountStatus({
           Deletion is final, so there is nothing to suspend or reinstate:{" "}
           <span className="font-mono text-2xs">set_account_status()</span> refuses any change to a
           deleted account.
+        </Note>
+      ) : writable && ownAccount ? (
+        <Note>
+          This is your own account. No admin changes their own account's status:{" "}
+          <span className="font-mono text-2xs">set_account_status()</span> refuses it, so ask another
+          admin.
         </Note>
       ) : writable ? (
         <Button

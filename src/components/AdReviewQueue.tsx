@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
+import { reasonLabel, useAdReasonCodes } from "@/lib/adReasons";
 import {
   Attr, AttrGrid, Badge, Button, Card, Empty, ErrorNote, Field, Modal, Note,
   Notice, ReadOnlyBanner, Select, SkeletonList, Stat, StatusBadge, Tabs, Textarea,
@@ -42,16 +43,8 @@ const TABS: { id: QueueTab; label: string }[] = [
  * moderators typing "misleading" and "Misleading claims" would split one
  * reason into two rows. The note carries the detail.
  */
-const REASON_CODES: { id: string; label: string }[] = [
-  { id: "misleading_claims", label: "Misleading or unverifiable claims" },
-  { id: "prohibited_content", label: "Prohibited content" },
-  { id: "poor_creative", label: "Image or copy quality" },
-  { id: "wrong_category", label: "Targeting does not match the product" },
-  { id: "product_unavailable", label: "Promoted product is not live" },
-  { id: "trademark", label: "Trademark or brand misuse" },
-  { id: "fraud_review", label: "Suspected invalid traffic / fraud" },
-  { id: "policy_other", label: "Other policy breach" },
-];
+// The codes themselves live in admin.ad_reason_codes (admin completion, Phase 3a),
+// read through useAdReasonCodes(). The database refuses a code that isn't listed.
 
 interface QueueAd {
   id: string;
@@ -124,6 +117,11 @@ export default function AdReviewQueue() {
   const [action, setAction] = useState<{ ad: QueueAd; kind: ActionKind } | null>(null);
   const [reasonCode, setReasonCode] = useState("");
   const [note, setNote] = useState("");
+  const reasons = useAdReasonCodes();
+  // A change request must say what to change: request_ad_changes() refuses one
+  // without a note (Phase 1c). Reject and suspend take the code's label if the
+  // note is empty.
+  const noteRequired = action?.kind === "changes";
 
   const queue = useQuery({
     queryKey: ["ad-review", tab],
@@ -316,8 +314,8 @@ export default function AdReviewQueue() {
                 autoFocus
               >
                 <option value="">Select a reason…</option>
-                {REASON_CODES.map((r) => (
-                  <option key={r.id} value={r.id}>
+                {(reasons.data ?? []).map((r) => (
+                  <option key={r.code} value={r.code}>
                     {r.label}
                   </option>
                 ))}
@@ -326,7 +324,11 @@ export default function AdReviewQueue() {
             <Field
               label="Note to the vendor"
               htmlFor="ad-reason-note"
-              hint="Optional, but this is what the vendor actually reads. Say what to change."
+              hint={
+                noteRequired
+                  ? "Required: this is what the vendor reads. Say what to change."
+                  : "Optional. This is what the vendor reads; without it they see the reason's label."
+              }
             >
               <Textarea
                 id="ad-reason-note"
@@ -340,7 +342,7 @@ export default function AdReviewQueue() {
               <Button onClick={() => setAction(null)}>Cancel</Button>
               <Button
                 variant="danger"
-                disabled={!reasonCode || decide.isPending}
+                disabled={!reasonCode || (noteRequired && !note.trim()) || decide.isPending}
                 onClick={() =>
                   decide.mutate({ id: action.ad.id, kind: action.kind, code: reasonCode, text: note })
                 }
@@ -483,6 +485,7 @@ function ReviewCard({
  *  UPDATE or DELETE grant, so there is nothing to edit here even for a super admin.
  *  Read through admin_ad_review_log_list (admin-schema separation, Phase 3b). */
 function DecisionHistory({ adId }: { adId: string }) {
+  const reasons = useAdReasonCodes();
   const log = useQuery({
     queryKey: ["ad-review-log", adId],
     queryFn: async () => {
@@ -517,7 +520,9 @@ function DecisionHistory({ adId }: { adId: string }) {
             </div>
             {(r.reason_code || r.note) && (
               <p className="mt-1 text-ink-muted">
-                {r.reason_code && <span className="font-mono text-2xs">{r.reason_code}</span>}
+                {r.reason_code && (
+                  <span title={r.reason_code}>{reasonLabel(reasons.data, r.reason_code)}</span>
+                )}
                 {r.reason_code && r.note && " — "}
                 {r.note}
               </p>

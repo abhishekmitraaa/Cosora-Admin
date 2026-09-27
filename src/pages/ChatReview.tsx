@@ -163,17 +163,14 @@ export default function ChatReview() {
   });
 
   /**
-   * Block = two calls, and the ORDER is deliberate.
+   * Block = ONE call, block_account_from_review() (admin completion, Phase 3a).
    *
-   * Suspend first, close the review second. The reverse ordering fails silently
-   * in the way that matters: a review marked 'buyer_blocked' with nobody
-   * actually suspended looks handled and disappears from the queue. This way a
-   * failure leaves the item visibly pending and the message below says exactly
-   * what did and did not happen.
-   *
-   * These cannot be one transaction from the client. Making them one would mean
-   * set_account_status growing a second job, and it is deliberately the single
-   * writer of the account_suspensions ledger.
+   * It used to be two requests, set_account_status() then
+   * resolve_conversation_review(), and a failure between them left an account
+   * suspended with its review still pending. The function locks the review, checks
+   * the account is a participant and the reason is an active block reason, then
+   * calls the same two functions in one transaction: both land or neither does.
+   * set_account_status() is still the only writer of the suspension ledger.
    */
   const block = useMutation({
     mutationFn: async ({
@@ -189,18 +186,10 @@ export default function ChatReview() {
       reasonId: string;
       resume: boolean;
     }) => {
-      const { error: suspendError } = await supabase.rpc("set_account_status", {
-        p_profile_id: profileId,
-        p_new_status: "suspended",
-        p_reason_id: reasonId,
-        p_source: "chat_review",
-        p_conversation_review_id: review.id,
-      });
-      if (suspendError) throw new Error(describeWriteError(suspendError));
-
-      const { error: resolveError } = await supabase.rpc("resolve_conversation_review", {
+      const { error } = await supabase.rpc("block_account_from_review", {
         p_review_id: review.id,
-        p_verdict: side === "buyer" ? "buyer_blocked" : "vendor_blocked",
+        p_profile_id: profileId,
+        p_side: side,
         p_reason_id: reasonId,
         // `resume` comes from the checkbox in the block dialog. Reopening is
         // safe either way — messages_insert independently requires the SENDER's
@@ -209,13 +198,7 @@ export default function ChatReview() {
         // back, so it is asked rather than assumed.
         p_resume: resume,
       });
-      if (resolveError) {
-        throw new Error(
-          `The ${side}'s account WAS suspended, but this review could not be closed: ` +
-            `${describeWriteError(resolveError)}. It is still pending. Close it with "Keep locked" ` +
-            `so the queue matches what actually happened; do not block again.`,
-        );
-      }
+      if (error) throw new Error(describeWriteError(error));
     },
     onSuccess: () => {
       invalidate();

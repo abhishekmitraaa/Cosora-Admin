@@ -9,6 +9,28 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-27 (admin completion, Phase 3): **Whole review actions, videos-only bulk approval, one ad-reason list, plan changes with reasons, Reports from the database.**
+  - `pages/ChatReview.tsx`: Block is one call, `block_account_from_review()`. The two-request flow, and its "suspended but still pending" recovery message, are gone.
+  - `pages/Videos.tsx`: "Approve all videos for vendor" uses `approve_vendor_videos_bulk()`, which returns the count; the modal says videos only. The before-and-after recount is gone.
+  - `lib/adReasons.ts` (new): `useAdReasonCodes()` reads `admin_ad_reason_codes()`.
+    - `components/AdReviewQueue.tsx` uses it instead of a hardcoded list, requires a note for Request changes, and labels codes in the decision history.
+    - `pages/Ads.tsx`: Pause and Reject pick a code and take an optional note. The takedown reason on a card shows the label.
+  - `pages/Subscriptions.tsx`:
+    - The plan select and Cancel open a modal that asks for a reason and explains the effect, then call `admin_subscription_change_plan()` / `admin_subscription_cancel()`.
+    - Subscriptions and invoices load 50 at a time.
+    - The direct `vendor_subscriptions` UPDATE is gone.
+  - `pages/Reports.tsx`:
+    - One `admin_report_summary()` call instead of six whole-table reads, with a revenue window.
+    - The headline is revenue net of GST, with GST shown separately.
+    - A note flags income with no gateway payment id.
+  - `pages/AdminLog.tsx`: shows an entry's reason, and names `subscription_plans` changes.
+  - `components/AccountStatus.tsx`: your own account shows why you can't change its status (the database refuses it).
+  - `lib/geo.ts`: "Delhi NCR", "NCR", "National Capital Region" and "Greater Noida".
+  - `vercel.json`: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+  - `lib/database.types.ts`: regenerated from the live schema (additive).
+  - **The database side:** textile-spark-net migrations `20260927182120`, `…182524`, `…182703`, with harnesses `05` and `06` (see its `test.md`).
+  - **Verified:** `npm run typecheck` 0, `npm run build` 0.
+
 - 2026-09-27 (admin completion, Phases 1 and 2): **The database now enforces each admin role's writes, and System Health shows every scheduled job.**
   - **Phase 1 (database only, textile-spark-net migrations `20260927145549`, `…150304`, `…150657`, `…150904`).** Nothing in this panel changed, but these actions are now refused for roles `roles.ts` never offered them to:
     - A write policy's admin arm names its roles:
