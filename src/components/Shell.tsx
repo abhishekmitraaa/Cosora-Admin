@@ -28,6 +28,7 @@ import {
   UserCog,
   Users,
   X,
+  Inbox,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
@@ -88,6 +89,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Insight",
     items: [
+      { to: "/leads", section: "leads", label: "Leads", icon: Inbox },
       { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
       { to: "/traction", section: "traction", label: "Live Activity", icon: Activity },
       { to: "/system-health", section: "system-health", label: "System Health", icon: HeartPulse },

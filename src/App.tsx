@@ -21,6 +21,7 @@ import Reports from "@/pages/Reports";
 import Admins from "@/pages/Admins";
 import AdminLog from "@/pages/AdminLog";
 import Accounts from "@/pages/Accounts";
+import Leads from "@/pages/Leads";
 import Chats from "@/pages/Chats";
 import ChatThread from "@/pages/ChatThread";
 import ChatReview from "@/pages/ChatReview";
@@ -272,6 +273,14 @@ export default function App() {
                 element={
                   <RequireSection section="customers">
                     <Customers />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/leads"
+                element={
+                  <RequireSection section="leads">
+                    <Leads />
                   </RequireSection>
                 }
               />

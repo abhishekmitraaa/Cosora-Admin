@@ -2873,6 +2873,41 @@ export type Database = {
           id: string
         }[]
       }
+      admin_lead_detail: { Args: { p_rfq_id: string }; Returns: Json }
+      admin_leads_list: {
+        Args: {
+          p_category?: string
+          p_cursor_at?: string
+          p_cursor_id?: string
+          p_direct?: boolean
+          p_limit?: number
+          p_min_age_hours?: number
+          p_search?: string
+          p_stage?: string
+        }
+        Returns: {
+          accepted_vendor_id: string
+          accepted_vendor_name: string
+          budget_max: number
+          budget_min: number
+          buyer_id: string
+          buyer_name: string
+          category: string
+          created_at: string
+          direct: boolean
+          first_quote_at: string
+          id: string
+          overdue: boolean
+          quantity: number
+          quotes: number
+          rfq_status: string
+          stage: string
+          target_vendor_id: string
+          target_vendor_name: string
+          title: string
+        }[]
+      }
+      admin_leads_summary: { Args: { p_days?: number }; Returns: Json }
       admin_list_admins: {
         Args: never
         Returns: {

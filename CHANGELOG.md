@@ -9,6 +9,17 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-28 (admin completion, Phase 7): **Leads: the RFQ pipeline.** A new read-only page.
+  - `pages/Leads.tsx` at `/leads`, under Insight in the nav. It reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail()` through `lib/leads.ts`. The migration is in textile-spark-net (`20260928071643`).
+    - Stage chips: new, unanswered, overdue, quoted, won, closed.
+    - Filters: audience (marketplace or direct), age, and a debounced search. Keyset "Load more".
+    - A detail modal with the request and its quotes.
+    - Figures: waiting for a first quote, overdue, the median time to a first quote and the share answered within 24 hours, over a chosen window.
+  - `roles.ts`: a `leads` section, read by super_admin, vendor_ops, product_moderator and support, written by nobody.
+  - `pages/Accounts.tsx` opens pre-searched from `?q=`, so a lead's buyer link lands on that account.
+  - `database.types.ts` regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0; the bundle calls `admin_leads_list`. Harness `11` in textile-spark-net: 16/16, rehearsed and live.
+
 - 2026-09-28 (admin completion, Phase 6): **Customers is real.** The dev-seed fixture is gone.
   - `pages/Customers.tsx` reads `admin_customer_list()`, `admin_customer_segment_counts()` and `admin_customer_tags()` through `lib/customers.ts`. The migration is in textile-spark-net (`20260928070410`).
     - One row per customer account (Cosora staff left out), with segment chips counted in the database.

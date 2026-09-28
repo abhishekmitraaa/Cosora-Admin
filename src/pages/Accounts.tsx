@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -62,7 +62,9 @@ const LIMIT = 50;
 export default function Accounts() {
   const role = useRole();
   const writable = canWrite(role, "accounts");
-  const [term, setTerm] = useState("");
+  // ?q= opens the page already searched, e.g. from a Leads row's buyer link.
+  const [params] = useSearchParams();
+  const [term, setTerm] = useState(() => params.get("q") ?? "");
   const [selected, setSelected] = useState<AccountRow | null>(null);
 
   const trimmed = term.trim();

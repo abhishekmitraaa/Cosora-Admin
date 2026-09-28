@@ -394,6 +394,21 @@ migration `20260928070410`, admin completion Phase 6) read `admin.customer_summa
   in the Admin Log. super_admin and support add, apply, remove and delete them.
 - A phone sign-in account's placeholder email shows as "Phone sign-in".
 
+### Leads: the RFQ pipeline (2026-09-28)
+
+`/leads` (section `leads`: super_admin, vendor_ops, product_moderator, support; read-only for
+all) reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail()`
+(textile-spark-net migration `20260928071643`, admin completion Phase 7).
+- **One stage per RFQ, from `admin.lead_rows`:** new, unanswered (overdue at 48 hours without
+  a quote), quoted, won, closed. A direct RFQ is marked.
+- **The numbers:**
+  - what's waiting for a first quote and what's overdue, across every open RFQ;
+  - over a chosen window: the median time to a first quote, and the share answered within
+    24 hours (of RFQs at least a day old).
+- **Paging and links:** the list pages by keyset, 50 at a time. The buyer's name links to
+  Accounts, which opens pre-searched from `?q=` (the account id), and the vendor links to its
+  detail page.
+
 ### Live Activity is a link, not a feature
 
 Microsoft Clarity, and only one analytics tool: two scripts on the buyer site
