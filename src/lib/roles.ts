@@ -78,8 +78,9 @@ export type Section =
   //   DB is already enforcing it. (Ads monitoring is NOT a section: it is a
   //   view inside "ads" and inherits that section's gate unchanged.)
   //
-  //   DEV-SEED, no table yet. `content`, `payments`, `discounts` and
-  //   `customers` render from a local development fixture and write nothing.
+  //   DEV-SEED, no table yet. `content` and `discounts` render from a local
+  //   development fixture and write nothing. (`payments` left this group on
+  //   2026-09-28 in Phase 5, `customers` in Phase 6: both read the database.)
   //   Their gates are declared NOW so Phase 2 only has to swap the data source,
   //   but until the tables exist these are UX only in a stronger sense than the
   //   rest of this file: there is no RLS behind them because there is nothing
@@ -249,10 +250,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // same time as in SECTION_READ and in the SQL, once the enum value exists.
   certificates: ["super_admin", "finance_admin"],
   discounts: ["super_admin", "finance_admin"],
-  // Read-only by design in this pass. The CRM screen searches, segments and
-  // summarises; it does not edit anyone. Tag editing is a Phase-2 feature that
-  // needs a table to write to before it needs a role gate.
-  customers: [],
+  // Tags only (admin completion Phase 6): admin_customer_tag_* refuse every
+  // other role in the database. Nothing on the screen edits an account.
+  customers: ["super_admin", "support"],
   // An external link. There is nothing here to write.
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.
