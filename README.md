@@ -227,8 +227,8 @@ changed fields before → after. Filters: admin, area, action, date range.
 
 ## Phase-4 sections
 
-Eight additions. Five read real rows, three render a development-only fixture, and
-one is a link to somebody else's product.
+Nine additions. Seven read real rows; Content and Discounts still render a
+development-only fixture (admin completion Phases 9 and 10).
 
 | Section | Data | `SECTION_READ` | `SECTION_WRITE` |
 |---|---|---|---|
@@ -237,10 +237,10 @@ one is a link to somebody else's product.
 | `system-health` | **real**: embedding-pipeline history, refused analytics events, and (since 2026-09-27) every scheduled job's last run via `admin_cron_status()` | `super_admin`, `vendor_ops` | none |
 | `content` | dev-seed | `super_admin` | `super_admin` |
 | `payments` | **real** since 2026-09-28: `admin_payments_ledger()` / `admin_payments_summary()` | `super_admin`, `finance_admin`, `support` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` (nothing on the page writes) |
-| `certificates` | dev-seed | `super_admin` *(see below)* | `super_admin` *(see below)* |
+| `certificates` | **real**: `certificate_orders` and the `certificate_*` RPCs | `super_admin`, `finance_admin` *(see below)* | `super_admin`, `finance_admin` *(see below)* |
 | `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
 | `customers` | **real** since 2026-09-28: `admin_customer_list()`, `admin_customer_segment_counts()`, tags | `super_admin`, `support`, `finance_admin` | `super_admin`, `support` (tags only; the RPCs refuse anyone else) |
-| `traction` | external link | all roles | none |
+| `traction` | **real** since 2026-09-28: `admin_live_activity()`, plus links to Microsoft Clarity | all roles | none |
 
 **Read the gates on the dev-seed rows differently from the rest of this file.**
 `roles.ts` is UX everywhere, and the database is the real gate — but for the
@@ -409,25 +409,27 @@ all) reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail(
   Accounts, which opens pre-searched from `?q=` (the account id), and the vendor links to its
   detail page.
 
-### Live Activity is a link, not a feature
+### Live Activity (2026-09-28)
 
-Microsoft Clarity, and only one analytics tool: two scripts on the buyer site
-means two consent banners, two sets of numbers that disagree in meetings, and
-twice the page weight on the mobile connections this marketplace actually runs
-on. Clarity over PostHog because it is free with no event cap (a video feed
-generates a lot of events) and session recordings are the core product, which is
-what "where in the RFQ form do vendors give up" actually needs. PostHog is the
-better answer if the need turns out to be funnels and cohorts; switching is one
-URL plus the snippet on the buyer site.
+`/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`
+through `lib/liveActivity.ts` (textile-spark-net migration `20260928145827`, admin completion
+Phase 8). The figures are Cosora's own, from the buyer site's event log (`engagement_events`):
+- visitors in the last 5 minutes and over a chosen window (15 minutes to 24 hours), signed in
+  and guest;
+- events per minute for the last hour, and events by type;
+- the most-viewed products, the busiest sellers (buyer actions, impressions left out), and
+  searches made by at least 3 different visitors (a rarer one could identify its author).
 
-**No iframe.** Clarity sends `X-Frame-Options: SAMEORIGIN` and sits behind a
-separate Microsoft login, so an embed renders an empty box or a sign-in screen —
-worse than an honest link. There is no visitor tracking, no new table and no
-query in this repo for it.
+It asks again every 30 seconds and pauses while the tab is hidden. A seller links to its detail
+page only for roles that can open it.
 
-Set `VITE_CLARITY_PROJECT_ID` here and add the Clarity snippet to
-textile-spark-net's `index.html`. Until both are done the page says so and the
-links go to the Clarity project list.
+**Recordings and heatmaps are Microsoft Clarity's**, by link: Clarity's dashboard refuses to
+load in a frame and sits behind a Microsoft sign-in. With `VITE_CLARITY_PROJECT_ID` set, the page
+links straight to Cosora's dashboard, recordings and heatmaps; without it, it says Clarity isn't
+connected. The buyer site loads Clarity only when the same variable is set in its Vercel project
+(textile-spark-net `src/lib/analytics/clarity.ts`, with sensitive screens masked). One analytics
+tool, not two: two scripts would mean two sets of numbers that disagree and twice the weight on
+mobile connections.
 
 ---
 

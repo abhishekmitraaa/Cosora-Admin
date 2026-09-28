@@ -201,9 +201,10 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   discounts: ["super_admin", "finance_admin"],
   customers: ["super_admin", "support", "finance_admin"],
   leads: ["super_admin", "vendor_ops", "product_moderator", "support"],
-  // The hosted analytics dashboard, reached by an external link. Every role,
-  // matching `reports` - this panel already shows all-time revenue to all six
-  // roles, so site traffic is not a narrower secret than what is on that page.
+  // Live Activity: admin_live_activity() (admin completion Phase 8) admits every
+  // active admin, plus links out to Microsoft Clarity. Every role, matching
+  // `reports` - this panel already shows all-time revenue to every role, so site
+  // traffic is not a narrower secret than what is on that page.
   traction: ALL_ROLES,
   // admin_audit_log_list() and admin_audit_log_actors() admit exactly these two.
   "admin-log": ["super_admin", "manager"],
@@ -259,7 +260,7 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   customers: ["super_admin", "support"],
   // Read-only: nothing on the page changes an RFQ or a quote.
   leads: [],
-  // An external link. There is nothing here to write.
+  // Read-only: nothing on Live Activity writes.
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.
   "admin-log": [],

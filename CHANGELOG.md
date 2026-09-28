@@ -9,6 +9,18 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-28 (admin completion, Phase 8): **Live Activity shows the buyer site now.** It used to be only a link to Microsoft Clarity.
+  - `pages/LiveActivity.tsx` reads `admin_live_activity()` through `lib/liveActivity.ts`. The migration is in textile-spark-net (`20260928145827`).
+    - Visitors in the last 5 minutes and over a chosen window (15 minutes to 24 hours), signed in and guest.
+    - Events per minute for the last hour (a Recharts bar chart on the token colours), and events by type.
+    - The most-viewed products, the busiest sellers, and searches made by at least 3 different visitors.
+    - It asks again every 30 seconds and pauses in a hidden tab. A seller links to its detail page for roles that can open it.
+  - The Clarity links (dashboard, recordings, heatmaps) show when `VITE_CLARITY_PROJECT_ID` is set; otherwise the page says how to connect it.
+  - `roles.ts` comments for `traction` updated; the section is unchanged (every role reads, nobody writes).
+  - README: the Phase-4 sections table now marks Certificates and Live Activity real.
+  - `database.types.ts` regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0; the bundle calls `admin_live_activity`. A local render with every Supabase request answered in the browser: every panel for super_admin and product_moderator, the role-gated seller link, the window switch, and polling that stops in a hidden tab. Harness `12` in textile-spark-net: 13/13, rehearsed and live.
+
 - 2026-09-28 (admin completion, Phase 7): **Leads: the RFQ pipeline.** A new read-only page.
   - `pages/Leads.tsx` at `/leads`, under Insight in the nav. It reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail()` through `lib/leads.ts`. The migration is in textile-spark-net (`20260928071643`).
     - Stage chips: new, unanswered, overdue, quoted, won, closed.
