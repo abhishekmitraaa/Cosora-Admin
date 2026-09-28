@@ -2917,6 +2917,7 @@ export type Database = {
           id: string
         }[]
       }
+      admin_live_activity: { Args: { p_minutes?: number }; Returns: Json }
       admin_payments_ledger: {
         Args: {
           p_cursor_at?: string

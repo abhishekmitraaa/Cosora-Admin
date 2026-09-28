@@ -1,165 +1,348 @@
-import { ExternalLink } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { format } from "date-fns";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Activity, ExternalLink, Eye, MousePointerClick, Users } from "lucide-react";
+import { useRole } from "@/hooks/useAdminSession";
+import { canSee } from "@/lib/roles";
+import { tokenColor, useResolvedTheme } from "@/lib/theme";
+import { EVENT_LABELS, LIVE_REFRESH_MS, WINDOWS, useLiveActivity, type LiveActivity as Live } from "@/lib/liveActivity";
 import {
+  Badge,
   Button,
-  Notice,
+  Empty,
+  ErrorNote,
   Note,
+  Notice,
   Page,
   PageHeader,
   Panel,
+  Select,
+  SkeletonList,
   Stack,
+  Stat,
 } from "@/components/ui";
 
 /**
- * PART D - LIVE WEBSITE TRACTION.
+ * LIVE ACTIVITY: the buyer site right now (admin completion Phase 8; Mitra's choice,
+ * "native dashboard + Clarity").
  *
- * THIS IS A LINK, NOT A FEATURE. No Cosora schema, no query, no table, no
- * tracking code in this repo. Visitor analytics is a solved third-party
- * problem and building a custom one would mean a page-view table, a session
- * model, a bot filter and a consent story, all to reproduce something free.
+ * The figures are Cosora's own. admin_live_activity() (lib/liveActivity.ts) reads the
+ * event log the buyer site already writes: product and storefront views, searches,
+ * clicks, button taps and ad impressions. The page asks again every 30 seconds and
+ * pauses while its tab is hidden.
  *
- * MICROSOFT CLARITY, NOT POSTHOG. One, not both, because two analytics scripts
- * on the buyer site means two consent banners, two sets of numbers that
- * disagree, and twice the page weight on the mobile connections this
- * marketplace actually runs on. Clarity wins here on three specifics:
+ * Session recordings and heatmaps are Microsoft Clarity's, reached by link. Clarity's
+ * dashboard sends X-Frame-Options and sits behind a Microsoft sign-in, so it can't be
+ * embedded here. The buyer site loads Clarity only in production and only when
+ * VITE_CLARITY_PROJECT_ID is set (textile-spark-net lib/analytics/clarity.ts), with
+ * sign-in, chats, onboarding, KYC, profile, requirement and billing screens masked.
  *
- *   - It is free with no event cap. PostHog's free tier meters events, and a
- *     marketplace with a video feed generates a lot of them.
- *   - Session recordings and heatmaps are the core product, not an add-on.
- *     "Which part of the RFQ form do vendors abandon" is the question this
- *     panel's users actually have, and that is a recording question.
- *   - It needs no self-hosting decision.
- *
- * PostHog is the better choice if the need turns out to be product analytics
- * (funnels, cohorts, feature flags) rather than watching sessions. Switching is
- * a change to one URL here plus the script on the buyer site.
- *
- * NO IFRAME. Clarity's dashboard sends `X-Frame-Options: SAMEORIGIN` and is
- * behind a Microsoft account login, so an embed renders a blank box or a login
- * page. A blank box that is supposed to be a dashboard is worse than a link, so
- * this is a clearly labelled link out.
- *
- * roles.ts, section "traction": every role, matching `reports`. Write: nobody,
- * because there is nothing here to write.
+ * roles.ts section "traction": every role reads it, nobody writes. Seller names link
+ * to their detail page only for the roles that can open it.
  */
+
+/** Not a secret: it is in the tag URL every buyer-site visitor downloads. */
+const CLARITY_ID = (import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined)?.trim() || null;
+const CLARITY = CLARITY_ID
+  ? {
+      dashboard: `https://clarity.microsoft.com/projects/view/${CLARITY_ID}/dashboard`,
+      recordings: `https://clarity.microsoft.com/projects/view/${CLARITY_ID}/impressions`,
+      heatmaps: `https://clarity.microsoft.com/projects/view/${CLARITY_ID}/heatmaps`,
+    }
+  : null;
+
+type Minute = Live["per_minute"][number];
+
+/** Chart colours from the token set, re-read when the theme flips (as on Reports). */
+function useChartInk() {
+  useResolvedTheme();
+  return {
+    series: tokenColor("viz-series"),
+    grid: tokenColor("viz-grid"),
+    axis: tokenColor("viz-axis"),
+    axisText: tokenColor("ink-faint"),
+    hover: tokenColor("surface-2"),
+  };
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
+
+function MinuteTooltip({ active, payload }: { active?: boolean; payload?: { payload: Minute }[] }) {
+  if (!active || !payload?.length) return null;
+  const m = payload[0].payload;
+  return (
+    <div className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-ink shadow-card">
+      <div className="font-semibold tabular-nums">{format(new Date(m.minute), "HH:mm")}</div>
+      <div className="text-ink-muted">
+        {plural(m.events, "event")} · {plural(m.visitors, "visitor")}
+      </div>
+    </div>
+  );
+}
 
 /**
- * The Clarity project id, from the environment rather than hardcoded: it
- * differs between the staging and production properties, and it is not a
- * secret (it ships in the buyer site's own tracking snippet).
+ * A ranked list for a half-width panel. Not <Table>: its 640px minimum width would
+ * scroll the figures out of sight at this size.
  */
-const PROJECT_ID = import.meta.env.VITE_CLARITY_PROJECT_ID as string | undefined;
-
-const DASHBOARD = PROJECT_ID
-  ? `https://clarity.microsoft.com/projects/view/${PROJECT_ID}/dashboard`
-  : "https://clarity.microsoft.com/projects";
-
-const RECORDINGS = PROJECT_ID
-  ? `https://clarity.microsoft.com/projects/view/${PROJECT_ID}/impressions`
-  : null;
-
-const HEATMAPS = PROJECT_ID
-  ? `https://clarity.microsoft.com/projects/view/${PROJECT_ID}/heatmaps`
-  : null;
+function RankList({
+  rows,
+}: {
+  rows: { key: string; primary: ReactNode; secondary?: ReactNode; figure: string; detail?: string }[];
+}) {
+  return (
+    <ol className="divide-y divide-line text-sm">
+      {rows.map((r, i) => (
+        <li key={r.key} className="flex items-center justify-between gap-3 py-2">
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <span className="w-4 shrink-0 text-right text-2xs tabular-nums text-ink-faint">{i + 1}</span>
+            <div className="min-w-0">
+              <div className="truncate text-ink">{r.primary}</div>
+              {r.secondary && <div className="truncate text-2xs text-ink-faint">{r.secondary}</div>}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="font-semibold tabular-nums text-ink">{r.figure}</div>
+            {r.detail && <div className="text-2xs tabular-nums text-ink-faint">{r.detail}</div>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function LiveActivity() {
+  const role = useRole();
+  const ink = useChartInk();
+  const [minutes, setMinutes] = useState<number>(60);
+  const live = useLiveActivity(minutes);
+  const windowLabel = WINDOWS.find((w) => w.minutes === minutes)?.label ?? `Last ${minutes} minutes`;
+  const linkVendors = canSee(role, "vendors");
+
+  const header = (
+    <PageHeader
+      title="Live Activity"
+      subtitle="What people are doing on the buyer site right now, from Cosora's own event log."
+      actions={
+        <Select aria-label="Window" value={String(minutes)} onChange={(e) => setMinutes(Number(e.target.value))}>
+          {WINDOWS.map((w) => (
+            <option key={w.minutes} value={w.minutes}>
+              {w.label}
+            </option>
+          ))}
+        </Select>
+      }
+    />
+  );
+
+  if (live.isLoading) {
+    return (
+      <Page>
+        {header}
+        <SkeletonList rows={3} height="h-40" />
+      </Page>
+    );
+  }
+  if (live.error) {
+    return (
+      <Page>
+        {header}
+        <ErrorNote message={(live.error as Error).message} />
+      </Page>
+    );
+  }
+
+  const d = live.data!;
+  const lastHourEvents = d.per_minute.reduce((s, m) => s + m.events, 0);
+  const count = (t: (typeof EVENT_LABELS)[number][0]) => d.by_type[t] ?? 0;
+
   return (
     <Page>
-      <PageHeader
-        title="Live Activity"
-        subtitle="Visitor traffic and session recordings for the buyer-facing site, in Microsoft Clarity."
-      />
+      {header}
 
       <Stack>
-        {!PROJECT_ID && (
-          <Notice tone="caution" title="Clarity is not configured yet">
-            <p className="mt-1">
-              Set <span className="font-mono text-2xs">VITE_CLARITY_PROJECT_ID</span> in this panel's{" "}
-              <span className="font-mono text-2xs">.env</span> to the Clarity project id, and add the
-              Clarity tracking snippet to textile-spark-net's{" "}
-              <span className="font-mono text-2xs">index.html</span>. Until both are done the links
-              below go to the Clarity project list rather than straight to Cosora's dashboard, and
-              there is no traffic data to see.
-            </p>
-          </Notice>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Badge tone="neutral">
+            refreshes every {LIVE_REFRESH_MS / 1000} s while this tab is open
+            {live.dataUpdatedAt ? ` · updated ${format(new Date(live.dataUpdatedAt), "HH:mm:ss")}` : ""}
+          </Badge>
+          {live.isFetching && <span className="text-2xs text-ink-faint">Updating…</span>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat
+            icon={<Activity size={18} />}
+            label="Active, last 5 minutes"
+            value={d.active_now.visitors.toLocaleString("en-IN")}
+            sub={`${d.active_now.signed_in} signed in · ${d.active_now.guests} guests`}
+            tone={d.active_now.visitors > 0 ? "positive" : undefined}
+          />
+          <Stat
+            icon={<Users size={18} />}
+            label={`Visitors, ${windowLabel.toLowerCase()}`}
+            value={d.active_window.visitors.toLocaleString("en-IN")}
+            sub={`${d.active_window.signed_in} signed in · ${d.active_window.guests} guests`}
+          />
+          <Stat
+            icon={<Eye size={18} />}
+            label={`Product views, ${windowLabel.toLowerCase()}`}
+            value={count("product_view").toLocaleString("en-IN")}
+            sub={`${plural(count("profile_view"), "storefront view")}`}
+          />
+          <Stat
+            icon={<MousePointerClick size={18} />}
+            label={`Events, ${windowLabel.toLowerCase()}`}
+            value={d.active_window.events.toLocaleString("en-IN")}
+            sub={`${count("ad_impression").toLocaleString("en-IN")} ${count("ad_impression") === 1 ? "is an ad impression" : "are ad impressions"}`}
+          />
+        </div>
 
         <Panel
-          title="Open the dashboard"
-          description="Traffic, referrers, devices, rage clicks and dead clicks, plus session recordings of real visits."
+          title="The last 60 minutes"
+          description="Events per minute, whatever the window above. Hover a bar for its visitors."
         >
-          <div className="flex flex-wrap gap-2">
-            <a href={DASHBOARD} target="_blank" rel="noopener noreferrer">
-              <Button variant="primary">
-                Open Clarity <ExternalLink size={14} />
-              </Button>
-            </a>
-            {RECORDINGS && (
-              <a href={RECORDINGS} target="_blank" rel="noopener noreferrer">
+          {lastHourEvents === 0 ? (
+            <Empty>Nothing was tracked on the buyer site in the last hour.</Empty>
+          ) : (
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={d.per_minute} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid stroke={ink.grid} vertical={false} />
+                  <XAxis
+                    dataKey="minute"
+                    interval={9}
+                    tickFormatter={(v: string) => format(new Date(v), "HH:mm")}
+                    tick={{ fontSize: 11, fill: ink.axisText }}
+                    stroke={ink.axis}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: ink.axisText }}
+                    stroke={ink.axis}
+                    width={32}
+                  />
+                  <Tooltip content={<MinuteTooltip />} cursor={{ fill: ink.hover }} />
+                  <Bar dataKey="events" fill={ink.series} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel title="Most-viewed products" description={windowLabel}>
+            {d.top_products.length === 0 ? (
+              <Empty>No product was viewed in this window.</Empty>
+            ) : (
+              <RankList
+                rows={d.top_products.map((p) => ({
+                  key: p.id,
+                  primary: p.name ?? "Removed product",
+                  secondary: p.vendor ?? undefined,
+                  figure: plural(p.views, "view"),
+                  detail: plural(p.visitors, "visitor"),
+                }))}
+              />
+            )}
+          </Panel>
+
+          <Panel
+            title="Busiest sellers"
+            description={`${windowLabel}. Buyer actions: views, clicks and button taps; impressions are left out.`}
+          >
+            {d.top_vendors.length === 0 ? (
+              <Empty>No buyer action reached a seller in this window.</Empty>
+            ) : (
+              <RankList
+                rows={d.top_vendors.map((v) => ({
+                  key: v.id,
+                  primary: linkVendors ? (
+                    <Link to={`/vendors/${v.id}`} className="underline-offset-2 hover:underline">
+                      {v.name ?? "Unnamed vendor"}
+                    </Link>
+                  ) : (
+                    (v.name ?? "Unnamed vendor")
+                  ),
+                  figure: plural(v.actions, "action"),
+                  detail: plural(v.visitors, "visitor"),
+                }))}
+              />
+            )}
+          </Panel>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel
+            title="Searches"
+            description="Shown only once at least 3 different visitors made the same search in this window. A rarer one could identify the person who typed it."
+          >
+            {d.top_searches.length === 0 ? (
+              <Empty>No search reached 3 different visitors in this window.</Empty>
+            ) : (
+              <RankList
+                rows={d.top_searches.map((s) => ({ key: s.query, primary: s.query, figure: plural(s.visitors, "visitor") }))}
+              />
+            )}
+          </Panel>
+
+          <Panel title="Events by type" description={windowLabel}>
+            <ul className="divide-y divide-line text-sm">
+              {EVENT_LABELS.map(([type, label]) => (
+                <li key={type} className="flex items-center justify-between gap-3 py-2">
+                  <span className="text-ink-muted">{label}</span>
+                  <span className="font-semibold tabular-nums text-ink">{count(type).toLocaleString("en-IN")}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </div>
+
+        <Note>
+          <span className="font-semibold text-ink">What counts.</span> A visitor is a signed-in account, or a
+          signed-out browser tab session, so one signed-out person with two tabs counts twice. Active means at
+          least one tracked event: viewing a product or a storefront, searching, clicking a result or an ad,
+          tapping call, message or WhatsApp, or loading a page with sponsored cards. Someone reading a page
+          without doing any of those isn't counted.
+        </Note>
+
+        {CLARITY ? (
+          <Panel
+            title="Recordings and heatmaps"
+            description="Microsoft Clarity: replays of real visits, heatmaps, rage and dead clicks."
+          >
+            <div className="flex flex-wrap gap-2">
+              <a href={CLARITY.dashboard} target="_blank" rel="noopener noreferrer">
+                <Button variant="primary">
+                  Open Clarity <ExternalLink size={14} />
+                </Button>
+              </a>
+              <a href={CLARITY.recordings} target="_blank" rel="noopener noreferrer">
                 <Button>
                   Session recordings <ExternalLink size={14} />
                 </Button>
               </a>
-            )}
-            {HEATMAPS && (
-              <a href={HEATMAPS} target="_blank" rel="noopener noreferrer">
+              <a href={CLARITY.heatmaps} target="_blank" rel="noopener noreferrer">
                 <Button>
                   Heatmaps <ExternalLink size={14} />
                 </Button>
               </a>
-            )}
-          </div>
-
-          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            These open in a new tab and need a Microsoft account with access to the Cosora Clarity
-            project. Signing in to this admin panel does not sign you in there.
-          </p>
-        </Panel>
-
-        {/*
-          Said plainly, because the obvious next question when someone sees a
-          nav item called Live Activity is "why is the data not on this page".
-        */}
-        <Note>
-          <span className="font-semibold text-ink">Why this is a link and not a dashboard.</span>{" "}
-          Clarity's pages send an <span className="font-mono text-2xs">X-Frame-Options</span> header
-          that blocks framing, and they sit behind a separate Microsoft login, so an embed here would
-          render an empty box or a sign-in screen. A blank panel that is supposed to be a dashboard
-          is worse than an honest link, so this page does not pretend to be one.
-          <br />
-          <br />
-          Nothing on this page reads Cosora's database. There is no visitor tracking in this repo and
-          none was added: page views, sessions and bot filtering are a solved third-party problem, and
-          rebuilding them here would mean a new table, a session model and a consent story to
-          reproduce something that already exists.
-        </Note>
-
-        <Panel
-          title="One analytics tool, deliberately"
-          description="Clarity was picked over PostHog and only one is wired up."
-        >
-          <ul className="space-y-2 text-sm leading-relaxed text-ink-muted">
-            <li>
-              <span className="font-medium text-ink">Two would be worse than one.</span> Two scripts
-              on the buyer site means two consent banners, two sets of numbers that disagree in
-              meetings, and twice the page weight on the mobile connections this marketplace runs on.
-            </li>
-            <li>
-              <span className="font-medium text-ink">Clarity is free with no event cap</span>, and a
-              buyer feed built around video generates a lot of events. PostHog's free tier meters
-              them.
-            </li>
-            <li>
-              <span className="font-medium text-ink">Recordings are the point.</span> The question
-              this panel's users have is "where in the RFQ form do vendors give up", and that is a
-              session-recording question rather than a funnel one.
-            </li>
-            <li>
-              <span className="font-medium text-ink">PostHog is the better answer</span> if the need
-              turns out to be product analytics: funnels, cohorts and feature flags. Switching is one
-              URL in this file plus the snippet on the buyer site.
-            </li>
-          </ul>
-        </Panel>
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+              These open in a new tab and need a Microsoft account with access to the Cosora Clarity project.
+              Signing in here doesn't sign you in there. Clarity can't be embedded on this page: its dashboard
+              refuses to load in a frame.
+            </p>
+          </Panel>
+        ) : (
+          <Notice tone="caution" title="Clarity isn't connected yet">
+            <p className="mt-1">
+              Session recordings and heatmaps come from Microsoft Clarity, which isn't set up. To turn it on:
+              create a Clarity project, set <span className="font-mono text-2xs">VITE_CLARITY_PROJECT_ID</span> to
+              its id in both Vercel projects (the buyer site loads Clarity; this panel links to it), set the
+              project's masking mode to Strict, and redeploy both. The figures above don't depend on it.
+            </p>
+          </Notice>
+        )}
       </Stack>
     </Page>
   );
