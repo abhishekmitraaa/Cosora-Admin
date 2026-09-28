@@ -9,6 +9,17 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-28 (admin completion, Phase 5): **Payments is a real ledger.** The dev-seed fixture is gone.
+  - `pages/Payments.tsx` reads `admin_payments_ledger()` and `admin_payments_summary()`, in `lib/payments.ts`. The migration is in textile-spark-net (`20260928043917`).
+    - One row per money movement: subscription payments, refunds as negative rows, unfinished checkouts, and ad and certificate orders.
+    - Every amount is in paise. The totals use Reports' definitions and describe exactly the filtered rows.
+  - Filters, a debounced literal search and keyset paging ("Load more", 50 rows at a time) run in the database, so the page doesn't grow with the data.
+  - The Latest strip asks again every 30 seconds, pauses in hidden tabs, and says when it last asked.
+  - Paid rows without a Razorpay payment id (demo-mode activations) are totalled and flagged, as on Reports.
+  - `lib/money.ts` holds `inrFromPaise()`. `components/ui.tsx` adds tones for `abandoned` and `review`.
+  - `lib/devSeed/payments.ts` is deleted. `database.types.ts` is regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0; the bundle calls the RPCs, and none of the payments fixture strings are in `dist/`. Harness `09` in textile-spark-net: 19/19, rehearsed and live.
+
 - 2026-09-28 (admin completion, Phase 4a): **Vendor detail reads a vendor's private fields through `admin_vendor_private()`.**
   - A vendor's PAN, owner email, phone, WhatsApp and street address became private on Mitra's decision (2026-09-27). The migrations are in textile-spark-net (`20260927184250`, `20260927185902`); Phase 4b revokes the columns once both apps are live.
   - `pages/VendorDetail.tsx` selects public columns only and merges the eight fields from `admin_vendor_private()` (super_admin, vendor_ops, support, finance_admin). A refused role sees the public fields and a note. WhatsApp is shown too.
