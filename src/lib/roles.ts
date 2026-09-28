@@ -180,8 +180,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // NOT support/finance/ads: a stalled embedding queue is not something those
   // roles can act on.
   "system-health": ["super_admin", "vendor_ops"],
-  // Site banners and theme are brand-level configuration. Starting at
-  // super_admin only; widen deliberately if a marketing role is ever added.
+  // Site banners and theme are brand-level configuration: super_admin only,
+  // mirroring admin.require_content_admin() in the admin_site_* RPCs (admin
+  // completion Phase 9). Widen both together if a marketing role is ever added.
   content: ["super_admin"],
   // Finance reads and acts; support reads, because "did this vendor's payment
   // land" is a support question. Mirrors the subscriptions split.
