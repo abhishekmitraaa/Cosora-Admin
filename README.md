@@ -227,7 +227,7 @@ changed fields before → after. Filters: admin, area, action, date range.
 
 ## Phase-4 sections
 
-Eight additions. Four read real rows, four render a development-only fixture, and
+Eight additions. Five read real rows, three render a development-only fixture, and
 one is a link to somebody else's product.
 
 | Section | Data | `SECTION_READ` | `SECTION_WRITE` |
@@ -239,7 +239,7 @@ one is a link to somebody else's product.
 | `payments` | **real** since 2026-09-28: `admin_payments_ledger()` / `admin_payments_summary()` | `super_admin`, `finance_admin`, `support` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` (nothing on the page writes) |
 | `certificates` | dev-seed | `super_admin` *(see below)* | `super_admin` *(see below)* |
 | `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
-| `customers` | dev-seed | `super_admin`, `support`, `finance_admin` | none |
+| `customers` | **real** since 2026-09-28: `admin_customer_list()`, `admin_customer_segment_counts()`, tags | `super_admin`, `support`, `finance_admin` | `super_admin`, `support` (tags only; the RPCs refuse anyone else) |
 | `traction` | external link | all roles | none |
 
 **Read the gates on the dev-seed rows differently from the rest of this file.**
@@ -325,7 +325,7 @@ After any change there:
 
 ```bash
 npm run build
-grep -c "TIRUPPUR500\|banner-seed-1\|cert-seed-01\|cust-seed-01" dist/assets/*.js   # must be 0
+grep -c "TIRUPPUR500\|banner-seed-1\|cert-seed-01" dist/assets/*.js   # must be 0
 ```
 
 ### Certificates is built on an unconfirmed decision
@@ -374,6 +374,25 @@ per money movement:
 - **The Latest strip is polling, not a push.** It asks again every 30 seconds, pauses while
   the tab is hidden, and says when it last asked. It doesn't animate: a ticker reads as
   money arriving right now.
+
+### Customers: a summary refreshed on demand (2026-09-28)
+
+`admin_customer_list()`, `admin_customer_segment_counts()` and the tag RPCs (textile-spark-net
+migration `20260928070410`, admin completion Phase 6) read `admin.customer_summary`.
+- **The summary** is a materialized view with one row per account that isn't deleted and
+  isn't active Cosora staff. It holds joined and last-active times (sign-in, message, RFQ,
+  quote), an interaction count, and lifetime spend in paise (paid subscriptions with GST and
+  ad orders, less refunds).
+- **Refresh:** the page calls `admin_customer_refresh()` on open, and the button calls it too.
+  The database rebuilds the view at most once every 10 minutes (concurrently, one at a time)
+  and otherwise answers with the current data's time, which the header shows. There is no
+  scheduled job.
+- **Segments** are computed at read time from the stored times (`admin.customer_rows`), so
+  "active" or "at risk" is never out of date between refreshes. The rules are written on the
+  page, and `lib/customers.ts` carries the same sentences.
+- **Tags** (`admin.customer_tags`, `admin.profile_tags`) are live tables, and every change is
+  in the Admin Log. super_admin and support add, apply, remove and delete them.
+- A phone sign-in account's placeholder email shows as "Phone sign-in".
 
 ### Live Activity is a link, not a feature
 

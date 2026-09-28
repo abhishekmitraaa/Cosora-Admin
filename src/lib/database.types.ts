@@ -2631,6 +2631,57 @@ export type Database = {
           schedule: string
         }[]
       }
+      admin_customer_list: {
+        Args: {
+          p_kind?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_segment?: string
+          p_sort?: string
+          p_tag?: string
+        }
+        Returns: {
+          account_status: string
+          city: string
+          email: string
+          id: string
+          interactions: number
+          joined_at: string
+          kind: string
+          last_active_at: string
+          name: string
+          payments: number
+          segments: string[]
+          spend_paise: number
+          tags: Json
+          total_count: number
+          total_spend_paise: number
+        }[]
+      }
+      admin_customer_refresh: { Args: never; Returns: Json }
+      admin_customer_segment_counts: { Args: never; Returns: Json }
+      admin_customer_tag_apply: {
+        Args: { p_profile_id: string; p_tag_id: string }
+        Returns: undefined
+      }
+      admin_customer_tag_create: { Args: { p_label: string }; Returns: string }
+      admin_customer_tag_delete: {
+        Args: { p_tag_id: string }
+        Returns: undefined
+      }
+      admin_customer_tag_remove: {
+        Args: { p_profile_id: string; p_tag_id: string }
+        Returns: undefined
+      }
+      admin_customer_tags: {
+        Args: never
+        Returns: {
+          id: string
+          label: string
+          uses: number
+        }[]
+      }
       admin_embedding_pipeline_health: {
         Args: { p_limit?: number }
         Returns: {

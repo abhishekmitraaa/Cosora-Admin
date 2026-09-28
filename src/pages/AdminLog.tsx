@@ -72,6 +72,8 @@ const AREAS: Record<string, string> = {
   "public.vendor_subscriptions": "Subscription",
   "public.subscription_invoices": "Invoice (refund)",
   "public.subscription_plans": "Subscription plan",
+  "admin.customer_tags": "Customer tag",
+  "admin.profile_tags": "Customer tag on an account",
 };
 
 const ACTIONS: Record<string, { label: string; tone: Tone }> = {

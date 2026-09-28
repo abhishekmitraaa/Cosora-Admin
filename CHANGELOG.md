@@ -9,6 +9,16 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-28 (admin completion, Phase 6): **Customers is real.** The dev-seed fixture is gone.
+  - `pages/Customers.tsx` reads `admin_customer_list()`, `admin_customer_segment_counts()` and `admin_customer_tags()` through `lib/customers.ts`. The migration is in textile-spark-net (`20260928070410`).
+    - One row per customer account (Cosora staff left out), with segment chips counted in the database.
+    - Server-side search, side, tag, segment and sort, 50 rows at a time.
+  - The page refreshes the database summary on open (at most once every 10 minutes, no scheduled job) and shows "Data as of HH:mm" with a Refresh button.
+  - **Tags:** super_admin and support create, apply, remove and delete them (`roles.ts` `customers` write is now those two). The Admin Log names them ("Customer tag", "Customer tag on an account").
+  - Phone sign-in placeholder emails show as "Phone sign-in". A suspended account is badged.
+  - `lib/devSeed/customers.ts` is deleted. `database.types.ts` is regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0; the bundle calls `admin_customer_list`, and no customer fixture string is in `dist/`. Harness `10` in textile-spark-net: 21/21, rehearsed and live.
+
 - 2026-09-28 (admin completion, Phase 5): **Payments is a real ledger.** The dev-seed fixture is gone.
   - `pages/Payments.tsx` reads `admin_payments_ledger()` and `admin_payments_summary()`, in `lib/payments.ts`. The migration is in textile-spark-net (`20260928043917`).
     - One row per money movement: subscription payments, refunds as negative rows, unfinished checkouts, and ad and certificate orders.
