@@ -108,6 +108,16 @@ thing the flagged-items log does **not** cover: `admin_flags_entity_type_check` 
 `('vendor','product','ad','conversation')` and **not `'video'`**, so the Videos screen has
 no `<FlagLog />`. Adding one is a constraint migration, not a UI change.
 
+### Vendor private fields (2026-09-28)
+
+A vendor's PAN, owner email, phone, WhatsApp and street address (`address_line`, `area`,
+`landmark`, `postal_code`) are private columns (admin completion Phase 4). Never select them
+from `vendor_profiles`. Vendor detail reads them through `admin_vendor_private(ids)`, which
+serves super_admin, vendor_ops, support and finance_admin and refuses any other role with
+`42501`; the page then says the fields are private. GSTIN, CIN, owner name, city, state and
+website stay ordinary columns. Once Phase 4b revokes the table-wide SELECT, a `select("*")` on
+`vendor_profiles` fails.
+
 ### Chat moderation (Phase 3)
 
 These are the sections where `support` is **not** read-only — reviewing chats is

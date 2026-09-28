@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-28 (admin completion, Phase 4a): **Vendor detail reads a vendor's private fields through `admin_vendor_private()`.**
+  - A vendor's PAN, owner email, phone, WhatsApp and street address became private on Mitra's decision (2026-09-27). The migrations are in textile-spark-net (`20260927184250`, `20260927185902`); Phase 4b revokes the columns once both apps are live.
+  - `pages/VendorDetail.tsx` selects public columns only and merges the eight fields from `admin_vendor_private()` (super_admin, vendor_ops, support, finance_admin). A refused role sees the public fields and a note. WhatsApp is shown too.
+  - `lib/database.types.ts` regenerated from the live schema: the three new functions, `vendor_profiles.has_phone` / `has_whatsapp`, and `approve_vendor_content_bulk` gone.
+  - Verified: `npm run typecheck` 0, `npm run build` 0, the bundle calls `admin_vendor_private`, and no file in `src/` selects a private column.
+
 - 2026-09-27 (admin completion, Phase 3): **Whole review actions, videos-only bulk approval, one ad-reason list, plan changes with reasons, Reports from the database.**
   - `pages/ChatReview.tsx`: Block is one call, `block_account_from_review()`. The two-request flow, and its "suspended but still pending" recovery message, are gone.
   - `pages/Videos.tsx`: "Approve all videos for vendor" uses `approve_vendor_videos_bulk()`, which returns the count; the modal says videos only. The before-and-after recount is gone.

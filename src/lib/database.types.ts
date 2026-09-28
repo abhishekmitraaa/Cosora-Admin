@@ -2118,6 +2118,8 @@ export type Database = {
           employee_count: string | null
           followers_count: number
           gstin: string | null
+          has_phone: boolean | null
+          has_whatsapp: boolean | null
           id: string
           is_verified: boolean
           landmark: string | null
@@ -2163,6 +2165,8 @@ export type Database = {
           employee_count?: string | null
           followers_count?: number
           gstin?: string | null
+          has_phone?: boolean | null
+          has_whatsapp?: boolean | null
           id: string
           is_verified?: boolean
           landmark?: string | null
@@ -2208,6 +2212,8 @@ export type Database = {
           employee_count?: string | null
           followers_count?: number
           gstin?: string | null
+          has_phone?: boolean | null
+          has_whatsapp?: boolean | null
           id?: string
           is_verified?: boolean
           landmark?: string | null
@@ -2892,6 +2898,20 @@ export type Database = {
         Args: { p_plan_id: string; p_reason: string; p_subscription_id: string }
         Returns: undefined
       }
+      admin_vendor_private: {
+        Args: { p_ids: string[] }
+        Returns: {
+          address_line: string
+          area: string
+          id: string
+          landmark: string
+          owner_email: string
+          pan: string
+          phone: string
+          postal_code: string
+          whatsapp: string
+        }[]
+      }
       admin_whoami: {
         Args: never
         Returns: {
@@ -2909,10 +2929,6 @@ export type Database = {
       }
       approve_vendor_content: {
         Args: { target_id: string; target_table: string }
-        Returns: undefined
-      }
-      approve_vendor_content_bulk: {
-        Args: { target: string }
         Returns: undefined
       }
       approve_vendor_videos_bulk: {
@@ -2948,6 +2964,14 @@ export type Database = {
         Returns: {
           full_name: string
           phone: string
+        }[]
+      }
+      call_vendor_contact: {
+        Args: { p_vendor_id: string }
+        Returns: {
+          brand_name: string
+          phone: string
+          whatsapp: string
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: Json }
@@ -3155,6 +3179,19 @@ export type Database = {
         Returns: {
           email: string
           phone: string
+        }[]
+      }
+      my_vendor_private: {
+        Args: never
+        Returns: {
+          address_line: string
+          area: string
+          landmark: string
+          owner_email: string
+          pan: string
+          phone: string
+          postal_code: string
+          whatsapp: string
         }[]
       }
       next_invoice_number: { Args: never; Returns: string }

@@ -37,6 +37,7 @@ interface VendorDetailRow {
   owner_name: string | null;
   owner_email: string | null;
   phone: string | null;
+  whatsapp: string | null;
   website: string | null;
   address_line: string | null;
   area: string | null;
@@ -50,6 +51,8 @@ interface VendorDetailRow {
   plan_id: string | null;
   plan_expires_at: string | null;
   ad_verified_until: string | null;
+  /** False when admin_vendor_private() refused this admin's role: the eight private fields are then null. */
+  privateVisible: boolean;
 }
 
 export default function VendorDetail() {
@@ -67,17 +70,36 @@ export default function VendorDetail() {
     queryKey: ["vendor", id],
     enabled: Boolean(id),
     queryFn: async (): Promise<VendorDetailRow | null> => {
-      const { data, error } = await supabase
-        .from("vendor_profiles")
-        .select(
-          `id, brand_name, about, city, state, country, business_type, owner_name, owner_email,
-           phone, website, address_line, area, postal_code, landmark, gstin, pan, cin,
-           is_verified, onboarding_complete, plan_id, plan_expires_at, ad_verified_until`,
-        )
-        .eq("id", id!)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return data;
+      // The PAN, owner email, phone, WhatsApp and street address are private columns
+      // (admin completion Phase 4). admin_vendor_private() serves them to super_admin,
+      // vendor_ops, support and finance_admin, and refuses any other role with 42501.
+      const [row, priv] = await Promise.all([
+        supabase
+          .from("vendor_profiles")
+          .select(
+            `id, brand_name, about, city, state, country, business_type, owner_name, website, gstin, cin,
+             is_verified, onboarding_complete, plan_id, plan_expires_at, ad_verified_until`,
+          )
+          .eq("id", id!)
+          .maybeSingle(),
+        supabase.rpc("admin_vendor_private", { p_ids: [id!] }),
+      ]);
+      if (row.error) throw new Error(row.error.message);
+      if (priv.error && priv.error.code !== "42501") throw new Error(priv.error.message);
+      if (!row.data) return null;
+      const p = priv.error ? null : (priv.data?.[0] ?? null);
+      return {
+        ...row.data,
+        pan: p?.pan ?? null,
+        owner_email: p?.owner_email ?? null,
+        phone: p?.phone ?? null,
+        whatsapp: p?.whatsapp ?? null,
+        address_line: p?.address_line ?? null,
+        area: p?.area ?? null,
+        landmark: p?.landmark ?? null,
+        postal_code: p?.postal_code ?? null,
+        privateVisible: !priv.error,
+      };
     },
   });
 
@@ -156,8 +178,15 @@ export default function VendorDetail() {
             <DataField label="Owner" value={v.owner_name} />
             <DataField label="Owner email" value={v.owner_email} />
             <DataField label="Phone" value={v.phone} />
+            <DataField label="WhatsApp" value={v.whatsapp} />
             <DataField label="Website" value={v.website} />
           </dl>
+          {!v.privateVisible && (
+            <Notice tone="caution" className="mt-3 text-xs">
+              PAN, email, phone, WhatsApp and the street address are private. Super admins, vendor
+              ops, support and finance can see them.
+            </Notice>
+          )}
 
           <SubHeading className="mb-1.5 mt-5">Registered address</SubHeading>
           <p className="text-sm text-ink">
