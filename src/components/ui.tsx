@@ -434,6 +434,9 @@ const STATUS_TONE: Record<string, Tone> = {
   processed: "positive",
   succeeded: "positive",
   refunded: "info",
+  // payments ledger (admin completion Phase 5)
+  abandoned: "neutral",
+  review: "caution",
   failed: "critical",
   canceled: "critical",
   cancelled: "critical",

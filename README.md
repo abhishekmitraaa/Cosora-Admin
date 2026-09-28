@@ -82,7 +82,7 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 The Phase-4 sections sit alongside these, and the difference in what is behind
 them matters. `geography` reads the same `vendor_profiles` rows the Vendors table
 lists, so its gate mirrors that one exactly and the database is already enforcing
-it. The five dev-seed sections have no table yet, so `roles.ts` is UX in a
+it. The dev-seed sections have no table yet, so `roles.ts` is UX in a
 stronger sense there than anywhere else in this file: **there is nothing behind
 those gates enforcing anything.** See "Phase-4 sections" below.
 
@@ -227,7 +227,7 @@ changed fields before → after. Filters: admin, area, action, date range.
 
 ## Phase-4 sections
 
-Eight additions. Two read real rows, five render a development-only fixture, and
+Eight additions. Four read real rows, four render a development-only fixture, and
 one is a link to somebody else's product.
 
 | Section | Data | `SECTION_READ` | `SECTION_WRITE` |
@@ -236,15 +236,15 @@ one is a link to somebody else's product.
 | `geography` | **real** | `super_admin`, `vendor_ops`, `support` | none |
 | `system-health` | **real**: embedding-pipeline history, refused analytics events, and (since 2026-09-27) every scheduled job's last run via `admin_cron_status()` | `super_admin`, `vendor_ops` | none |
 | `content` | dev-seed | `super_admin` | `super_admin` |
-| `payments` | dev-seed | `super_admin`, `finance_admin`, `support` | `super_admin`, `finance_admin` |
+| `payments` | **real** since 2026-09-28: `admin_payments_ledger()` / `admin_payments_summary()` | `super_admin`, `finance_admin`, `support` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` (nothing on the page writes) |
 | `certificates` | dev-seed | `super_admin` *(see below)* | `super_admin` *(see below)* |
 | `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
 | `customers` | dev-seed | `super_admin`, `support`, `finance_admin` | none |
 | `traction` | external link | all roles | none |
 
 **Read the gates on the dev-seed rows differently from the rest of this file.**
-`roles.ts` is UX everywhere, and the database is the real gate — but for those
-five sections there is no database behind them yet, so there is nothing enforcing
+`roles.ts` is UX everywhere, and the database is the real gate — but for the
+dev-seed sections there is no database behind them yet, so there is nothing enforcing
 anything. Do not read a gate there as evidence a write is protected. Phase 2
 creates the tables and their RLS at the same time.
 
@@ -325,7 +325,7 @@ After any change there:
 
 ```bash
 npm run build
-grep -c "TIRUPPUR500\|banner-seed-1\|txn-seed-01\|cert-seed-01\|cust-seed-01" dist/assets/*.js   # must be 0
+grep -c "TIRUPPUR500\|banner-seed-1\|cert-seed-01\|cust-seed-01" dist/assets/*.js   # must be 0
 ```
 
 ### Certificates is built on an unconfirmed decision
@@ -346,21 +346,34 @@ is gated to `super_admin` alone. Naming a role nobody can hold would be worse
 than the narrow gate. `roles.ts` carries the note on exactly where to add it in
 both maps once Phase 2 creates it.
 
-### Payments: the Live strip does not animate
+### Payments: one ledger, from the database (2026-09-28)
 
-There is no Realtime subscription anywhere in this repo and no table behind the
-screen, so a ticking animation would be theatre an admin would reasonably read as
-money arriving right now. The strip renders the most recent rows once, and its
-status chip says "not live yet, no subscription attached".
+`admin_payments_ledger()` and `admin_payments_summary()` (textile-spark-net migration
+`20260928043917`, admin completion Phase 5) read `admin.payment_entries`, a view with one row
+per money movement:
 
-It takes its rows as a prop and does no fetching of its own, so Phase 2 attaches
-a Supabase Realtime channel to its **parent** and the component is unchanged.
+| Row | From | Amount |
+|---|---|---|
+| Subscription payment | `subscription_invoices` | rupees ×100, net + GST |
+| Refund (negative) | the invoice's refund columns | `refunded_amount`, already paise |
+| Unfinished checkout | `subscription_payment_orders` (`created`/`failed`) | paise, GST included |
+| Ad or certificate order | `ad_orders` | paise, no GST line |
 
-`reports` keeps its KPI view untouched. The ledger is seeded rather than derived
-from `subscription_invoices` + `ad_orders` because those are two tables with two
-currency units (rupees vs paise) and two status vocabularies; deriving it
-client-side would mean this screen silently disagreeing with Reports the first
-time either changed. Phase 2 wants one `transactions` table in **one** unit.
+- **Every amount arrives in paise.** The page only formats (`lib/money.ts`); it never
+  multiplies.
+- **One status vocabulary:** paid, pending, abandoned (a checkout unpaid for 24 hours),
+  failed, review (an ad order paid but not fulfilled) and refunded.
+- **Filters, search and paging run in the database.** Paging is keyset on
+  `(occurred_at, entry_key)`, 50 rows at a time. Search is literal text over the vendor's
+  name, the reference and the Razorpay id. Dates are IST days.
+- **The totals describe exactly the filtered rows,** on Reports' definitions (paid invoices
+  by `created_at`, paid ad orders by `paid_at`), so the two pages agree over the same window.
+  Harness `09` in textile-spark-net checks that.
+- **Paid rows with no Razorpay payment id** (demo-mode activations) are totalled and called
+  out, as on Reports.
+- **The Latest strip is polling, not a push.** It asks again every 30 seconds, pauses while
+  the tab is hidden, and says when it last asked. It doesn't animate: a ticker reads as
+  money arriving right now.
 
 ### Live Activity is a link, not a feature
 
