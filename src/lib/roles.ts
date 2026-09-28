@@ -112,6 +112,9 @@ export type Section =
   // Buyer/vendor CRM and segmentation. Distinct from "accounts", which is
   // suspension only.
   | "customers"
+  // The RFQ pipeline (admin completion Phase 7): every buyer request's stage and
+  // how fast vendors answer. Read-only. admin_leads_* admit exactly these roles.
+  | "leads"
   // Third-party website analytics. An external link, not a built feature.
   | "traction"
   // Every admin's changes and sign-ins, with date and time (MPF-26). Mirrors
@@ -197,6 +200,7 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   certificates: ["super_admin", "finance_admin"],
   discounts: ["super_admin", "finance_admin"],
   customers: ["super_admin", "support", "finance_admin"],
+  leads: ["super_admin", "vendor_ops", "product_moderator", "support"],
   // The hosted analytics dashboard, reached by an external link. Every role,
   // matching `reports` - this panel already shows all-time revenue to all six
   // roles, so site traffic is not a narrower secret than what is on that page.
@@ -253,6 +257,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // Tags only (admin completion Phase 6): admin_customer_tag_* refuse every
   // other role in the database. Nothing on the screen edits an account.
   customers: ["super_admin", "support"],
+  // Read-only: nothing on the page changes an RFQ or a quote.
+  leads: [],
   // An external link. There is nothing here to write.
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.
