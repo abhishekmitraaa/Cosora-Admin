@@ -174,7 +174,7 @@ and `vendor_profiles` has one admin field left: `is_verified`.
 
 `/faqs` edits `public.faqs`, the FAQ content on the buyer Help page (`/profile/help` and
 `/help`), the vendor Subscription page, and the seller landing page (`/seller`). It's the
-panel's first real content editor; **Site content** is still dev-seed.
+panel's first real content editor; Site content followed on 2026-09-29.
 
 | Role | FAQs |
 |---|---|
@@ -227,15 +227,15 @@ changed fields before → after. Filters: admin, area, action, date range.
 
 ## Phase-4 sections
 
-Nine additions. Seven read real rows; Content and Discounts still render a
-development-only fixture (admin completion Phases 9 and 10).
+Nine additions. Eight read real rows; Discounts still renders a development-only
+fixture (admin completion Phase 10).
 
 | Section | Data | `SECTION_READ` | `SECTION_WRITE` |
 |---|---|---|---|
 | Ads → Monitoring | **real** | *(inherits `ads`)* | *(inherits `ads`)* |
 | `geography` | **real** | `super_admin`, `vendor_ops`, `support` | none |
 | `system-health` | **real**: embedding-pipeline history, refused analytics events, and (since 2026-09-27) every scheduled job's last run via `admin_cron_status()` | `super_admin`, `vendor_ops` | none |
-| `content` | dev-seed | `super_admin` | `super_admin` |
+| `content` | **real** since 2026-09-29: vendor-dashboard banners and the buyer site's theme (`admin_site_*`) | `super_admin` (the RPCs refuse anyone else) | `super_admin` |
 | `payments` | **real** since 2026-09-28: `admin_payments_ledger()` / `admin_payments_summary()` | `super_admin`, `finance_admin`, `support` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` (nothing on the page writes) |
 | `certificates` | **real**: `certificate_orders` and the `certificate_*` RPCs | `super_admin`, `finance_admin` *(see below)* | `super_admin`, `finance_admin` *(see below)* |
 | `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
@@ -408,6 +408,20 @@ all) reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail(
 - **Paging and links:** the list pages by keyset, 50 at a time. The buyer's name links to
   Accounts, which opens pre-searched from `?q=` (the account id), and the vendor links to its
   detail page.
+
+### Site content (2026-09-29)
+
+`/content` (section `content`, super_admin only) edits two things through `lib/siteContent.ts`
+and the `admin_site_*` RPCs (textile-spark-net migration `20260928195051`, admin completion Phase 9).
+- **Vendor dashboard banners** (Mitra: none on the buyer side): add, edit, reorder, turn on and off,
+  schedule and delete. The destination must be a path on cosora.in. An image (JPEG, PNG or WebP, up
+  to 2 MB) is uploaded to `site-content/banners/` only when the banner is saved; a refused save
+  removes it, and a replaced or deleted banner's image is deleted after the row.
+- **Theme:** the buyer site's five brand colours and two fonts. The page shows the WCAG contrast of
+  text on white and of white on each accent, and blocks a save below 4.5:1 and 3:1, as the database
+  does. "Revert to saved" and "Cosora defaults".
+
+Both reach the site in about a minute (the `site-config` snapshot). Both tables are in the Admin Log.
 
 ### Live Activity (2026-09-28)
 

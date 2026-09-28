@@ -1,30 +1,36 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageOff, Plus, Trash2 } from "lucide-react";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
-import { useDevSeed, SEED_ACTIVE } from "@/lib/devSeed/store";
 import {
-  addBanner,
-  bannerStore,
-  BODY_FONTS,
-  CURRENT_THEME,
-  editBanner,
-  moveBanner,
-  PLACEMENT_LABELS,
-  TOKEN_LABELS,
-  TOKEN_USAGE,
-  type Banner,
-  type BannerPlacement,
-  type ThemeTokens,
-} from "@/lib/devSeed/content";
-import { HEADING_FONTS } from "@/lib/devSeed/content";
+  BANNER_LIMITS,
+  COLOUR_LABELS,
+  IMAGE_MAX_BYTES,
+  IMAGE_TYPES,
+  bannerImageUrl,
+  contrast,
+  isHex,
+  isInternalPath,
+  useDeleteBanner,
+  useReorderBanners,
+  useSaveBanner,
+  useSaveTheme,
+  useSiteBanners,
+  useSiteTheme,
+  type BannerDraft,
+  type SiteBanner,
+  type SiteTheme,
+  type ThemeColour,
+} from "@/lib/siteContent";
 import {
   Badge,
   Button,
   Card,
-  DevSeedBanner,
+  Checkbox,
   Empty,
+  ErrorNote,
   Field,
   Input,
   Modal,
@@ -34,41 +40,33 @@ import {
   Panel,
   ReadOnlyBanner,
   Select,
+  SkeletonList,
   Stack,
   SubHeading,
   Tabs,
+  type Tone,
 } from "@/components/ui";
 
 /**
- * C1 - SITE CONTENT AND DESIGN. DEV-SEED DATA. Nothing here writes to Supabase.
+ * SITE CONTENT (admin completion Phase 9). Real data: lib/siteContent.ts and the
+ * admin_site_* RPCs in textile-spark-net migration 20260928195051.
  *
- * Both tabs edit a local store from src/lib/devSeed/content.ts, which is
- * populated in a development build and empty in production. See that file and
- * src/lib/devSeed/store.ts for the full contract; the short version is that
- * Phase 2 creates `site_banners` and `site_theme`, swaps the store for a query,
- * and this file's markup does not change.
+ *   Banners  the vendor dashboard's banners (Mitra: nothing on the buyer side). Order,
+ *            schedule, an optional image, and a button that goes to a path on cosora.in.
+ *   Theme    the buyer site's five brand colours and two fonts, with the contrast floors
+ *            the database enforces: text at least 4.5:1 on white, white at least 3:1 on
+ *            each accent.
  *
- * Gated to super_admin in roles.ts (section "content"), read and write.
+ * roles.ts section "content": super_admin reads and writes; the RPCs refuse everyone else.
+ * A saved change reaches the site in about a minute (the site-config snapshot).
  */
 
 type Tab = "banners" | "theme";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "banners", label: "Banners" },
+  { id: "banners", label: "Vendor dashboard banners" },
   { id: "theme", label: "Theme" },
 ];
-
-const EMPTY_DRAFT: Omit<Banner, "id"> = {
-  title: "",
-  subtitle: "",
-  linkUrl: "",
-  imageLabel: "",
-  placement: "home_hero",
-  position: 99,
-  active: true,
-  startsAt: null,
-  endsAt: null,
-};
 
 export default function Content() {
   const role = useRole();
@@ -79,11 +77,10 @@ export default function Content() {
     <Page>
       <PageHeader
         title="Site content"
-        subtitle="Banners on the buyer-facing site, and the type and colour it is built from."
+        subtitle="Banners on the vendor dashboard, and the colours and fonts of the buyer site."
       />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "content")} />}
-      {SEED_ACTIVE && <DevSeedBanner what="Site content" />}
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -95,509 +92,588 @@ export default function Content() {
 /* ══════════════════════════════════════════════════════════════════ *
  * Banners
  * ══════════════════════════════════════════════════════════════════ */
+
+// <input type="date"> works in local days. A start is that day's first moment; an end is
+// the first moment of the next day, so "ends on 5 Oct" runs through the 5th.
+const dayStart = (v: string) => (v ? new Date(`${v}T00:00:00`).toISOString() : null);
+const dayAfter = (v: string) => {
+  if (!v) return null;
+  const d = new Date(`${v}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+};
+const startInput = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd") : "");
+const endInput = (iso: string | null) => (iso ? format(new Date(Date.parse(iso) - 1), "yyyy-MM-dd") : "");
+
+function draftFrom(b: SiteBanner | null): BannerDraft {
+  return {
+    title: b?.title ?? "",
+    subtitle: b?.subtitle ?? "",
+    cta_label: b?.cta_label ?? "",
+    link_path: b?.link_path ?? "",
+    image_path: b?.image_path ?? null,
+    file: null,
+    active: b?.active ?? true,
+    starts_at: b?.starts_at ?? null,
+    ends_at: b?.ends_at ?? null,
+  };
+}
+
+function bannerStatus(b: SiteBanner, now: number): { label: string; tone: Tone } {
+  if (!b.active) return { label: "off", tone: "neutral" };
+  if (b.ends_at && Date.parse(b.ends_at) <= now) return { label: "ended", tone: "neutral" };
+  if (b.starts_at && Date.parse(b.starts_at) > now) return { label: "scheduled", tone: "info" };
+  return { label: "showing", tone: "positive" };
+}
+
 function BannersTab({ writable }: { writable: boolean }) {
-  const banners = useDevSeed(bannerStore);
-  const [editing, setEditing] = useState<Banner | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<Omit<Banner, "id">>(EMPTY_DRAFT);
+  const banners = useSiteBanners();
+  const reorder = useReorderBanners();
+  const save = useSaveBanner();
+  const [editing, setEditing] = useState<SiteBanner | "new" | null>(null);
+  const [deleting, setDeleting] = useState<SiteBanner | null>(null);
 
-  // Grouped by placement, because "which banner is on top" is only a question
-  // within a placement. A single flat ordered list would let someone reorder a
-  // vendor-dashboard banner against a buyer-home one, which means nothing.
-  const placements = Object.keys(PLACEMENT_LABELS) as BannerPlacement[];
-  const grouped = placements
-    .map((p) => ({
-      placement: p,
-      rows: banners.filter((b) => b.placement === p).sort((a, b) => a.position - b.position),
-    }))
-    .filter((g) => g.rows.length > 0);
+  if (banners.isLoading) return <SkeletonList rows={2} height="h-28" />;
+  if (banners.error) return <ErrorNote message={(banners.error as Error).message} />;
+  const rows = banners.data ?? [];
+  const now = Date.now();
+  const busy = reorder.isPending || save.isPending;
 
-  function openCreate() {
-    setDraft(EMPTY_DRAFT);
-    setCreating(true);
+  function move(index: number, dir: -1 | 1) {
+    const ids = rows.map((b) => b.id);
+    [ids[index], ids[index + dir]] = [ids[index + dir], ids[index]];
+    reorder.mutate(ids, { onError: (e) => toast.error(e.message) });
   }
 
-  function submitCreate() {
-    if (!draft.title.trim()) return;
-    addBanner({ ...draft, title: draft.title.trim(), subtitle: draft.subtitle.trim() });
-    setCreating(false);
-    toast.success("Banner added to the local fixture");
-  }
-
-  function submitEdit() {
-    if (!editing || !editing.title.trim()) return;
-    editBanner(editing.id, editing);
-    setEditing(null);
-    toast.success("Banner updated in the local fixture");
+  function toggle(b: SiteBanner) {
+    save.mutate(
+      { id: b.id, draft: { ...draftFrom(b), active: !b.active }, previousImage: b.image_path },
+      {
+        onSuccess: () => toast.success(b.active ? "Banner turned off" : "Banner turned on"),
+        onError: (e) => toast.error(e.message),
+      },
+    );
   }
 
   return (
     <Stack>
       <Note>
-        Scheduling is two optional dates. A banner with no dates is live whenever it is active; a
-        banner with dates is live only inside them <span className="font-medium text-ink">and</span>{" "}
-        while active, so deactivating always wins over a schedule. Phase 2 needs the buyer-side query
-        to apply the same rule, or a scheduled banner will keep serving after its end date.
+        These show to sellers on the vendor dashboard, in this order. A banner shows while it's on and
+        inside its dates, and a change reaches the site in about a minute. Buyer-side banners were
+        removed (Mitra, 2026-09-27). Banner text shows in English until a translation is added to the
+        buyer app's catalogues.
       </Note>
 
-      {banners.length === 0 ? (
+      {rows.length === 0 ? (
         <Empty
           action={
             writable && (
-              <Button variant="primary" onClick={openCreate}>
+              <Button variant="primary" onClick={() => setEditing("new")}>
                 <Plus size={14} /> Add a banner
               </Button>
             )
           }
         >
-          No banners are configured. In a production build this list is empty because the{" "}
-          <span className="font-mono text-2xs">site_banners</span> table does not exist yet.
+          No banners. The vendor dashboard shows none until one is added.
         </Empty>
       ) : (
-        grouped.map((group) => (
-          <Panel
-            key={group.placement}
-            title={PLACEMENT_LABELS[group.placement]}
-            description={`${group.rows.length} banner${group.rows.length === 1 ? "" : "s"}, in the order buyers see them.`}
-            actions={
-              writable && (
-                <Button onClick={openCreate}>
-                  <Plus size={14} /> Add
-                </Button>
-              )
-            }
-          >
-            <div className="space-y-2">
-              {group.rows.map((b, i) => (
-                <BannerCard
-                  key={b.id}
-                  banner={b}
-                  writable={writable}
-                  isFirst={i === 0}
-                  isLast={i === group.rows.length - 1}
-                  onEdit={() => setEditing(b)}
-                />
-              ))}
-            </div>
-          </Panel>
-        ))
+        <Panel
+          title="Vendor dashboard"
+          description={`${rows.length} banner${rows.length === 1 ? "" : "s"}, in the order sellers see them.`}
+          actions={
+            writable && (
+              <Button onClick={() => setEditing("new")}>
+                <Plus size={14} /> Add
+              </Button>
+            )
+          }
+        >
+          <div className="space-y-2">
+            {rows.map((b, i) => {
+              const s = bannerStatus(b, now);
+              return (
+                <Card key={b.id} padded={false} className="flex flex-wrap items-start gap-3 p-3">
+                  {b.image_path ? (
+                    <img
+                      src={bannerImageUrl(b.image_path)}
+                      alt=""
+                      className="h-16 w-28 shrink-0 rounded-lg border border-line object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-16 w-28 shrink-0 place-items-center rounded-lg border border-dashed border-line-strong bg-surface-2 text-ink-faint">
+                      <ImageOff size={16} aria-label="No image" />
+                    </div>
+                  )}
+
+                  <div className="min-w-[14rem] flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-ink">{b.title}</span>
+                      <Badge tone={s.tone} dot>
+                        {s.label}
+                      </Badge>
+                    </div>
+                    {b.subtitle && <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{b.subtitle}</p>}
+                    <p className="mt-1 font-mono text-2xs text-ink-faint">
+                      {b.link_path ? `${b.cta_label ? `"${b.cta_label}" → ` : ""}${b.link_path}` : "no link"}
+                    </p>
+                    {(b.starts_at || b.ends_at) && (
+                      <p className="mt-1 text-2xs tabular-nums text-ink-faint">
+                        {b.starts_at ? format(new Date(b.starts_at), "d MMM yyyy") : "now"} to{" "}
+                        {b.ends_at ? format(new Date(Date.parse(b.ends_at) - 1), "d MMM yyyy") : "no end"}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        aria-label="Move up"
+                        disabled={!writable || busy || i === 0}
+                        onClick={() => move(i, -1)}
+                        className="grid h-6 w-6 place-items-center rounded-md border border-line text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-40"
+                      >
+                        <ChevronUp size={13} />
+                      </button>
+                      <button
+                        aria-label="Move down"
+                        disabled={!writable || busy || i === rows.length - 1}
+                        onClick={() => move(i, 1)}
+                        className="grid h-6 w-6 place-items-center rounded-md border border-line text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-40"
+                      >
+                        <ChevronDown size={13} />
+                      </button>
+                    </div>
+                    <Button size="sm" disabled={!writable || busy} onClick={() => setEditing(b)}>
+                      Edit
+                    </Button>
+                    <Button size="sm" disabled={!writable || busy} onClick={() => toggle(b)}>
+                      {b.active ? "Turn off" : "Turn on"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      aria-label={`Delete "${b.title}"`}
+                      disabled={!writable || busy}
+                      onClick={() => setDeleting(b)}
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </Panel>
       )}
 
-      <Modal open={creating} title="Add a banner" onClose={() => setCreating(false)} width="lg">
-        <BannerForm value={draft} onChange={setDraft} />
-        <div className="mt-4 flex justify-end gap-2">
-          <Button onClick={() => setCreating(false)}>Cancel</Button>
-          <Button variant="primary" disabled={!draft.title.trim()} onClick={submitCreate}>
-            Add banner
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={editing !== null}
-        title={`Edit "${editing?.title ?? ""}"`}
-        onClose={() => setEditing(null)}
-        width="lg"
-      >
-        {editing && (
-          <BannerForm
-            value={editing}
-            onChange={(patch) => setEditing({ ...editing, ...patch })}
-          />
-        )}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button onClick={() => setEditing(null)}>Cancel</Button>
-          <Button variant="primary" disabled={!editing?.title.trim()} onClick={submitEdit}>
-            Save changes
-          </Button>
-        </div>
-      </Modal>
+      {editing !== null && (
+        <BannerModal banner={editing === "new" ? null : editing} onClose={() => setEditing(null)} />
+      )}
+      {deleting && <DeleteModal banner={deleting} onClose={() => setDeleting(null)} />}
     </Stack>
   );
 }
 
-function BannerCard({
-  banner: b,
-  writable,
-  isFirst,
-  isLast,
-  onEdit,
-}: {
-  banner: Banner;
-  writable: boolean;
-  isFirst: boolean;
-  isLast: boolean;
-  onEdit: () => void;
-}) {
-  const now = Date.now();
-  const scheduled = b.startsAt || b.endsAt;
-  const withinWindow =
-    (!b.startsAt || new Date(b.startsAt).getTime() <= now) &&
-    (!b.endsAt || new Date(b.endsAt).getTime() >= now);
-  const serving = b.active && withinWindow;
+function validate(d: BannerDraft): Partial<Record<keyof BannerDraft, string>> {
+  const e: Partial<Record<keyof BannerDraft, string>> = {};
+  const title = d.title.trim();
+  if (!title) e.title = "A banner needs a headline.";
+  else if (title.length > BANNER_LIMITS.title) e.title = `At most ${BANNER_LIMITS.title} characters.`;
+  if (d.subtitle.trim().length > BANNER_LIMITS.subtitle) e.subtitle = `At most ${BANNER_LIMITS.subtitle} characters.`;
+  if (d.cta_label.trim().length > BANNER_LIMITS.cta) e.cta_label = `At most ${BANNER_LIMITS.cta} characters.`;
+  const link = d.link_path.trim();
+  if (link && !isInternalPath(link)) e.link_path = 'A path on cosora.in that starts with one "/", like /advertisements.';
+  if (d.cta_label.trim() && !link) e.link_path = "A button needs a destination.";
+  if (d.starts_at && d.ends_at && Date.parse(d.starts_at) >= Date.parse(d.ends_at)) e.ends_at = "The banner must start before it ends.";
+  return e;
+}
+
+function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: () => void }) {
+  const save = useSaveBanner();
+  const [draft, setDraft] = useState<BannerDraft>(() => draftFrom(banner));
+  const [fileError, setFileError] = useState<string | null>(null);
+  const errors = validate(draft);
+  const valid = Object.keys(errors).length === 0;
+  const set = (patch: Partial<BannerDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  // A picked file previews from memory; it's uploaded only when the banner is saved.
+  const localPreview = useMemo(() => (draft.file ? URL.createObjectURL(draft.file) : null), [draft.file]);
+  useEffect(() => () => void (localPreview && URL.revokeObjectURL(localPreview)), [localPreview]);
+  const preview = localPreview ?? (draft.image_path ? bannerImageUrl(draft.image_path) : null);
+
+  function pick(file: File | undefined) {
+    setFileError(null);
+    if (!file) return;
+    if (!IMAGE_TYPES[file.type]) return setFileError("Use a JPEG, PNG or WebP image.");
+    if (file.size > IMAGE_MAX_BYTES) return setFileError("The image must be 2 MB or smaller.");
+    set({ file });
+  }
+
+  function submit() {
+    save.mutate(
+      {
+        id: banner?.id ?? null,
+        draft: { ...draft, title: draft.title.trim(), subtitle: draft.subtitle.trim(), cta_label: draft.cta_label.trim(), link_path: draft.link_path.trim() },
+        previousImage: banner?.image_path ?? null,
+      },
+      {
+        onSuccess: (r) => {
+          toast.success(banner ? "Banner saved" : "Banner added", { description: "It reaches the vendor dashboard in about a minute." });
+          if (r.cleanupError) toast.warning(`The old image couldn't be deleted: ${r.cleanupError}`);
+          onClose();
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
 
   return (
-    <Card padded={false} className="flex flex-wrap items-start gap-3 p-3">
-      {/* A labelled slot, not a fake image. There is no upload pipeline behind
-          this screen, and a grey rectangle pretending to be a photo would
-          suggest otherwise. */}
-      <div className="grid h-16 w-28 shrink-0 place-items-center rounded-lg border border-dashed border-line-strong bg-surface-2 px-2 text-center">
-        <span className="break-all font-mono text-2xs leading-tight text-ink-faint">
-          {b.imageLabel || "no image set"}
-        </span>
+    <Modal open title={banner ? `Edit "${banner.title}"` : "Add a banner"} onClose={onClose} width="lg">
+      <div className="space-y-3">
+        <Field label={`Headline (${draft.title.trim().length}/${BANNER_LIMITS.title})`} htmlFor="banner-title" error={draft.title ? errors.title : null}>
+          <Input
+            id="banner-title"
+            autoFocus
+            value={draft.title}
+            maxLength={BANNER_LIMITS.title + 20}
+            placeholder="Get prime placement above competitors"
+            onChange={(e) => set({ title: e.target.value })}
+          />
+        </Field>
+        <Field label="Supporting line" htmlFor="banner-subtitle" error={errors.subtitle}>
+          <Input
+            id="banner-subtitle"
+            value={draft.subtitle}
+            placeholder="Boost your visibility with featured listings"
+            onChange={(e) => set({ subtitle: e.target.value })}
+          />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Button label" htmlFor="banner-cta" hint="Leave blank for no button." error={errors.cta_label}>
+            <Input id="banner-cta" value={draft.cta_label} placeholder="Claim this banner" onChange={(e) => set({ cta_label: e.target.value })} />
+          </Field>
+          <Field label="Destination" htmlFor="banner-link" hint="A path on cosora.in." error={errors.link_path}>
+            <Input
+              id="banner-link"
+              value={draft.link_path}
+              placeholder="/advertisements"
+              className="font-mono text-xs"
+              onChange={(e) => set({ link_path: e.target.value })}
+            />
+          </Field>
+        </div>
+
+        <Field label="Image" htmlFor="banner-image" hint="Optional. JPEG, PNG or WebP, up to 2 MB, about 3:2." error={fileError}>
+          <div className="flex flex-wrap items-center gap-3">
+            {preview ? (
+              <img src={preview} alt="" className="h-20 w-32 rounded-lg border border-line object-cover" />
+            ) : (
+              <div className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line-strong bg-surface-2 text-ink-faint">
+                <ImageOff size={16} aria-label="No image" />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <input
+                id="banner-image"
+                type="file"
+                accept={Object.keys(IMAGE_TYPES).join(",")}
+                onChange={(e) => pick(e.target.files?.[0])}
+                className="text-xs text-ink-muted file:mr-2 file:rounded-md file:border file:border-line file:bg-surface-2 file:px-2 file:py-1 file:text-xs file:text-ink"
+              />
+              {preview && (
+                <Button size="sm" variant="ghost" onClick={() => set({ file: null, image_path: null })}>
+                  Remove image
+                </Button>
+              )}
+            </div>
+          </div>
+        </Field>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Starts on" htmlFor="banner-start" hint="Blank: straight away.">
+            <Input id="banner-start" type="date" value={startInput(draft.starts_at)} onChange={(e) => set({ starts_at: dayStart(e.target.value) })} />
+          </Field>
+          <Field label="Ends after" htmlFor="banner-end" hint="Blank: until turned off." error={errors.ends_at}>
+            <Input id="banner-end" type="date" value={endInput(draft.ends_at)} onChange={(e) => set({ ends_at: dayAfter(e.target.value) })} />
+          </Field>
+        </div>
+
+        <Checkbox label="On" hint="A banner that's off never shows, whatever its dates." checked={draft.active} onChange={(e) => set({ active: e.target.checked })} />
       </div>
 
-      <div className="min-w-[14rem] flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-ink">{b.title}</span>
-          {serving ? (
-            <Badge tone="positive" dot>serving</Badge>
-          ) : b.active ? (
-            <Badge tone="caution" dot>outside its dates</Badge>
-          ) : (
-            <Badge dot>inactive</Badge>
-          )}
-        </div>
-        <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{b.subtitle}</p>
-        <p className="mt-1 font-mono text-2xs text-ink-faint">{b.linkUrl || "no link set"}</p>
-        {scheduled && (
-          <p className="mt-1 text-2xs tabular-nums text-ink-faint">
-            {b.startsAt ? new Date(b.startsAt).toLocaleDateString("en-IN") : "no start"} to{" "}
-            {b.endsAt ? new Date(b.endsAt).toLocaleDateString("en-IN") : "no end"}
-          </p>
-        )}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        <div className="flex flex-col gap-0.5">
-          <button
-            aria-label="Move up"
-            disabled={!writable || isFirst}
-            onClick={() => moveBanner(b.id, -1)}
-            className="grid h-6 w-6 place-items-center rounded-md border border-line text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-40"
-          >
-            <ChevronUp size={13} />
-          </button>
-          <button
-            aria-label="Move down"
-            disabled={!writable || isLast}
-            onClick={() => moveBanner(b.id, 1)}
-            className="grid h-6 w-6 place-items-center rounded-md border border-line text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-40"
-          >
-            <ChevronDown size={13} />
-          </button>
-        </div>
-        <Button size="sm" disabled={!writable} onClick={onEdit}>
-          Edit
+      <div className="mt-4 flex justify-end gap-2">
+        <Button onClick={onClose} disabled={save.isPending}>
+          Cancel
         </Button>
-        <Button
-          size="sm"
-          variant={b.active ? "danger" : "primary"}
-          disabled={!writable}
-          onClick={() => {
-            editBanner(b.id, { active: !b.active });
-            toast.success(b.active ? "Banner deactivated" : "Banner activated");
-          }}
-        >
-          {b.active ? "Deactivate" : "Activate"}
+        <Button variant="primary" disabled={!valid || save.isPending} onClick={submit}>
+          {save.isPending ? "Saving…" : banner ? "Save changes" : "Add banner"}
         </Button>
       </div>
-    </Card>
+    </Modal>
   );
 }
 
-function BannerForm({
-  value,
-  onChange,
-}: {
-  value: Omit<Banner, "id">;
-  onChange: (patch: Omit<Banner, "id">) => void;
-}) {
-  const set = (patch: Partial<Banner>) => onChange({ ...value, ...patch });
-  // <input type="date"> wants yyyy-mm-dd; the store holds ISO instants.
-  const toDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
-  const fromDate = (v: string) => (v ? new Date(`${v}T00:00:00`).toISOString() : null);
-
+function DeleteModal({ banner, onClose }: { banner: SiteBanner; onClose: () => void }) {
+  const del = useDeleteBanner();
   return (
-    <div className="space-y-3">
-      <Field label="Headline" htmlFor="banner-title">
-        <Input
-          id="banner-title"
-          autoFocus
-          value={value.title}
-          placeholder="Monsoon sourcing week"
-          onChange={(e) => set({ title: e.target.value })}
-        />
-      </Field>
-      <Field label="Supporting line" htmlFor="banner-subtitle">
-        <Input
-          id="banner-subtitle"
-          value={value.subtitle}
-          placeholder="Rate cards from 40 mills, open until the end of the month."
-          onChange={(e) => set({ subtitle: e.target.value })}
-        />
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Destination path" htmlFor="banner-link" hint="Relative to the buyer site.">
-          <Input
-            id="banner-link"
-            value={value.linkUrl}
-            placeholder="/categories/fabrics"
-            onChange={(e) => set({ linkUrl: e.target.value })}
-          />
-        </Field>
-        <Field
-          label="Image filename"
-          htmlFor="banner-image"
-          hint="A name only for now. Uploads arrive with the storage bucket in Phase 2."
+    <Modal open title={`Delete "${banner.title}"?`} onClose={onClose}>
+      <p className="text-sm text-ink-muted">
+        It leaves the vendor dashboard within about a minute{banner.image_path ? ", and its image is deleted" : ""}. To take a
+        banner down for a while instead, turn it off.
+      </p>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button onClick={onClose} disabled={del.isPending}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          disabled={del.isPending}
+          onClick={() =>
+            del.mutate(banner.id, {
+              onSuccess: (imageError) => {
+                toast.success("Banner deleted");
+                if (imageError) toast.warning(`Its image couldn't be deleted: ${imageError}`);
+                onClose();
+              },
+              onError: (e) => toast.error(e.message),
+            })
+          }
         >
-          <Input
-            id="banner-image"
-            value={value.imageLabel}
-            placeholder="monsoon-week-1600x600.jpg"
-            onChange={(e) => set({ imageLabel: e.target.value })}
-          />
-        </Field>
+          {del.isPending ? "Deleting…" : "Delete banner"}
+        </Button>
       </div>
-      <Field label="Placement" htmlFor="banner-placement">
-        <Select
-          id="banner-placement"
-          value={value.placement}
-          onChange={(e) => set({ placement: e.target.value as BannerPlacement })}
-        >
-          {(Object.keys(PLACEMENT_LABELS) as BannerPlacement[]).map((p) => (
-            <option key={p} value={p}>
-              {PLACEMENT_LABELS[p]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Starts on" htmlFor="banner-start" hint="Leave blank to start immediately.">
-          <Input
-            id="banner-start"
-            type="date"
-            value={toDate(value.startsAt)}
-            onChange={(e) => set({ startsAt: fromDate(e.target.value) })}
-          />
-        </Field>
-        <Field label="Ends on" htmlFor="banner-end" hint="Leave blank to run until deactivated.">
-          <Input
-            id="banner-end"
-            type="date"
-            value={toDate(value.endsAt)}
-            onChange={(e) => set({ endsAt: fromDate(e.target.value) })}
-          />
-        </Field>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
 /* ══════════════════════════════════════════════════════════════════ *
  * Theme
  * ══════════════════════════════════════════════════════════════════ */
+
+const COLOURS = Object.keys(COLOUR_LABELS) as ThemeColour[];
+
+const pickTheme = (t: SiteTheme): SiteTheme => ({
+  vendor_accent: t.vendor_accent,
+  buyer_accent: t.buyer_accent,
+  success: t.success,
+  border: t.border,
+  ink: t.ink,
+  heading_font: t.heading_font,
+  body_font: t.body_font,
+});
+
 function ThemeTab({ writable }: { writable: boolean }) {
-  const [draft, setDraft] = useState<ThemeTokens>(CURRENT_THEME);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(CURRENT_THEME);
-  const swatchKeys = Object.keys(TOKEN_LABELS) as (keyof typeof TOKEN_LABELS)[];
+  const state = useSiteTheme();
+  const saveTheme = useSaveTheme();
+  const [draft, setDraft] = useState<SiteTheme | null>(null);
+
+  useEffect(() => {
+    if (state.data && draft === null) setDraft(pickTheme(state.data.theme));
+  }, [state.data, draft]);
+
+  if (state.isLoading || (state.data && !draft)) return <SkeletonList rows={2} height="h-40" />;
+  if (state.error) return <ErrorNote message={(state.error as Error).message} />;
+  if (!state.data || !draft) return null;
+
+  const { fonts, floors, defaults } = state.data;
+  const saved = pickTheme(state.data.theme);
+  const normalised = { ...draft, ...Object.fromEntries(COLOURS.map((k) => [k, draft[k].toLowerCase()])) } as SiteTheme;
+  const dirty = JSON.stringify(normalised) !== JSON.stringify(saved);
+  const coloursOk = COLOURS.every((k) => isHex(draft[k]));
+  const checks = coloursOk
+    ? [
+        { label: "Text on white", ratio: contrast(draft.ink, "#ffffff"), floor: floors.ink_on_white },
+        { label: "White on the vendor accent", ratio: contrast("#ffffff", draft.vendor_accent), floor: floors.white_on_accent },
+        { label: "White on the buyer accent", ratio: contrast("#ffffff", draft.buyer_accent), floor: floors.white_on_accent },
+      ]
+    : [];
+  const floorsOk = coloursOk && checks.every((c) => c.ratio >= c.floor);
 
   return (
     <Stack>
       <Note>
-        This edits the <span className="font-medium text-ink">buyer-facing site's</span> theme, not
-        this admin panel's. The admin panel's own tokens live in{" "}
-        <span className="font-mono text-2xs">src/index.css</span> and its light and dark modes are
-        controlled by the toggle in the navigation rail.
+        This is the buyer site's theme (cosora.in, the buyer and vendor app), not this panel's. A saved theme
+        reaches the site in about a minute. A few standard buttons use a separate colour setting and keep
+        today's coral for now, whatever the buyer accent.
       </Note>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
         <Stack>
           <Panel
             title="Typography"
-            description="A curated list, deliberately. Free text lets someone save a family that does not exist and take the buyer site's type down; an upload needs a licence, a storage bucket and a webfont pipeline. Every option here is a Google Font already available to the buyer app."
+            description="Open Sans (body) and Roboto (headings) are what the site shipped with. The others load from Google Fonts when chosen."
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label="Heading font"
-                htmlFor="theme-heading"
-                hint={HEADING_FONTS.find((f) => f.family === draft.headingFont)?.note}
-              >
+              <Field label="Heading font" htmlFor="theme-heading">
                 <Select
                   id="theme-heading"
                   disabled={!writable}
-                  value={draft.headingFont}
-                  onChange={(e) => setDraft({ ...draft, headingFont: e.target.value })}
+                  value={draft.heading_font}
+                  onChange={(e) => setDraft({ ...draft, heading_font: e.target.value })}
                 >
-                  {HEADING_FONTS.map((f) => (
-                    <option key={f.family} value={f.family}>
-                      {f.family}
-                      {f.devanagari ? " (Devanagari)" : ""}
+                  {fonts.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field
-                label="Body font"
-                htmlFor="theme-body"
-                hint={BODY_FONTS.find((f) => f.family === draft.bodyFont)?.note}
-              >
+              <Field label="Body font" htmlFor="theme-body">
                 <Select
                   id="theme-body"
                   disabled={!writable}
-                  value={draft.bodyFont}
-                  onChange={(e) => setDraft({ ...draft, bodyFont: e.target.value })}
+                  value={draft.body_font}
+                  onChange={(e) => setDraft({ ...draft, body_font: e.target.value })}
                 >
-                  {BODY_FONTS.map((f) => (
-                    <option key={f.family} value={f.family}>
-                      {f.family}
-                      {f.devanagari ? " (Devanagari)" : ""}
+                  {fonts.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
                     </option>
                   ))}
                 </Select>
               </Field>
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-              Devanagari coverage is called out because Cosora's vendors do not all write in Latin
-              script. A heading face without it falls back mid-sentence, which is worse than
-              choosing a plainer family that has it.
-            </p>
           </Panel>
 
-          <Panel
-            title="Colour tokens"
-            description="Named after the job each colour does, not its hue, so a rebrand does not leave a token called blue holding a green."
-          >
+          <Panel title="Colours" description="Named for the job each colour does, so a rebrand never leaves a token called blue holding a green.">
             <div className="space-y-2">
-              {swatchKeys.map((key) => (
-                <div
-                  key={key}
-                  className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-2.5"
-                >
-                  <input
-                    type="color"
-                    aria-label={TOKEN_LABELS[key]}
-                    disabled={!writable}
-                    value={draft[key]}
-                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                    className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-line bg-transparent disabled:cursor-not-allowed"
-                  />
-                  <div className="min-w-[10rem] flex-1">
-                    <div className="text-sm font-medium text-ink">{TOKEN_LABELS[key]}</div>
-                    <div className="text-2xs text-ink-faint">{TOKEN_USAGE[key]}</div>
+              {COLOURS.map((key) => {
+                const ok = isHex(draft[key]);
+                return (
+                  <div key={key} className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-2.5">
+                    <input
+                      type="color"
+                      aria-label={COLOUR_LABELS[key].label}
+                      disabled={!writable}
+                      value={ok ? draft[key].toLowerCase() : "#000000"}
+                      onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                      className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-line bg-transparent disabled:cursor-not-allowed"
+                    />
+                    <div className="min-w-[10rem] flex-1">
+                      <div className="text-sm font-medium text-ink">{COLOUR_LABELS[key].label}</div>
+                      <div className="text-2xs text-ink-faint">{COLOUR_LABELS[key].usage}</div>
+                    </div>
+                    <Input
+                      aria-label={`${COLOUR_LABELS[key].label} hex value`}
+                      disabled={!writable}
+                      value={draft[key]}
+                      onChange={(e) => setDraft({ ...draft, [key]: e.target.value.trim() })}
+                      className="w-28 font-mono text-xs uppercase"
+                    />
+                    {!ok ? (
+                      <Badge tone="critical">not #rrggbb</Badge>
+                    ) : (
+                      draft[key].toLowerCase() !== saved[key] && <Badge tone="caution">changed</Badge>
+                    )}
                   </div>
-                  <Input
-                    aria-label={`${TOKEN_LABELS[key]} hex value`}
-                    disabled={!writable}
-                    value={draft[key]}
-                    onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-                    className="w-28 font-mono text-xs uppercase"
-                  />
-                  {draft[key].toLowerCase() !== CURRENT_THEME[key].toLowerCase() && (
-                    <Badge tone="caution">changed</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button variant="primary" disabled={!writable || !dirty} onClick={() => toast.message("Nothing was saved", { description: "The site_theme table does not exist yet. Phase 2 wires this button to it." })}>
-                Save theme
-              </Button>
-              <Button disabled={!dirty} onClick={() => setDraft(CURRENT_THEME)}>
-                Reset to live values
-              </Button>
-              {dirty && (
-                <span className="text-xs text-caution-fg">
-                  Preview only. Nothing is saved and the buyer site is unchanged.
-                </span>
-              )}
+                );
+              })}
             </div>
           </Panel>
+
+          <Panel title="Contrast" description="The database refuses a theme below these floors.">
+            {coloursOk ? (
+              <ul className="divide-y divide-line text-sm">
+                {checks.map((c) => (
+                  <li key={c.label} className="flex items-center justify-between gap-3 py-2">
+                    <span className="text-ink-muted">{c.label}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-semibold tabular-nums text-ink">{c.ratio.toFixed(2)}:1</span>
+                      <Badge tone={c.ratio >= c.floor ? "positive" : "critical"} dot>
+                        {c.ratio >= c.floor ? `meets ${c.floor}:1` : `below ${c.floor}:1`}
+                      </Badge>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-muted">Fix the colours marked above to see their contrast.</p>
+            )}
+          </Panel>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="primary"
+              disabled={!writable || !dirty || !floorsOk || saveTheme.isPending}
+              onClick={() =>
+                saveTheme.mutate(normalised, {
+                  onSuccess: () => toast.success("Theme saved", { description: "It reaches the site in about a minute." }),
+                  onError: (e) => toast.error(e.message),
+                })
+              }
+            >
+              {saveTheme.isPending ? "Saving…" : "Save theme"}
+            </Button>
+            <Button disabled={!dirty} onClick={() => setDraft(saved)}>
+              Revert to saved
+            </Button>
+            <Button disabled={!writable || JSON.stringify(normalised) === JSON.stringify(pickTheme(defaults))} onClick={() => setDraft(pickTheme(defaults))}>
+              Cosora defaults
+            </Button>
+            {dirty && <span className="text-xs text-caution-fg">Not saved yet. The site is unchanged.</span>}
+          </div>
         </Stack>
 
-        <ThemePreview theme={draft} />
+        <ThemePreview theme={coloursOk ? normalised : saved} />
       </div>
     </Stack>
   );
 }
 
 /**
- * Live preview.
- *
- * Deliberately a real miniature of buyer-side surfaces (a vendor card, a buyer
- * CTA, a verified badge) rather than a row of colour squares: the question this
- * pane answers is "can you read the label on that button", which swatches
- * cannot show. Fonts are applied by name and fall back to the system stack when
- * a family is not loaded, so a preview never renders in a face it is not
- * naming.
+ * A miniature of buyer-site surfaces, in the chosen fonts (loaded from Google Fonts for
+ * the preview). The question it answers is "can you read that button", which swatches can't.
  */
-function ThemePreview({ theme }: { theme: ThemeTokens }) {
+function ThemePreview({ theme }: { theme: SiteTheme }) {
+  useEffect(() => {
+    for (const family of [theme.heading_font, theme.body_font]) {
+      const href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}:wght@400;700&display=swap`;
+      if (document.querySelector(`link[data-preview-font="${family}"]`)) continue;
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      link.setAttribute("data-preview-font", family);
+      document.head.appendChild(link);
+    }
+  }, [theme.heading_font, theme.body_font]);
+
   return (
     <div className="lg:sticky lg:top-6">
       <SubHeading className="mb-2 block">Preview</SubHeading>
       <div
         className="overflow-hidden rounded-xl border border-line shadow-card"
-        style={{
-          background: "#ffffff",
-          color: theme.ink,
-          fontFamily: `"${theme.bodyFont}", system-ui, sans-serif`,
-        }}
+        style={{ background: "#ffffff", color: theme.ink, fontFamily: `"${theme.body_font}", system-ui, sans-serif` }}
       >
         <div className="border-b p-4" style={{ borderColor: theme.border }}>
-          <div
-            className="text-lg font-bold leading-tight"
-            style={{ fontFamily: `"${theme.headingFont}", system-ui, sans-serif` }}
-          >
+          <div className="text-lg font-bold leading-tight" style={{ fontFamily: `"${theme.heading_font}", system-ui, sans-serif` }}>
             Cotton poplin, 120 GSM
           </div>
-          <div className="mt-1 text-xs" style={{ color: theme.border }}>
-            Rathi Textiles, Erode
+          <div className="mt-1 text-xs" style={{ color: theme.buyer_accent }}>
+            ₹245 / metre · MOQ 500 m
           </div>
-
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span
-              className="rounded-md px-2 py-1 text-xs font-medium"
-              style={{ background: `${theme.success}1a`, color: theme.success }}
-            >
+            <span className="rounded-md px-2 py-1 text-xs font-medium" style={{ background: `${theme.success}1a`, color: theme.success }}>
               Verified supplier
-            </span>
-            <span className="text-xs" style={{ color: theme.border }}>
-              MOQ 500 m
             </span>
           </div>
         </div>
-
         <div className="space-y-2 p-4">
-          <button
-            className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white"
-            style={{ background: theme.vendorAccent }}
-          >
-            Send a quote
+          <button className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white" style={{ background: theme.buyer_accent }}>
+            Request a quote
           </button>
-          <button
-            className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white"
-            style={{ background: theme.buyerAccent }}
-          >
-            Request a sample
+          <button className="w-full rounded-lg px-3 py-2 text-sm font-medium text-white" style={{ background: theme.vendor_accent }}>
+            Send a quote (vendor)
           </button>
-          <button
-            className="w-full rounded-lg border px-3 py-2 text-sm font-medium"
-            style={{ borderColor: theme.border, color: theme.ink }}
-          >
+          <button className="w-full rounded-lg border px-3 py-2 text-sm font-medium" style={{ borderColor: theme.border, color: theme.ink }}>
             Save for later
           </button>
-          <p className="pt-1 text-xs leading-relaxed" style={{ color: theme.ink }}>
-            Body copy at the size buyers actually read it, in{" "}
-            <span style={{ color: theme.vendorAccent }}>the link colour</span> and the ink colour
-            together.
+          <p className="pt-1 text-xs leading-relaxed">
+            Body text as buyers read it, with <span style={{ color: theme.vendor_accent }}>a vendor link</span>.
           </p>
         </div>
       </div>
       <p className="mt-2 text-2xs leading-relaxed text-ink-faint">
-        The preview is fixed to a light background because the buyer site has no dark mode. Check
-        both filled buttons here: white text needs a background dark enough to carry it, and a light
-        accent will fail that on this pane before it fails on the live site.
+        The site has no dark mode, so the preview is always light.
       </p>
     </div>
   );

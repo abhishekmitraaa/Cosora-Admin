@@ -9,6 +9,15 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-29 (admin completion, Phase 9): **Site content is real.** The dev-seed fixture is gone.
+  - `pages/Content.tsx` reads and writes through `lib/siteContent.ts` and the `admin_site_*` RPCs. The migration and the `site-config-snapshot` edge function are in textile-spark-net (`20260928195051`).
+    - Vendor dashboard banners only (Mitra's call): add, edit, reorder, turn on and off, schedule and delete; an optional image uploaded when the banner is saved; a destination that must be a path on cosora.in.
+    - Theme: five colours and two fonts from the database's list, with live contrast ratios; Save is blocked below the floors (4.5:1 text on white, 3:1 white on each accent). "Revert to saved" and "Cosora defaults". The preview loads the chosen fonts.
+  - `AdminLog.tsx` names the two tables. `roles.ts` notes that `content` mirrors `admin.require_content_admin()`.
+  - `lib/devSeed/content.ts` is deleted. README: Content is real.
+  - `database.types.ts` regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0; the bundle calls `admin_site_banners`, and no fixture string is in `dist/`. A local render with every Supabase request answered in the browser: the badges, the reorder and turn-off calls, the form's refusals, and the contrast floors blocking and allowing Save. Harness `13` in textile-spark-net: 15/15, rehearsed and live.
+
 - 2026-09-28 (admin completion, Phase 8): **Live Activity shows the buyer site now.** It used to be only a link to Microsoft Clarity.
   - `pages/LiveActivity.tsx` reads `admin_live_activity()` through `lib/liveActivity.ts`. The migration is in textile-spark-net (`20260928145827`).
     - Visitors in the last 5 minutes and over a chosen window (15 minutes to 24 hours), signed in and guest.
