@@ -56,6 +56,7 @@ const AREAS: Record<string, string> = {
   "public.blog_posts": "Blog post",
   "public.blog_categories": "Blog category",
   "public.blog_settings": "Blog landing page",
+  "public.authors": "Blog author",
   "public.profiles": "Account status",
   "admin.account_suspensions": "Suspension record",
   "public.conversations": "Chat",

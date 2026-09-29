@@ -62,7 +62,7 @@ export type BlogPostFull = {
   hero_image_alt: string | null;
   thumbnail: string | null;
   thumbnail_alt: string | null;
-  author: string | null;
+  author_id: string | null;
   category_id: string | null;
   is_featured: boolean;
   sort_order: number;
@@ -88,6 +88,19 @@ export type BlogCategory = {
   seo_description: string | null;
   sort_order: number;
   posts: number;
+};
+
+/**
+ * A byline: one of the named people, or Cosora itself. Rows are seeded by
+ * migration (textile-spark-net 20260929221659_blog_authors) and this app only
+ * reads them, to fill the post editor's Author dropdown.
+ */
+export type BlogAuthor = {
+  id: string;
+  slug: string;
+  name: string;
+  entity_type: "person" | "organization";
+  role: string | null;
 };
 
 export type BlogSettings = {
@@ -131,6 +144,36 @@ export async function removeBlogImage(path: string | null): Promise<string | nul
   return error ? error.message : null;
 }
 
+// ── Authors ─────────────────────────────────────────────────────────────────
+
+/**
+ * Cosora first, as the default a new post starts on, then the people by name.
+ * Read straight from the table: every author row is public, like the
+ * categories, so there is nothing for an RPC gate to add.
+ */
+export function useBlogAuthors() {
+  return useQuery({
+    queryKey: ["blogs", "authors"],
+    queryFn: async (): Promise<BlogAuthor[]> => {
+      const { data, error } = await supabase
+        .from("authors")
+        .select("id,slug,name,entity_type,role")
+        .order("name");
+      if (error) throw new Error(error.message);
+      const rows = (data ?? []) as BlogAuthor[];
+      return [
+        ...rows.filter((a) => a.entity_type === "organization"),
+        ...rows.filter((a) => a.entity_type === "person"),
+      ];
+    },
+  });
+}
+
+/** "Anandita Mitra, CEO" for a person; the plain name for Cosora. */
+export function authorLabel(a: BlogAuthor): string {
+  return a.entity_type === "person" && a.role ? `${a.name}, ${a.role}` : a.name;
+}
+
 // ── Posts ───────────────────────────────────────────────────────────────────
 
 export function useBlogPosts() {
@@ -169,7 +212,7 @@ export type BlogPostInput = {
   hero_image_alt: string;
   thumbnail: string | null;
   thumbnail_alt: string;
-  author: string;
+  author_id: string | null;
   category_id: string | null;
   is_featured: boolean;
   status: BlogStatus;
@@ -199,7 +242,7 @@ export function useSaveBlogPost() {
         p_hero_image_alt: input.hero_image_alt || undefined,
         p_thumbnail: input.thumbnail ?? undefined,
         p_thumbnail_alt: input.thumbnail_alt || undefined,
-        p_author: input.author || undefined,
+        p_author_id: input.author_id ?? undefined,
         p_category_id: input.category_id ?? undefined,
         p_is_featured: input.is_featured,
         p_status: input.status,

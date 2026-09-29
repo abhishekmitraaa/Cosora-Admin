@@ -9,6 +9,18 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-30: **Articles have a real author, picked from a list.** The free-text Author box,
+  which defaulted to "Cosora Team", is now a dropdown of the rows in `public.authors`: Cosora
+  first (the default for a new post), then Anandita Mitra (CEO), Ishani Banerjee (CMO) and
+  Abhishek Mitra (CTO). The post saves `author_id` through `admin_blog_post_save`'s new
+  `p_author_id`; the Journal renders the byline, the author page and the author JSON-LD from
+  that row (a Person for a named person, an Organization for Cosora). The three existing posts
+  are on Cosora; reassigning one is a matter of picking a name and saving.
+  - `lib/blogs.ts` `useBlogAuthors` reads the table directly: every author row is public, so an
+    RPC gate would add nothing. There is no screen for editing authors; the rows are seeded by
+    migration (textile-spark-net `20260929221659_blog_authors`) and change the same way.
+  - Admin Log labels `public.authors` changes as "Blog author".
+
 - 2026-09-30: **Blog categories get their own search fields, and saves stop losing data.**
   - Categories: the form now edits the search title and search description, with a preview
     and counters that follow the category rules, which differ from an article's: a category's

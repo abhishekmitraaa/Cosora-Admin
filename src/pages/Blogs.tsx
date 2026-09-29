@@ -39,7 +39,9 @@ import {
   TITLE_SUFFIX,
 } from "@/lib/blogSeo";
 import {
+  authorLabel,
   removeBlogImage,
+  useBlogAuthors,
   useBlogCategories,
   useBlogPost,
   useBlogPosts,
@@ -314,7 +316,8 @@ type Draft = {
   hero_image_alt: string;
   thumbnail: string | null;
   thumbnail_alt: string;
-  author: string;
+  /** Null until chosen; the editor shows and saves Cosora in its place. */
+  author_id: string | null;
   category_id: string | null;
   is_featured: boolean;
   status: BlogStatus;
@@ -341,7 +344,7 @@ const EMPTY_DRAFT: Draft = {
   hero_image_alt: "",
   thumbnail: null,
   thumbnail_alt: "",
-  author: "Cosora Team",
+  author_id: null,
   category_id: null,
   is_featured: false,
   status: "draft",
@@ -364,7 +367,7 @@ function draftFrom(p: BlogPostFull): Draft {
     hero_image_alt: p.hero_image_alt ?? "",
     thumbnail: p.thumbnail,
     thumbnail_alt: p.thumbnail_alt ?? "",
-    author: p.author ?? "",
+    author_id: p.author_id,
     category_id: p.category_id,
     is_featured: p.is_featured,
     status: p.status,
@@ -400,6 +403,7 @@ function ArticleEditor({
 }) {
   const existing = useBlogPost(id);
   const categories = useBlogCategories();
+  const authors = useBlogAuthors();
   const save = useSaveBlogPost();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [loaded, setLoaded] = useState(id === null);
@@ -412,6 +416,10 @@ function ArticleEditor({
   }, [id, existing.data, loaded]);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  // A new post, or one saved before authors existed, starts on Cosora: the
+  // organisation row, and what the old "Cosora Team" byline meant.
+  const authorId =
+    draft.author_id ?? authors.data?.find((a) => a.entity_type === "organization")?.id ?? null;
   const errors = validate(draft);
   const valid = Object.keys(errors).length === 0;
 
@@ -472,12 +480,26 @@ function ArticleEditor({
               onChange={(e) => set({ slug: e.target.value })}
             />
           </Field>
-          <Field label="Author">
-            <Input
-              value={draft.author}
-              disabled={!writable}
-              onChange={(e) => set({ author: e.target.value })}
-            />
+          <Field
+            label="Author"
+            hint={
+              authors.isError
+                ? "Authors could not be loaded. Saving keeps the current author."
+                : "Shown on the article and linked to the author's page."
+            }
+          >
+            <Select
+              value={authorId ?? ""}
+              disabled={!writable || !authors.data?.length}
+              onChange={(e) => set({ author_id: e.target.value || null })}
+            >
+              {authors.data ? null : <option value="">Loading authors</option>}
+              {(authors.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {authorLabel(a)}
+                </option>
+              ))}
+            </Select>
           </Field>
         </div>
 
@@ -691,7 +713,7 @@ function ArticleEditor({
                   hero_image_alt: draft.hero_image_alt.trim(),
                   thumbnail: draft.thumbnail,
                   thumbnail_alt: draft.thumbnail_alt.trim(),
-                  author: draft.author.trim(),
+                  author_id: authorId,
                   category_id: draft.category_id,
                   is_featured: draft.is_featured,
                   status: draft.status,
