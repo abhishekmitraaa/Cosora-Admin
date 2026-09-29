@@ -103,6 +103,10 @@ export type Section =
   | "system-health"
   // Banners and theme configuration for the buyer-facing site.
   | "content"
+  // The public Cosora Journal at www.cosora.in/blogs: articles, categories and
+  // the landing hero. Same gate as "content" because the admin_blog_* RPCs all
+  // call admin.require_content_admin().
+  | "blogs"
   // Transaction ledger. Distinct from "reports", which keeps its KPI view.
   | "payments"
   // Physical certificate fulfilment.
@@ -184,6 +188,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // mirroring admin.require_content_admin() in the admin_site_* RPCs (admin
   // completion Phase 9). Widen both together if a marketing role is ever added.
   content: ["super_admin"],
+  // Mirrors admin.require_content_admin() in every admin_blog_* RPC. Widen the
+  // SQL gate and this line together; either alone is wrong.
+  blogs: ["super_admin"],
   // Finance reads and acts; support reads, because "did this vendor's payment
   // land" is a support question. Mirrors the subscriptions split.
   payments: ["super_admin", "finance_admin", "support"],
@@ -251,6 +258,7 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // role can write it from a browser even if a page tried.
   "system-health": [],
   content: ["super_admin"],
+  blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
   // Mirrors certificate_fulfiller() exactly. Add "delivery_team" here at the
   // same time as in SECTION_READ and in the SQL, once the enum value exists.

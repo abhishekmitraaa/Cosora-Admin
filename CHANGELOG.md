@@ -9,6 +9,41 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-29 (admin completion, Phase 10): **The blog is editable.** The Cosora Journal at
+  www.cosora.in/blogs is written here instead of by hand in SQL.
+  - `pages/Blogs.tsx` reads and writes through `lib/blogs.ts` and the `admin_blog_*` RPCs.
+    Three tabs: Articles, Categories and Landing page. The migrations are in
+    textile-spark-net (`20260929120000` to `20260929120300`).
+    - Articles: create, edit, reorder, publish, unpublish, schedule and delete. An article is
+      built from ordered blocks (text, heading, list, image, table, FAQ, quote, call to action,
+      divider), and the block order is the order it renders in.
+    - Formatting is bold, italic, underline, a link and two font-size steps, applied by a
+      toolbar over a textarea with a live preview. No editor dependency was added: the stored
+      format is HTML, so a richer editor can replace the toolbar later with no data migration.
+      Font size is two named steps rather than a picker, so an author cannot fake a heading
+      with large text and cost the page its heading structure.
+    - Images upload to `site-content/blog/<uuid>.<ext>`. Alt text is required on every article
+      image, enforced by the database, not just the form.
+    - Search appearance: a live preview of the title, address and description as a result will
+      show them, character counts against 60 and 158, tags, a canonical link and a no-index
+      switch. Blank fields fall back to the title and excerpt, so a post is never published
+      without meta tags.
+    - Categories: add, rename, describe and delete, each with its own search title and
+      description because a category page is an indexable URL. Deleting refuses while articles
+      still point at it.
+    - Landing page: the hero banner shown above the masthead on the blog home.
+  - `ui.tsx`: `Textarea` now forwards a ref, which the formatting toolbar needs to read the
+    selection. No other component changed.
+  - `AdminLog.tsx` names the three blog tables. `roles.ts` adds `blogs`, mirroring
+    `admin.require_content_admin()`, super_admin only.
+  - `database.types.ts` regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0. `copy-audit` reports 43 issues, all of
+    them pre-existing in Leads, Payments and SystemHealth; none in the new files. Against the
+    live database: every `admin_blog_*` RPC returns 401 to the anon key, the reserved slugs
+    `category`, `page` and `api` are refused, an image block without alt text is rejected, and
+    a second FAQ block on one article is rejected.
+
+
 - 2026-09-29 (admin completion, Phase 9): **Site content is real.** The dev-seed fixture is gone.
   - `pages/Content.tsx` reads and writes through `lib/siteContent.ts` and the `admin_site_*` RPCs. The migration and the `site-config-snapshot` edge function are in textile-spark-net (`20260928195051`).
     - Vendor dashboard banners only (Mitra's call): add, edit, reorder, turn on and off, schedule and delete; an optional image uploaded when the banner is saved; a destination that must be a path on cosora.in.

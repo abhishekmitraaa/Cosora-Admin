@@ -53,6 +53,9 @@ type LogRow = {
 /** What each audited table is called here. */
 const AREAS: Record<string, string> = {
   "public.faqs": "FAQ",
+  "public.blog_posts": "Blog post",
+  "public.blog_categories": "Blog category",
+  "public.blog_settings": "Blog landing page",
   "public.profiles": "Account status",
   "admin.account_suspensions": "Suspension record",
   "public.conversations": "Chat",

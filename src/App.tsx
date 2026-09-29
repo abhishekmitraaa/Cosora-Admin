@@ -39,6 +39,7 @@ import Faqs from "@/pages/Faqs";
 // imported because they are small and admins move between them constantly.
 const Geography = lazy(() => import("@/pages/Geography"));
 import Content from "@/pages/Content";
+import Blogs from "@/pages/Blogs";
 import Payments from "@/pages/Payments";
 import Certificates from "@/pages/Certificates";
 import Discounts from "@/pages/Discounts";
@@ -241,6 +242,14 @@ export default function App() {
                 element={
                   <RequireSection section="content">
                     <Content />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/blogs"
+                element={
+                  <RequireSection section="blogs">
+                    <Blogs />
                   </RequireSection>
                 }
               />

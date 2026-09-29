@@ -1,6 +1,9 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useEffect } from "react";
+import {
+  forwardRef,
+  useEffect,
+} from "react";
 import { Inbox, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import { setTheme, useTheme, type ThemeChoice } from "@/lib/theme";
 import type {
@@ -189,9 +192,17 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return <input {...props} className={cn(FIELD, className)} />;
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn(FIELD, "resize-y leading-relaxed", className)} />;
-}
+/**
+ * forwardRef because the blog editor's formatting toolbar needs the element to
+ * read selectionStart/selectionEnd; every other caller can ignore the ref.
+ */
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function Textarea({ className, ...props }, ref) {
+    return (
+      <textarea {...props} ref={ref} className={cn(FIELD, "resize-y leading-relaxed", className)} />
+    );
+  },
+);
 
 /**
  * Labelled field wrapper. `label` is required on purpose: there is no code path

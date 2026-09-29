@@ -5,16 +5,7 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
-/*
- * GENERATED from the live schema of Supabase project vxdhhgdfubqedfpwfyrb.
- * Do not hand-edit. Regenerate after every migration.
- *
- * This file was previously generated-plus-hand-maintained, and the hand-written
- * region went stale: it still typed `vendor_profiles.account_status`, a column
- * migration 20260801095820 had already DROPPED. TypeScript therefore accepted
- * queries that were 400-ing at runtime on Vendors, VendorDetail, Products and
- * Ads. Regenerating is what caught it; keep it generated.
- */
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -121,6 +112,9 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          discount_code: string | null
+          discount_paise: number
+          discount_redemption_id: string | null
           order_id: string
           paid_at: string | null
           spec: Json
@@ -130,6 +124,9 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          discount_code?: string | null
+          discount_paise?: number
+          discount_redemption_id?: string | null
           order_id: string
           paid_at?: string | null
           spec: Json
@@ -139,6 +136,9 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          discount_code?: string | null
+          discount_paise?: number
+          discount_redemption_id?: string | null
           order_id?: string
           paid_at?: string | null
           spec?: Json
@@ -241,6 +241,173 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      blog_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_posts: {
+        Row: {
+          author: string | null
+          blocks: Json | null
+          body: string | null
+          canonical_url: string | null
+          category_id: string | null
+          created_at: string
+          excerpt: string | null
+          hero_image: string | null
+          hero_image_alt: string | null
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          og_image: string | null
+          published_at: string | null
+          read_time: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[] | null
+          thumbnail: string | null
+          thumbnail_alt: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string | null
+          blocks?: Json | null
+          body?: string | null
+          canonical_url?: string | null
+          category_id?: string | null
+          created_at?: string
+          excerpt?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          id?: string
+          is_featured?: boolean
+          noindex?: boolean
+          og_image?: string | null
+          published_at?: string | null
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          sort_order?: number
+          status?: string
+          tags?: string[] | null
+          thumbnail?: string | null
+          thumbnail_alt?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string | null
+          blocks?: Json | null
+          body?: string | null
+          canonical_url?: string | null
+          category_id?: string | null
+          created_at?: string
+          excerpt?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          id?: string
+          is_featured?: boolean
+          noindex?: boolean
+          og_image?: string | null
+          published_at?: string | null
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          sort_order?: number
+          status?: string
+          tags?: string[] | null
+          thumbnail?: string | null
+          thumbnail_alt?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "blog_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_settings: {
+        Row: {
+          hero_cta_href: string | null
+          hero_cta_label: string | null
+          hero_enabled: boolean
+          hero_eyebrow: string | null
+          hero_image: string | null
+          hero_image_alt: string | null
+          hero_subtitle: string | null
+          hero_title: string | null
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          hero_cta_href?: string | null
+          hero_cta_label?: string | null
+          hero_enabled?: boolean
+          hero_eyebrow?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          hero_cta_href?: string | null
+          hero_cta_label?: string | null
+          hero_enabled?: boolean
+          hero_eyebrow?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       buyer_profiles: {
         Row: {
@@ -1834,6 +2001,8 @@ export type Database = {
           billing_period_start: string | null
           created_at: string
           currency: string
+          discount_amount: number | null
+          discount_code: string | null
           gst_amount: number | null
           gst_number: string | null
           id: string
@@ -1858,6 +2027,8 @@ export type Database = {
           billing_period_start?: string | null
           created_at?: string
           currency?: string
+          discount_amount?: number | null
+          discount_code?: string | null
           gst_amount?: number | null
           gst_number?: string | null
           id?: string
@@ -1882,6 +2053,8 @@ export type Database = {
           billing_period_start?: string | null
           created_at?: string
           currency?: string
+          discount_amount?: number | null
+          discount_code?: string | null
           gst_amount?: number | null
           gst_number?: string | null
           id?: string
@@ -1929,7 +2102,11 @@ export type Database = {
           amount: number
           billing_cycle: string
           created_at: string
+          discount_code: string | null
+          discount_redemption_id: string | null
+          discount_rupees: number
           gst_number: string | null
+          list_rupees: number | null
           order_id: string
           paid_at: string | null
           plan_id: string
@@ -1940,7 +2117,11 @@ export type Database = {
           amount: number
           billing_cycle?: string
           created_at?: string
+          discount_code?: string | null
+          discount_redemption_id?: string | null
+          discount_rupees?: number
           gst_number?: string | null
+          list_rupees?: number | null
           order_id: string
           paid_at?: string | null
           plan_id: string
@@ -1951,7 +2132,11 @@ export type Database = {
           amount?: number
           billing_cycle?: string
           created_at?: string
+          discount_code?: string | null
+          discount_redemption_id?: string | null
+          discount_rupees?: number
           gst_number?: string | null
+          list_rupees?: number | null
           order_id?: string
           paid_at?: string | null
           plan_id?: string
@@ -2687,6 +2872,161 @@ export type Database = {
           reason: string
         }[]
       }
+      admin_blog_category_delete: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      admin_blog_category_list: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          name: string
+          posts: number
+          seo_description: string
+          seo_title: string
+          slug: string
+          sort_order: number
+        }[]
+      }
+      admin_blog_category_reorder: {
+        Args: { p_ids: string[] }
+        Returns: undefined
+      }
+      admin_blog_category_save: {
+        Args: {
+          p_description?: string
+          p_id?: string
+          p_name?: string
+          p_seo_description?: string
+          p_seo_title?: string
+          p_slug?: string
+        }
+        Returns: string
+      }
+      admin_blog_post_delete: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+          images: string[]
+        }[]
+      }
+      admin_blog_post_get: {
+        Args: { p_id: string }
+        Returns: {
+          author: string
+          blocks: Json
+          body: string
+          canonical_url: string
+          category_id: string
+          created_at: string
+          excerpt: string
+          hero_image: string
+          hero_image_alt: string
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          og_image: string
+          published_at: string
+          read_time: string
+          seo_description: string
+          seo_title: string
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[]
+          thumbnail: string
+          thumbnail_alt: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_post_list: {
+        Args: never
+        Returns: {
+          category_id: string
+          category_name: string
+          excerpt: string
+          has_blocks: boolean
+          hero_image: string
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          published_at: string
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[]
+          thumbnail: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_post_reorder: { Args: { p_ids: string[] }; Returns: undefined }
+      admin_blog_post_save: {
+        Args: {
+          p_author?: string
+          p_blocks?: Json
+          p_canonical_url?: string
+          p_category_id?: string
+          p_excerpt?: string
+          p_hero_image?: string
+          p_hero_image_alt?: string
+          p_id?: string
+          p_is_featured?: boolean
+          p_noindex?: boolean
+          p_og_image?: string
+          p_published_at?: string
+          p_seo_description?: string
+          p_seo_title?: string
+          p_slug?: string
+          p_status?: string
+          p_tags?: string[]
+          p_thumbnail?: string
+          p_thumbnail_alt?: string
+          p_title?: string
+        }
+        Returns: string
+      }
+      admin_blog_post_set_status: {
+        Args: { p_id: string; p_published_at?: string; p_status: string }
+        Returns: {
+          id: string
+          published_at: string
+          status: string
+        }[]
+      }
+      admin_blog_settings_get: {
+        Args: never
+        Returns: {
+          hero_cta_href: string
+          hero_cta_label: string
+          hero_enabled: boolean
+          hero_eyebrow: string
+          hero_image: string
+          hero_image_alt: string
+          hero_subtitle: string
+          hero_title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_settings_save: {
+        Args: {
+          p_hero_cta_href?: string
+          p_hero_cta_label?: string
+          p_hero_enabled?: boolean
+          p_hero_eyebrow?: string
+          p_hero_image?: string
+          p_hero_image_alt?: string
+          p_hero_subtitle?: string
+          p_hero_title?: string
+        }
+        Returns: {
+          hero_image: string
+        }[]
+      }
       admin_conversation_review_list: {
         Args: { p_conversation_id?: string; p_status?: string }
         Returns: {
@@ -2777,6 +3117,32 @@ export type Database = {
           label: string
           uses: number
         }[]
+      }
+      admin_discount_code_save: {
+        Args: {
+          p_active?: boolean
+          p_applies_to?: string
+          p_code?: string
+          p_id?: string
+          p_kind?: string
+          p_max_uses?: number
+          p_note?: string
+          p_per_vendor_limit?: number
+          p_plan_ids?: string[]
+          p_valid_from?: string
+          p_valid_to?: string
+          p_value?: number
+        }
+        Returns: string
+      }
+      admin_discount_code_set_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: undefined
+      }
+      admin_discount_codes: { Args: never; Returns: Json }
+      admin_discount_redemptions: {
+        Args: { p_code_id: string; p_limit?: number }
+        Returns: Json
       }
       admin_embedding_pipeline_health: {
         Args: { p_limit?: number }
@@ -3028,6 +3394,8 @@ export type Database = {
         }
         Returns: {
           detail: string
+          discount_code: string
+          discount_paise: number
           entry_key: string
           gateway_ref: string
           gst_paise: number
@@ -3208,6 +3576,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      blog_assert_slug: {
+        Args: { p_id: string; p_slug: string }
+        Returns: string
+      }
+      blog_blocks_valid: { Args: { p_blocks: Json }; Returns: boolean }
+      blog_read_time: { Args: { p_blocks: Json }; Returns: string }
+      blog_slugify: { Args: { p_text: string }; Returns: string }
       build_video_search_text: {
         Args: { v: Database["public"]["Tables"]["product_videos"]["Row"] }
         Returns: string
@@ -3283,6 +3658,40 @@ export type Database = {
       discard_account_deletion_code: {
         Args: { p_request: string }
         Returns: undefined
+      }
+      discount_check: {
+        Args: {
+          p_ad_rupees?: number
+          p_certificate_rupees?: number
+          p_code: string
+          p_order_kind: string
+          p_plan_id?: string
+          p_plan_rupees?: number
+          p_vendor: string
+        }
+        Returns: Json
+      }
+      discount_confirm: {
+        Args: { p_order_ref: string; p_redemption: string }
+        Returns: Json
+      }
+      discount_release: {
+        Args: { p_order_ref: string; p_redemption: string }
+        Returns: Json
+      }
+      discount_reserve: {
+        Args: {
+          p_ad_rupees?: number
+          p_certificate_rupees?: number
+          p_code: string
+          p_expected_rupees?: number
+          p_order_kind: string
+          p_order_ref: string
+          p_plan_id?: string
+          p_plan_rupees?: number
+          p_vendor: string
+        }
+        Returns: Json
       }
       drain_vendor_catalog_recompute: {
         Args: { p_limit?: number }
