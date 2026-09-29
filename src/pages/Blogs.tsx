@@ -324,6 +324,12 @@ type Draft = {
   noindex: boolean;
 };
 
+  /**
+   * Not edited in this form, but carried through so a save writes back what
+   * was stored. admin_blog_post_save sets og_image = p_og_image, so sending
+   * null here erased a custom share image on every save.
+   */
+  og_image: string | null;
 const EMPTY_DRAFT: Draft = {
   title: "",
   slug: "",
@@ -345,6 +351,7 @@ const EMPTY_DRAFT: Draft = {
   noindex: false,
 };
 
+  og_image: null,
 function draftFrom(p: BlogPostFull): Draft {
   return {
     title: p.title ?? "",
@@ -367,6 +374,7 @@ function draftFrom(p: BlogPostFull): Draft {
     noindex: p.noindex,
   };
 }
+    og_image: p.og_image,
 
 function validate(d: Draft): Partial<Record<keyof Draft, string>> {
   const e: Partial<Record<keyof Draft, string>> = {};
@@ -690,7 +698,7 @@ function ArticleEditor({
                     : null,
                   seo_title: draft.seo_title.trim(),
                   seo_description: draft.seo_description.trim(),
-                  og_image: null,
+                  og_image: draft.og_image,
                   tags: draft.tags
                     .split(",")
                     .map((t) => t.trim())
