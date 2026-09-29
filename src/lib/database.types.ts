@@ -325,6 +325,7 @@ export type Database = {
       }
       blog_posts: {
         Row: {
+          author: string | null
           author_id: string | null
           blocks: Json | null
           body: string | null
@@ -352,6 +353,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          author?: string | null
           author_id?: string | null
           blocks?: Json | null
           body?: string | null
@@ -379,6 +381,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          author?: string | null
           author_id?: string | null
           blocks?: Json | null
           body?: string | null
@@ -3019,6 +3022,7 @@ export type Database = {
       admin_blog_post_reorder: { Args: { p_ids: string[] }; Returns: undefined }
       admin_blog_post_save: {
         Args: {
+          p_author?: string
           p_author_id?: string
           p_blocks?: Json
           p_canonical_url?: string
