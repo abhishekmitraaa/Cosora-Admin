@@ -1,11 +1,13 @@
 # Migrations
 
-**This repo's `supabase/migrations/` is only half the story.**
+**This repo's `supabase/migrations/` is one of three.**
 
-`Cosora-Admin` and `textile-spark-net` share one Supabase project
-(`vxdhhgdfubqedfpwfyrb`). Migrations in the two repos depend on each other in
-**both directions** and must be applied as a single timestamp-ordered list, not
-repo by repo.
+`Cosora-Admin`, `textile-spark-net` and `cosora-blogs` share one Supabase project
+(`vxdhhgdfubqedfpwfyrb`). Migrations in the three repos depend on each other in
+**every direction** and must be applied as a single timestamp-ordered list, not
+repo by repo. Each file lives in exactly one repo, and new migrations, admin
+ones included, go to `textile-spark-net`; nothing new has landed here since
+Phase 5.
 
 Concretely, from this repo:
 

@@ -36,7 +36,8 @@ entry in each, from that repo's point of view.
   www.cosora.in/blogs is written here instead of by hand in SQL.
   - `pages/Blogs.tsx` reads and writes through `lib/blogs.ts` and the `admin_blog_*` RPCs.
     Three tabs: Articles, Categories and Landing page. The migrations are in
-    textile-spark-net (`20260929120000` to `20260929120300`).
+    textile-spark-net (`20260929114553` to `20260929123402`, renamed 2026-09-30 from
+    `20260929120000` to `20260929120300` to match the versions Supabase recorded).
     - Articles: create, edit, reorder, publish, unpublish, schedule and delete. An article is
       built from ordered blocks (text, heading, list, image, table, FAQ, quote, call to action,
       divider), and the block order is the order it renders in.
