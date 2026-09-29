@@ -9,6 +9,19 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-30: **Blog categories get their own search fields, and saves stop losing data.**
+  - Categories: the form now edits the search title and search description, with a preview
+    and counters that follow the category rules, which differ from an article's: a category's
+    search title is used exactly as written with no site name added, and the description is
+    clamped to 158 at a whole word, exactly as the blog clamps it (`lib/blogSeo.ts`
+    `categoryRenderedTitle`, `categoryRenderedDescription`). The Description box grows to six
+    rows, since it now holds the category page's body copy. These two fields were already
+    saved, but only by SQL; this is what lets editors fix thin category pages themselves.
+  - Articles: saving an existing post no longer erases its `og_image`. The editor never loaded
+    the field and always sent null.
+  - The editor preview shows entities as the page does (`&plusmn;` as ±), and the counters
+    decode every entity the way the blog now does.
+
 - 2026-09-29: **The blog's search title counter counts what the page actually shows.** It
   measured the Search title field alone, but the blog appends " · The Cosora Journal" (21
   characters) to every article title, so every count read 21 short: the GSM article's

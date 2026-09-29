@@ -92,7 +92,7 @@ export function summarise(text: string, max = 155): string {
   const t = (text ?? "").replace(/\s+/g, " ").trim();
   if (!t) return "";
   if (t.length <= max) return t;
-  return `${t.slice(0, max).replace(/\s+\S*$/, "")}…`;
+  return `${t.slice(0, max).replace(/\s+\S*$/, "")}\u2026`;
 }
 
 /**
@@ -110,7 +110,42 @@ export function stripMarkdown(md: string | null, max = 300): string {
     .replace(/\s+/g, " ")
     .trim();
   if (text.length <= max) return text;
-  return `${text.slice(0, max).replace(/\s+\S*$/, "")}…`;
+  return `${text.slice(0, max).replace(/\s+\S*$/, "")}\u2026`;
+}
+
+/**
+ * cosora-blogs src/lib/metadata.ts clampDescription: trims to the last whole
+ * word inside the limit, drops trailing punctuation, adds an ellipsis. Applied
+ * to every listing and category description, including ones an editor wrote.
+ */
+export function clampDescription(text: string, max = SEO_DESC_MAX): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:\u2014-]$/, "")}\u2026`;
+}
+
+/**
+ * A category page's <title>. Unlike an article, a category's search title is
+ * used exactly as written, with no site name appended; only the fallback, the
+ * category name, gets the suffix. (cosora-blogs listingMetadata.)
+ */
+export function categoryRenderedTitle(seoTitle: string, name: string): string {
+  return seoTitle.trim() || (name ? `${name}${TITLE_SUFFIX}` : "");
+}
+
+/** A category page's meta description, clamped exactly as the blog clamps it. */
+export function categoryRenderedDescription(
+  seoDescription: string,
+  description: string,
+  name: string,
+): string {
+  return clampDescription(
+    seoDescription.trim() ||
+      description.trim() ||
+      `${name} stories from ${SITE_NAME}: sourcing, fabrics and manufacturing across India.`,
+  );
 }
 
 /**

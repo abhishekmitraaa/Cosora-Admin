@@ -26,6 +26,8 @@ import { useRole } from "@/hooks/useAdminSession";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import {
   blocksToText,
+  categoryRenderedDescription,
+  categoryRenderedTitle,
   charCount,
   renderedDescription,
   renderedTitle,
@@ -322,14 +324,14 @@ type Draft = {
   tags: string;
   canonical_url: string;
   noindex: boolean;
-};
-
   /**
    * Not edited in this form, but carried through so a save writes back what
    * was stored. admin_blog_post_save sets og_image = p_og_image, so sending
    * null here erased a custom share image on every save.
    */
   og_image: string | null;
+};
+
 const EMPTY_DRAFT: Draft = {
   title: "",
   slug: "",
@@ -349,9 +351,9 @@ const EMPTY_DRAFT: Draft = {
   tags: "",
   canonical_url: "",
   noindex: false,
+  og_image: null,
 };
 
-  og_image: null,
 function draftFrom(p: BlogPostFull): Draft {
   return {
     title: p.title ?? "",
@@ -372,9 +374,9 @@ function draftFrom(p: BlogPostFull): Draft {
     tags: (p.tags ?? []).join(", "),
     canonical_url: p.canonical_url ?? "",
     noindex: p.noindex,
+    og_image: p.og_image,
   };
 }
-    og_image: p.og_image,
 
 function validate(d: Draft): Partial<Record<keyof Draft, string>> {
   const e: Partial<Record<keyof Draft, string>> = {};
@@ -742,6 +744,15 @@ function CategoriesTab({ writable }: { writable: boolean }) {
   const rows = categories.data ?? [];
   const editing = Boolean(draft.id);
 
+  // What the category page will emit, by the listing's rules, not an article's:
+  // a search title is used exactly as written, and the description is clamped.
+  const catTitle = categoryRenderedTitle(draft.seo_title, draft.name);
+  const catTitleLength = charCount(catTitle);
+  const catDesc = categoryRenderedDescription(draft.seo_description, draft.description, draft.name);
+  const catDescLength = charCount(catDesc);
+  const seoTitleSet = Boolean(draft.seo_title.trim());
+  const seoDescWritten = charCount(draft.seo_description.trim());
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <div>
@@ -814,13 +825,59 @@ function CategoriesTab({ writable }: { writable: boolean }) {
           </Field>
           <Field
             label="Description"
-            hint="Shown on the category page. Blank lines start new paragraphs. Search results use the category's search description when one is set, otherwise the start of this."
+            hint="Shown on the category page. Blank lines start new paragraphs. Search results use the search description below when one is set, otherwise the start of this."
           >
             <Textarea
-              rows={2}
+              rows={6}
               value={draft.description}
               disabled={!writable}
               onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            />
+          </Field>
+
+          <div className="rounded-xl border border-line bg-surface p-3">
+            <p className="text-2xs uppercase tracking-wide text-ink-muted">Preview</p>
+            <p className="mt-1 text-sm text-brand">{catTitle || `New category${TITLE_SUFFIX}`}</p>
+            <p className="text-2xs text-ink-muted">
+              www.cosora.in/blogs/category/{draft.slug || "category-slug"}
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">{catDesc}</p>
+          </div>
+          <Field
+            label="Search title"
+            hint={
+              seoTitleSet
+                ? `${catTitleLength} of ${SEO_TITLE_MAX} characters, used exactly as written with no site name added. ${
+                    catTitleLength > SEO_TITLE_MAX
+                      ? `${catTitleLength - SEO_TITLE_MAX} too many.`
+                      : `${SEO_TITLE_MAX - catTitleLength} left.`
+                  }`
+                : draft.name
+                  ? `Blank, so the name is used with "${SUFFIX_LABEL}" added: ${catTitleLength} of ${SEO_TITLE_MAX} characters.`
+                  : `Blank uses the name, with "${SUFFIX_LABEL}" added.`
+            }
+          >
+            <Input
+              value={draft.seo_title}
+              disabled={!writable}
+              onChange={(e) => setDraft((d) => ({ ...d, seo_title: e.target.value }))}
+            />
+          </Field>
+          <Field
+            label="Search description"
+            hint={
+              !draft.seo_description.trim()
+                ? `Blank, so results show the start of the description: ${catDescLength} of ${SEO_DESC_MAX} characters.`
+                : seoDescWritten > SEO_DESC_MAX
+                  ? `${seoDescWritten} characters written. Results cut it to ${catDescLength}, at the last whole word.`
+                  : `${catDescLength} of ${SEO_DESC_MAX} characters. Aim for ${SEO_DESC_MIN} or more.`
+            }
+          >
+            <Textarea
+              rows={3}
+              value={draft.seo_description}
+              disabled={!writable}
+              onChange={(e) => setDraft((d) => ({ ...d, seo_description: e.target.value }))}
             />
           </Field>
           <div className="flex gap-2">
