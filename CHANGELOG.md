@@ -9,6 +9,16 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-09-29: **The blog's search title counter counts what the page actually shows.** It
+  measured the Search title field alone, but the blog appends " · The Cosora Journal" (21
+  characters) to every article title, so every count read 21 short: the GSM article's
+  66-character title showed "66 of 60" while its real `<title>` was 87. `lib/blogSeo.ts` now
+  mirrors the blog's title and description logic in one place, including the legacy Markdown
+  body fallback that two of the three live posts still use, and the preview shows the full
+  tag. Verified byte-for-byte against the live `<title>` and meta description of every
+  published post. The Categories tab's Description hint no longer claims the field is the
+  search description; the separate search description overrides it when set.
+
 - 2026-09-29 (admin completion, Phase 10): **The blog is editable.** The Cosora Journal at
   www.cosora.in/blogs is written here instead of by hand in SQL.
   - `pages/Blogs.tsx` reads and writes through `lib/blogs.ts` and the `admin_blog_*` RPCs.

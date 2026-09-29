@@ -24,7 +24,18 @@ import { BlockEditor } from "@/components/blog/BlockEditor";
 import { BlogImageField } from "@/components/blog/BlogImageField";
 import { useRole } from "@/hooks/useAdminSession";
 import { canWrite, readOnlyReason } from "@/lib/roles";
-import { inlineToText } from "@/lib/blogInline";
+import {
+  blocksToText,
+  charCount,
+  renderedDescription,
+  renderedTitle,
+  SEO_DESC_MAX,
+  SEO_DESC_MIN,
+  SEO_TITLE_MAX,
+  SUFFIX_LABEL,
+  TITLE_ROOM,
+  TITLE_SUFFIX,
+} from "@/lib/blogSeo";
 import {
   removeBlogImage,
   useBlogCategories,
@@ -44,11 +55,6 @@ import {
 } from "@/lib/blogs";
 
 const BLOG_URL = "https://www.cosora.in/blogs";
-
-/** Lengths Google will actually show. Advisory only, never blocking. */
-const SEO_TITLE_MAX = 60;
-const SEO_DESC_MIN = 120;
-const SEO_DESC_MAX = 158;
 
 type TabId = "articles" | "categories" | "landing";
 
@@ -399,33 +405,35 @@ function ArticleEditor({
   const errors = validate(draft);
   const valid = Object.keys(errors).length === 0;
 
-  // What the blog will actually emit, derived exactly as the site derives it.
-  const effectiveTitle = draft.seo_title.trim() || draft.title.trim();
-  const bodyText = draft.blocks
-    .map((b) =>
-      b.type === "rich_text"
-        ? inlineToText(b.html)
-        : b.type === "heading"
-          ? b.text
-          : b.type === "quote"
-            ? b.text
-            : "",
-    )
-    .filter(Boolean)
-    .join(" ");
-  const effectiveDesc =
-    draft.seo_description.trim() || draft.excerpt.trim() || bodyText.slice(0, SEO_DESC_MAX);
+  // What the blog will actually emit, derived by lib/blogSeo exactly as
+  // cosora-blogs derives it. The title is measured as the whole <title> tag,
+  // site name included: measuring the field alone under-reported every title by
+  // the 21 characters of " · The Cosora Journal".
+  const pageTitle = renderedTitle(draft.seo_title, draft.title);
+  const titleLength = charCount(pageTitle);
+  const usingArticleTitle = !draft.seo_title.trim() && Boolean(pageTitle);
+  const bodyText = blocksToText(draft.blocks);
+  // The stored legacy Markdown body: never edited here, but the blog still falls
+  // back to it for a post with no prose blocks.
+  const effectiveDesc = renderedDescription(
+    draft.seo_description,
+    draft.excerpt,
+    draft.blocks,
+    existing.data?.body ?? null,
+  );
+  const descLength = charCount(effectiveDesc);
   const words = bodyText ? bodyText.split(/\s+/).length : 0;
 
   const seoWarnings = useMemo(() => {
     const w: string[] = [];
-    if (effectiveTitle.length > SEO_TITLE_MAX) w.push("The title will be cut short in results.");
-    if (effectiveDesc.length < SEO_DESC_MIN) w.push("The description is shorter than ideal.");
+    if (titleLength > SEO_TITLE_MAX) w.push("The title will be cut short in results.");
+    if (descLength < SEO_DESC_MIN) w.push("The description is shorter than ideal.");
+    if (descLength > SEO_DESC_MAX) w.push("The description will be cut short in results.");
     if (!draft.blocks.some((b) => b.type === "heading")) w.push("No headings, so no contents list.");
     if (!draft.category_id) w.push("No category, so it will not appear under a section.");
     if (!draft.thumbnail && !draft.hero_image) w.push("No image, so cards will show a placeholder.");
     return w;
-  }, [effectiveTitle, effectiveDesc, draft]);
+  }, [titleLength, descLength, draft]);
 
   if (id && !loaded) {
     return (
@@ -574,7 +582,7 @@ function ArticleEditor({
         </Note>
         <div className="rounded-xl border border-line bg-surface p-3">
           <p className="text-2xs uppercase tracking-wide text-ink-muted">Preview</p>
-          <p className="mt-1 text-sm text-brand">{effectiveTitle || "Untitled"}</p>
+          <p className="mt-1 text-sm text-brand">{pageTitle || `Untitled${TITLE_SUFFIX}`}</p>
           <p className="text-2xs text-ink-muted">
             www.cosora.in/blogs/{draft.slug || "article-slug"}
           </p>
@@ -583,7 +591,15 @@ function ArticleEditor({
 
         <Field
           label="Search title"
-          hint={`${effectiveTitle.length} of ${SEO_TITLE_MAX} characters used.`}
+          hint={
+            !pageTitle
+              ? `The site adds "${SUFFIX_LABEL}" (${SEO_TITLE_MAX - TITLE_ROOM} characters with its space), so keep the title to ${TITLE_ROOM}.`
+              : `${usingArticleTitle ? "Blank, so the article title is used. " : ""}${titleLength} of ${SEO_TITLE_MAX} characters with "${SUFFIX_LABEL}" added. ${
+                  titleLength > SEO_TITLE_MAX
+                    ? `${titleLength - SEO_TITLE_MAX} too many.`
+                    : `${SEO_TITLE_MAX - titleLength} left.`
+                }`
+          }
         >
           <Input
             value={draft.seo_title}
@@ -593,7 +609,7 @@ function ArticleEditor({
         </Field>
         <Field
           label="Search description"
-          hint={`${effectiveDesc.length} characters. Aim for ${SEO_DESC_MIN} to ${SEO_DESC_MAX}.`}
+          hint={`${descLength} characters. Aim for ${SEO_DESC_MIN} to ${SEO_DESC_MAX}.`}
         >
           <Textarea
             rows={2}
@@ -788,7 +804,10 @@ function CategoriesTab({ writable }: { writable: boolean }) {
               onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))}
             />
           </Field>
-          <Field label="Description" hint="Shown on the category page and used as its description.">
+          <Field
+            label="Description"
+            hint="Shown on the category page. Blank lines start new paragraphs. Search results use the category's search description when one is set, otherwise the start of this."
+          >
             <Textarea
               rows={2}
               value={draft.description}

@@ -78,7 +78,8 @@ export function previewInline(html: string): string {
 }
 
 /** Plain text, for word counts and the SEO description fallback. */
-export function inlineToText(html: string): string {
+export function inlineToText(html: string | null | undefined): string {
+  if (!html) return "";
   return html
     .replace(/<br\s*\/?>/gi, " ")
     .replace(/<[^>]*>/g, "")
@@ -86,6 +87,8 @@ export function inlineToText(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
     .replace(/\s+/g, " ")
     .trim();
 }
