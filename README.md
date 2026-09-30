@@ -225,6 +225,53 @@ changed fields before → after. Filters: admin, area, action, date range.
   changes and removes teammates in the five team roles (`TEAM_ROLES` in `roles.ts`), and
   nothing else: not a super admin, another manager or their own access.
 
+---
+
+### Support (2026-09-30; live 2026-10-01, rollout Off)
+
+Answers what buyers and vendors send from Help: chats, callback requests, fraud reports
+and app feedback. The plan and its decisions are in textile-spark-net
+`documentation/help-feature-plan.md`. The data is `public.support_*`, read and written
+only through `admin_support_*` functions (textile-spark-net migrations `20260930212818`,
+`20260930213143` and `20260930213451`, applied 2026-10-01). Rollout starts Off, so the
+inbox stays empty until a super admin opens it in Support settings.
+
+| Route | Page | What it does |
+|---|---|---|
+| `/support` | `Support.tsx` (default) | Inbox: views, filters, the waiting count, live updates |
+| `/support/callbacks` | `SupportCallbacks` | Callback requests, with the call window and attempts |
+| `/support/fraud` | `SupportFraud` | Fraud reports (restricted) |
+| `/support/feedback` | `SupportFeedback` | Bug reports and ideas |
+| `/support/:ticketNo` | `SupportTicket.tsx` | One request: thread, reply or internal note, files, status, the requester, context, history |
+| `/support/settings` | `SupportSettings.tsx` | Rollout, test accounts, hours, holidays, contact details, topics |
+| `/faqs` → Quick Guides | `components/HelpGuides.tsx` | The Help page's step-by-step guides (en, hi, gu) |
+
+| Role | Support | Support settings | Quick Guides |
+|---|---|---|---|
+| `super_admin` | read, act | read, change | read, edit |
+| `support` | read, act | read | read, edit |
+| `manager` | read | read | – |
+| everyone else | – | – | – |
+
+- **The database is the gate.** `admin.support_can_read()` / `support_can_write()` in the
+  functions, mirrored by `support` and `support-settings` in `roles.ts`. Change both together.
+- **The requester sees "Cosora Support"**, never a name. Internal notes never reach them;
+  RLS guarantees it, not this app.
+- **Phone numbers are masked.** Reveal calls `admin_support_reveal_contact()`, which writes a
+  `reveal_contact` row to the Admin Log before returning the number.
+- **Files:** `lib/support.ts` `uploadStaffFile()` reserves a path, uploads to the private
+  `support-attachments` bucket, then calls the `support-attachment-verify` edge function,
+  which checks the file's first bytes and the type storage serves it as. It returns only
+  once the file is `clean`, because the database sends nothing else. Links are signed for
+  5 minutes: opening a photo or PDF signs a fresh one, and audio re-signs on play. PDFs
+  download; they never render in the panel.
+- **Live updates:** `useSupportRealtime()` subscribes to `support_tickets`,
+  `support_ticket_staff` and `support_messages` with a topic of its own per mount, and
+  treats every event as "refetch". The nav count polls every 60 s instead, so the rail
+  holds no socket.
+- **Rollout starts Off.** The inbox says so, and links to Support settings.
+- A Support-role admin lands on `/support`; other roles land where they did.
+
 ## Phase-4 sections
 
 Nine additions. Eight read real rows; Discounts still renders a development-only
@@ -539,9 +586,10 @@ diverged.
 
 ### Navigation
 
-Five collapsible groups (Moderation, People, Commerce, Insight, Settings)
-rather than a twenty-item scroll. **Every route and every label is unchanged** -
-only the grouping is new. The group holding the current route is always
+Six collapsible groups (Support, Moderation, People, Commerce, Insight, Settings)
+rather than a twenty-item scroll. Support (2026-09-30) comes first because a person is
+waiting on each item in it; its Inbox shows the number of requests waiting on staff.
+**Every earlier route and label is unchanged** - only the grouping is new. The group holding the current route is always
 expanded; the rest remember their state in `localStorage`. A group whose items
 are all hidden by role renders nothing, heading included.
 

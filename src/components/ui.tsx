@@ -665,6 +665,7 @@ export function Modal({
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 className="font-display text-base font-bold tracking-tight text-ink">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
             className="-mr-1 -mt-1 rounded-md p-1 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
@@ -722,6 +723,9 @@ export function Tabs<T extends string>({
       {tabs.map((t) => (
         <button
           key={t.id}
+          // Not a submit button: Tabs can sit inside a form (the Quick Guide editor's
+          // language tabs), and a bare <button> there saved and closed the form.
+          type="button"
           onClick={() => onChange(t.id)}
           aria-current={active === t.id ? "page" : undefined}
           className={cn(

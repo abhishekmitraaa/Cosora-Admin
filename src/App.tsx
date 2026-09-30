@@ -46,6 +46,10 @@ import Discounts from "@/pages/Discounts";
 import Customers from "@/pages/Customers";
 import LiveActivity from "@/pages/LiveActivity";
 import SystemHealth from "@/pages/SystemHealth";
+// Help & Support (2026-09-30): the inbox and its boards, one request, and settings.
+import SupportInbox, { SupportCallbacks, SupportFeedback, SupportFraud } from "@/pages/Support";
+import SupportTicket from "@/pages/SupportTicket";
+import SupportSettings from "@/pages/SupportSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -54,6 +58,9 @@ const queryClient = new QueryClient({
 /** Send each admin to the first section their role can actually see. */
 function Landing() {
   const role = useAdminSession().identity?.role ?? null;
+  // Answering support requests is the Support role's day (Help & Support, D-03). Other
+  // roles that can read support keep landing where they did.
+  if (role === "support") return <Navigate to="/support" replace />;
   const first =
     (
       [
@@ -330,6 +337,54 @@ export default function App() {
                 element={
                   <RequireSection section="admin-log">
                     <AdminLog />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support"
+                element={
+                  <RequireSection section="support">
+                    <SupportInbox />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support/callbacks"
+                element={
+                  <RequireSection section="support">
+                    <SupportCallbacks />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support/fraud"
+                element={
+                  <RequireSection section="support">
+                    <SupportFraud />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support/feedback"
+                element={
+                  <RequireSection section="support">
+                    <SupportFeedback />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support/settings"
+                element={
+                  <RequireSection section="support-settings">
+                    <SupportSettings />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/support/:ticketNo"
+                element={
+                  <RequireSection section="support">
+                    <SupportTicket />
                   </RequireSection>
                 }
               />

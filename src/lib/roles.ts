@@ -18,7 +18,10 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   vendor_ops: "Vendor ops",
   ads_moderator: "Ads moderator",
   finance_admin: "Finance admin",
-  support: "Support (read-only)",
+  // Was "Support (read-only)". Support has written chat reviews, FAQs, customer tags and
+  // account status for a while, and since Help & Support (2026-09-30) it answers every
+  // support request, so "read-only" was wrong everywhere it rendered.
+  support: "Support",
   // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. Since
   // 2026-09-26 it also adds, changes and removes teammates in TEAM_ROLES on the
   // Admins page. It sees no moderation or commerce section.
@@ -123,7 +126,18 @@ export type Section =
   | "traction"
   // Every admin's changes and sign-ins, with date and time (MPF-26). Mirrors
   // admin_audit_log_list(), which admits super_admin and manager only.
-  | "admin-log";
+  | "admin-log"
+  // Help & Support (2026-09-30, textile-spark-net documentation/help-feature-plan.md):
+  // the inbox, the ticket workspace, and the callback, fraud-report and feedback boards.
+  // REAL DATA: public.support_* through the admin_support_* functions, which gate with
+  // admin.support_can_read() (super_admin, support, manager) and
+  // admin.support_can_write() (super_admin, support). Manager reads (Andy, D-08), and
+  // every phone number it reveals is written to the Admin Log.
+  | "support"
+  // Hours, holidays, rollout, the contact details Help shows, and which topics are on.
+  // Everyone who reads support may look; only a super admin changes it
+  // (admin.require_content_admin() in each admin_support_set_* function).
+  | "support-settings";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -216,6 +230,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   traction: ALL_ROLES,
   // admin_audit_log_list() and admin_audit_log_actors() admit exactly these two.
   "admin-log": ["super_admin", "manager"],
+  // Mirrors admin.support_can_read(). Change the SQL gate and this line together.
+  support: ["super_admin", "support", "manager"],
+  "support-settings": ["super_admin", "support", "manager"],
 };
 
 /**
@@ -273,6 +290,11 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.
   "admin-log": [],
+  // Mirrors admin.support_can_write(): claim, reply, resolve, callbacks, fraud outcomes,
+  // feedback. Manager is read-only here (D-08).
+  support: ["super_admin", "support"],
+  // admin.require_content_admin(): super admins only.
+  "support-settings": ["super_admin"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

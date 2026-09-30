@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
+import HelpGuides from "@/components/HelpGuides";
 import {
   Badge,
   Button,
@@ -87,6 +88,8 @@ export default function Faqs() {
   const [editing, setEditing] = useState<FaqRow | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [deleting, setDeleting] = useState<FaqRow | null>(null);
+  // Quick Guides (Help & Support P4d) share this page and its audience, not its table.
+  const [guides, setGuides] = useState(false);
 
   const meta = SURFACES.find((s) => s.id === surface)!;
 
@@ -197,17 +200,38 @@ export default function Faqs() {
 
   const canAdd = writable && draft.question.trim() && draft.answer.trim() && (!meta.grouped || draft.category.trim());
 
+  const tabs = (
+    <Tabs<Surface | "guides">
+      tabs={[
+        ...SURFACES.map((s) => ({ id: s.id, label: s.label, count: all.filter((r) => r.surface === s.id).length })),
+        { id: "guides" as const, label: "Quick Guides" },
+      ]}
+      active={guides ? "guides" : surface}
+      onChange={(id) => {
+        setGuides(id === "guides");
+        if (id !== "guides") setSurface(id);
+      }}
+    />
+  );
+
+  if (guides) {
+    return (
+      <Page>
+        <PageHeader title="FAQs" subtitle={SUBTITLE} />
+        {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "faqs")} />}
+        {tabs}
+        <HelpGuides writable={writable} />
+      </Page>
+    );
+  }
+
   return (
     <Page>
       <PageHeader title="FAQs" subtitle={SUBTITLE} />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "faqs")} />}
 
-      <Tabs
-        tabs={SURFACES.map((s) => ({ id: s.id, label: s.label, count: all.filter((r) => r.surface === s.id).length }))}
-        active={surface}
-        onChange={setSurface}
-      />
+      {tabs}
 
       <Note className="mb-4">
         Shown on {meta.where}. Changes reach the live page within about a minute of saving, with no deploy.{" "}

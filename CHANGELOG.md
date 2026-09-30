@@ -9,6 +9,61 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-01 (Help & Support P4, live): **The Support section works against production.** The three
+  support migrations are applied (textile-spark-net `20260930212818`, `…213143`, `…213451`), and
+  `support-attachment-verify` is deployed. Rollout is Off, so the inbox is empty until a super admin
+  opens it.
+  - `lib/database.types.ts` regenerated from the live schema: 803 lines added, none changed. It
+    replaces the hand-added function types, and adds the support tables and `csp_violations`.
+  - Opened against production as demo-admin, read-only (writes aborted in the browser), at 1440 and
+    390 wide: every Support page renders, and the Quick Guides language tabs switch without saving.
+  - Layout fixes from that check: the hours rows in Support settings overflowed on a phone (the times
+    now take their own row), and the inbox's "From" filter reads "All" instead of truncating.
+  - Verified: `npm run typecheck` 0, `npm run build`.
+
+- 2026-10-01 (Help & Support P4, review fixes): **Fixes from a review of the Support pages, before anyone has used them.**
+  - Quick Guides: clicking Hindi or Gujarati saved the guide and closed the editor, because the kit's Tabs buttons were submit buttons. `Tabs` and the Modal close button are `type="button"` now, which fixes any form that holds them.
+  - Replying with files: a retry after a failure reuses the files already checked and drops the one that failed, instead of uploading everything again. `uploadStaffFile` waits for a `clean` verdict, which the database now requires.
+  - File links are signed for 5 minutes, so opening a photo or PDF now signs a fresh link, and audio re-signs when play starts on an old one.
+  - A failed background refresh no longer replaces the request (or Support settings) with an error and loses a half-typed reply; a notice says it's showing the last version.
+  - Callbacks: the date shows as booked in IST, not in the browser's time zone; a resolved callback isn't "overdue"; a callback booked for later shows "due in …" in the inbox.
+  - Assign to: a request held by someone who left the support team shows their name, and "Nobody" frees it.
+  - Status changes: the reason field is labelled, and the dialog keeps it when the database refuses.
+  - Nav: Inbox is lit on a request page.
+  - Copy: admins can test only while rollout is Staff testing; the billing topic is named as the table shows it.
+  - Verified: `npm run typecheck` 0, `npm run build`.
+
+- 2026-09-30 (Help & Support P4, branch `help-support/p4-admin-console`): **A Support section
+  answers buyers' and vendors' requests. It runs on textile-spark-net's three support migrations
+  (applied 2026-10-01, entry above), and rollout starts Off.**
+  - **Nav:** a Support group first: Inbox (with the waiting count), Callbacks, Fraud reports,
+    App feedback, Support settings. A Support-role admin lands on `/support`.
+  - **`/support`** and the three boards (`pages/Support.tsx`): views (waiting on us, open,
+    mine, unassigned, resolved, closed, all) with counts; filters for channel, topic, side,
+    language and a search; test requests tagged, and hidden by unticking “Include test requests”; oldest waiting first; live
+    updates; a notice while rollout is Off or Staff.
+  - **`/support/:ticketNo`** (`pages/SupportTicket.tsx`): the thread (photos, audio, PDFs as
+    downloads; "checking" and "refused" states); reply or internal note with up to 5 files;
+    take, assign, resolve, reopen, close with a reason; masked phones with a logged Reveal;
+    callback attempts; fraud outcomes, with the vendor's flag log; feedback reviewed; the
+    requester's account (Account controls for super_admin and support, the status badge for a
+    manager); what the database gathered at opening; other requests; the history. Links to
+    Accounts, Vendors and Chats show only to roles that can open them.
+  - **`/support/settings`** (`pages/SupportSettings.tsx`): rollout (Off, Staff testing with up
+    to 20 test accounts, Everyone, with the launch checklist before Everyone), hours, holidays,
+    the phone and email Help shows, topics on and off (Subscription and billing, `vendor_billing`, asks first: D-11).
+    super_admin changes; the database's `can_edit` decides.
+  - **`/faqs` → Quick Guides** (`components/HelpGuides.tsx`): add, edit and delete guides in
+    English, Hindi and Gujarati; active; "checked against the app".
+  - `roles.ts`: sections `support` (read super_admin, support, manager; write super_admin,
+    support) and `support-settings` (write super_admin). The Support role's label is
+    "Support", no longer "Support (read-only)".
+  - Admin Log: labels for the support tables, Quick Guides, and "Revealed a phone number".
+  - `lib/support.ts` holds every call; `lib/database.types.ts` has the 23 new functions,
+    added by hand until the types are regenerated after the migrations are applied.
+  - Verified: `npm run typecheck` 0, `npm run build`. Not opened in a browser: the functions
+    don't exist yet.
+
 - 2026-09-30: **Articles have a real author, picked from a list.** The free-text Author box,
   which defaulted to "Cosora Team", is now a dropdown of the rows in `public.authors`: Cosora
   first (the default for a new post), then Anandita Mitra (CEO), Ishani Banerjee (CMO) and
