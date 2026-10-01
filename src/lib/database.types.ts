@@ -972,6 +972,7 @@ export type Database = {
           position: number
           question: string
           surface: string
+          translations: Json
           updated_at: string
         }
         Insert: {
@@ -984,6 +985,7 @@ export type Database = {
           position?: number
           question: string
           surface: string
+          translations?: Json
           updated_at?: string
         }
         Update: {
@@ -996,6 +998,7 @@ export type Database = {
           position?: number
           question?: string
           surface?: string
+          translations?: Json
           updated_at?: string
         }
         Relationships: [
@@ -3863,6 +3866,20 @@ export type Database = {
           position: number
         }[]
       }
+      admin_faq_set_translations: {
+        Args: { p_id: string; p_translations: Json }
+        Returns: {
+          id: string
+          translations: Json
+        }[]
+      }
+      admin_faq_translations: {
+        Args: { p_surface?: string }
+        Returns: {
+          id: string
+          translations: Json
+        }[]
+      }
       admin_faq_update: {
         Args: {
           p_active?: boolean
@@ -3944,6 +3961,25 @@ export type Database = {
         Returns: {
           active: boolean
           id: string
+        }[]
+      }
+      admin_fraud_findings: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_status: string
+          amount_inr: number
+          decided_at: string
+          decided_by_name: string
+          id: string
+          incident_date: string
+          outcome: string
+          report_purged_at: string
+          subject_kind: string
+          subject_name: string
+          subject_profile_id: string
+          ticket_no: string
+          what_happened: string
+          withdrawn_at: string
         }[]
       }
       admin_fraud_set_outcome: {
@@ -4179,6 +4215,59 @@ export type Database = {
           p_vendor_accent: string
         }
         Returns: Json
+      }
+      admin_staff_get: {
+        Args: { p_user_id: string }
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          employee_id: string
+          full_name: string
+          is_active: boolean
+          personal_email: string
+          user_id: string
+          work_email: string
+        }[]
+      }
+      admin_staff_identifiers: {
+        Args: { p_full_name: string; p_personal_email: string }
+        Returns: {
+          employee_id: string
+          work_email: string
+        }[]
+      }
+      admin_staff_list: {
+        Args: never
+        Returns: {
+          admin_role: Database["public"]["Enums"]["admin_role_type"]
+          employee_id: string
+          full_name: string
+          is_active: boolean
+          password_changed_at: string
+          personal_email: string
+          phone: string
+          registered_at: string
+          registered_by_name: string
+          temp_password_delivery: string
+          temp_password_issued_at: string
+          user_id: string
+          work_email: string
+        }[]
+      }
+      admin_staff_password_event: {
+        Args: { p_delivery?: string; p_event: string; p_user_id: string }
+        Returns: undefined
+      }
+      admin_staff_record: {
+        Args: {
+          p_employee_id: string
+          p_full_name: string
+          p_personal_email: string
+          p_phone: string
+          p_registered_by: string
+          p_user_id: string
+          p_work_email: string
+        }
+        Returns: undefined
       }
       admin_status_of: {
         Args: { p_user_id: string }
@@ -4513,6 +4602,7 @@ export type Database = {
         }[]
       }
       expire_subscriptions: { Args: never; Returns: number }
+      faq_translations_valid: { Args: { p: Json }; Returns: boolean }
       for_you_products: {
         Args: { match_count?: number; p_buyer_id: string }
         Returns: {
@@ -4825,6 +4915,14 @@ export type Database = {
         }
         Returns: Json
       }
+      support_receipt_record: {
+        Args: { p_detail?: string; p_sent: boolean; p_ticket_id: string }
+        Returns: undefined
+      }
+      support_receipt_target: {
+        Args: { p_ticket_no: string; p_user: string }
+        Returns: Json
+      }
       support_reopen: { Args: { p_ticket_id: string }; Returns: Json }
       support_report_fraud: {
         Args: {
@@ -4873,6 +4971,8 @@ export type Database = {
         }
         Returns: Json
       }
+      support_sweep_purge: { Args: { p_ticket_ids: string[] }; Returns: number }
+      support_sweep_run: { Args: { p_limit?: number }; Returns: Json }
       suspend_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
         Returns: undefined

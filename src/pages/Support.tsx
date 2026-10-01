@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { FraudRecordsPanel } from "@/components/FraudRecords";
 import { format } from "date-fns";
 import { Clock, MessageSquare, PhoneCall, ShieldAlert, Lightbulb } from "lucide-react";
 import {
@@ -79,9 +80,11 @@ interface QueueProps {
   channel?: SupportChannel;
   title: string;
   subtitle: string;
+  /** Shown under the queue, for example the confirmed-fraud records on the Fraud board. */
+  footer?: ReactNode;
 }
 
-export function SupportQueue({ channel, title, subtitle }: QueueProps) {
+export function SupportQueue({ channel, title, subtitle, footer }: QueueProps) {
   useSupportRealtime();
   const counts = useSupportCounts();
   const settings = useSupportSettings();
@@ -266,6 +269,7 @@ export function SupportQueue({ channel, title, subtitle }: QueueProps) {
             </>
           )}
         </Panel>
+        {footer}
       </Stack>
     </Page>
   );
@@ -387,7 +391,8 @@ export function SupportFraud() {
     <SupportQueue
       channel="fraud_report"
       title="Fraud reports"
-      subtitle="Reports of fraud, with evidence. The reporter sees only that their report was received and reviewed: never the outcome, the notes, or the reported party's details."
+      subtitle="Reports of fraud, with evidence. The reporter sees only that their report was received and reviewed: never the outcome, the notes, or the reported party's details. A report is kept for a year; a confirmed fraud stays on record below."
+      footer={<FraudRecordsPanel />}
     />
   );
 }

@@ -662,6 +662,7 @@ function FraudPanel({ detail: d }: { detail: SupportTicketDetail }) {
   const [outcome, setOutcome] = useState(d.staff.fraud_outcome ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const confirmsFraud = outcome !== "" && outcome !== "no_action";
   return (
     <Panel
       title="Fraud report"
@@ -707,13 +708,19 @@ function FraudPanel({ detail: d }: { detail: SupportTicketDetail }) {
               {FRAUD_OUTCOMES.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </Select>
           </Field>
-          <Field label="Note (internal, goes to the Admin Log)" htmlFor="fraud-note">
+          {/* A decision of fraud is kept as a lasting record after the report itself is
+              deleted (a year after filing), so it has to say what the party did. */}
+          <Field
+            label={confirmsFraud ? "What they did (kept on the lasting record)" : "Note (internal, goes to the Admin Log)"}
+            htmlFor="fraud-note"
+            hint={confirmsFraud ? "A line or two in your own words. It stays on the Confirmed fraud record after the report is deleted." : undefined}
+          >
             <Textarea id="fraud-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
           <Button
             variant="primary"
             size="sm"
-            disabled={busy || !outcome}
+            disabled={busy || !outcome || (confirmsFraud && !note.trim())}
             onClick={async () => {
               setBusy(true);
               try {

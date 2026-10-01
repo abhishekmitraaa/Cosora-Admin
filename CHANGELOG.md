@@ -9,6 +9,31 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-01 (Help & Support P7, the launch gate; branch `help-support/p7-fixes`, on top of P6; not merged): **Two fixes the local end-to-end run found.** The run itself is in textile-spark-net (`tests/local/`, `documentation/test.md`).
+  - **A newly registered staff member could not get past "Choose your password".** Saving the new password through `admin-staff` (the Auth admin API) ends the account's sessions, so the panel's `refreshSession()` failed with "Invalid Refresh Token: Refresh Token Not Found" and the screen stayed. `setOwnPassword()` (`src/lib/staff.ts`) now signs in again with the new password; that session carries `must_change_password = false`.
+  - **Confirming fraud needs a note.** On Warned, Suspended or Escalated to legal, the Fraud panel's note becomes "What they did (kept on the lasting record)" and Save waits for it. It is the line the Confirmed fraud record keeps after the report is deleted a year after filing; before, a decision saved without a note left the record saying "No note was written."
+
+- 2026-10-01 (Help & Support P6; branch `help-support/p6-background`, on top of P5; not merged): **Support → Fraud reports gains "Confirmed fraud".**
+  - One line per report decided as fraud: when, by whom, who it was, what they did (the reviewer's note), the amount and date, the outcome and the account's status then.
+  - It stays after the report itself is deleted, a year after filing (textile-spark-net D-16, revised 2026-10-01). A decision later changed to "no action" shows as withdrawn.
+  - It reads `admin_fraud_findings()`, from textile-spark-net `20261001140000` (rehearsed, not applied). Until that's applied the panel says no report has been decided as fraud.
+  - `database.types.ts` gains the P6 functions by hand.
+
+- 2026-10-01 (Help & Support P5, content; branch `help-support/p5-content`, on top of staff registration; not merged): **FAQs → a Seller Help tab, and Hindi and Gujarati in Edit.**
+  - Seller Help is grouped by category like Buyer Help, with category suggestions taken from the open tab.
+  - Edit has a Hindi and a Gujarati question and answer. Save sends `admin_faq_update`, then `admin_faq_set_translations`. A half-filled language is refused in the page, and a note appears when the English changes, because the database clears stored translations then.
+  - The table shows `hi` and `gu` badges for the stored languages, read through `admin_faq_translations()`. If that function isn't in the database yet, the page still loads, without translations.
+  - Needs textile-spark-net `20261001130000` (rehearsed, not applied). `database.types.ts` has the new functions and the `faqs.translations` column by hand; regenerate after the apply.
+
+- 2026-10-01 (Staff registration; branch `admin-staff/registration`, not merged): **Admins → "Register a staff member" and the Staff directory.**
+  - A manager or super admin enters a name, personal email, mobile number and role. The new `admin-staff` edge function generates the employee ID, the work email (the sign-in name) and a temporary password.
+  - The password goes to the personal email by Resend, or is shown once to the registrar while Resend isn't set up.
+  - At first sign-in, `RequireAdmin` shows "Choose your password" until the person replaces it.
+  - The directory lists everyone registered here, with "New temporary password". Nobody can use it on their own account.
+  - The Admin Log shows registrations and resets under "Staff directory".
+  - It needs textile-spark-net's `admin_staff_registry` migration (rehearsed, not applied), and the function deployed.
+  - `database.types.ts` gained the five `admin_staff_*` functions by hand, in the generator's format; regenerate after the apply.
+
 - 2026-10-01 (Help & Support P4, live): **The Support section works against production.** The three
   support migrations are applied (textile-spark-net `20260930212818`, `…213143`, `…213451`), and
   `support-attachment-verify` is deployed. Rollout is Off, so the inbox is empty until a super admin

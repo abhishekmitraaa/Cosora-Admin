@@ -88,6 +88,10 @@ const AREAS: Record<string, string> = {
   "public.support_holidays": "Support holiday",
   "public.support_settings": "Support settings",
   "public.help_guides": "Quick Guide",
+  // Staff registration (2026-10-01): written by the admin-staff edge function, with the
+  // registrar as the actor. "Created" is a registration; "Changed" a new temporary
+  // password. The password itself is never logged.
+  "admin.staff_members": "Staff directory",
 };
 
 const ACTIONS: Record<string, { label: string; tone: Tone }> = {
@@ -107,6 +111,7 @@ const KEY_FIELDS = [
   "question", "term", "pattern", "label", "reason", "note", "title", "name", "brand_name",
   "status", "admin_role", "is_active", "account_status", "doc_type", "verified", "surface",
   "email", "outcome", "refund_status", "amount_paise", "ticket_no", "field", "rollout", "slug",
+  "employee_id", "work_email", "full_name", "temporary_password", "delivery",
 ];
 
 const IST = new Intl.DateTimeFormat("en-IN", {
