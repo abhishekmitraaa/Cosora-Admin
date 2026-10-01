@@ -9,6 +9,15 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-01 (Staff registration; branch `admin-staff/registration`, not merged): **Admins → "Register a staff member" and the Staff directory.**
+  - A manager or super admin enters a name, personal email, mobile number and role. The new `admin-staff` edge function generates the employee ID, the work email (the sign-in name) and a temporary password.
+  - The password goes to the personal email by Resend, or is shown once to the registrar while Resend isn't set up.
+  - At first sign-in, `RequireAdmin` shows "Choose your password" until the person replaces it.
+  - The directory lists everyone registered here, with "New temporary password". Nobody can use it on their own account.
+  - The Admin Log shows registrations and resets under "Staff directory".
+  - It needs textile-spark-net's `admin_staff_registry` migration (rehearsed, not applied), and the function deployed.
+  - `database.types.ts` gained the five `admin_staff_*` functions by hand, in the generator's format; regenerate after the apply.
+
 - 2026-10-01 (Help & Support P4, live): **The Support section works against production.** The three
   support migrations are applied (textile-spark-net `20260930212818`, `…213143`, `…213451`), and
   `support-attachment-verify` is deployed. Rollout is Off, so the inbox is empty until a super admin

@@ -736,6 +736,23 @@ silent and expensive:
 | My Profile Phase 22 — support writes FAQs | **Working in this code and in the database** (2026-09-24). The RPC gates are live (migration `20260924170736`). The live panel still shows support the read-only view until this repo is deployed. Verified by textile-spark-net's `tests/faqs-support-write.spec.ts` (2/2) on :5174: support adds, edits, reorders, deactivates and deletes on all three tabs; product_moderator has no FAQs entry and gets 42501 from every RPC |
 | My Profile Phase 23 — FAQ read path on the CDN | **Working** (2026-09-24). No change to how this page writes. Every FAQ write now also rebuilds the site's CDN snapshots (a database trigger in textile-spark-net), and the page says changes reach the live page "within about a minute". Verified by textile-spark-net's `tests/faqs-snapshot.spec.ts` and `faqs-admin-editable.spec.ts` against this panel |
 
+## Registering staff (`admin-staff`, 2026-10-01)
+
+Admins → **Register a staff member**, for `super_admin` and `manager` (team roles only for a manager). It is for
+people joining the Cosora team who don't have an address to sign in with yet:
+
+- the `admin-staff` edge function (`verify_jwt: true`) generates the **employee ID** (`EMP-0001`), the **work email**
+  (`first.last@cosora.in`, the sign-in name) and a **temporary password**;
+- the password goes to the person's **personal email** by Resend (`RESEND_API_KEY`, `RESEND_FROM`). While Resend
+  isn't set up, the panel shows it **once** to the registrar, and nothing stores it;
+- at first sign-in `RequireAdmin` shows `ChangeTemporaryPassword` until they choose their own
+  (`app_metadata.must_change_password`).
+
+The **Staff directory** (`admin_staff_list()`) shows everyone registered, with **New temporary password** for when
+someone is locked out. Their work email has no mailbox yet, so "Forgot password" can't reach them. The formats are
+interim; the task to settle them is in textile-spark-net `documentation/ToDo.md`. Inviting by email (below) stays
+for people who already have an address.
+
 ## Inviting admins by email (`admin-invite`)
 
 The Admins screen can bring in someone who has **never used Cosora**. Deployed as

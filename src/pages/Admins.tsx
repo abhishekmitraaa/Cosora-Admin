@@ -5,6 +5,7 @@ import { Mail, TriangleAlert, UserCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ROLE_LABELS, TEAM_ROLES, assignableRoles, type AdminRole } from "@/lib/roles";
 import { useAdminSession } from "@/hooks/useAdminSession";
+import { RegisterStaffPanel, StaffDirectoryPanel } from "@/components/StaffPanels";
 import {
   Badge,
   Button,
@@ -290,6 +291,12 @@ export default function Admins() {
           )}
         </p>
       </Panel>
+
+      {/* Staff registration (2026-10-01): new team members get a generated work email,
+          employee ID and temporary password. Inviting by email, below, stays for people
+          who already have an address they sign in with. */}
+      <RegisterStaffPanel myRole={myRole} />
+      <StaffDirectoryPanel myRole={myRole} myId={identity?.id} />
 
       <Panel
         title="Invite an admin by email"
