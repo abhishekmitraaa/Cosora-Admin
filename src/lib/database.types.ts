@@ -972,6 +972,7 @@ export type Database = {
           position: number
           question: string
           surface: string
+          translations: Json
           updated_at: string
         }
         Insert: {
@@ -984,6 +985,7 @@ export type Database = {
           position?: number
           question: string
           surface: string
+          translations?: Json
           updated_at?: string
         }
         Update: {
@@ -996,6 +998,7 @@ export type Database = {
           position?: number
           question?: string
           surface?: string
+          translations?: Json
           updated_at?: string
         }
         Relationships: [
@@ -3863,6 +3866,20 @@ export type Database = {
           position: number
         }[]
       }
+      admin_faq_set_translations: {
+        Args: { p_id: string; p_translations: Json }
+        Returns: {
+          id: string
+          translations: Json
+        }[]
+      }
+      admin_faq_translations: {
+        Args: { p_surface?: string }
+        Returns: {
+          id: string
+          translations: Json
+        }[]
+      }
       admin_faq_update: {
         Args: {
           p_active?: boolean
@@ -4566,6 +4583,7 @@ export type Database = {
         }[]
       }
       expire_subscriptions: { Args: never; Returns: number }
+      faq_translations_valid: { Args: { p: Json }; Returns: boolean }
       for_you_products: {
         Args: { match_count?: number; p_buyer_id: string }
         Returns: {

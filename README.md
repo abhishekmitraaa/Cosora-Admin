@@ -172,6 +172,11 @@ and `vendor_profiles` has one admin field left: `is_verified`.
 
 ### FAQs (2026-09-23)
 
+Since Help & Support P5 (2026-10-01): four surfaces (Buyer Help, **Seller Help**, Subscription, Seller
+Registration), and each FAQ can store its own Hindi and Gujarati, edited in **Edit**
+(`admin_faq_set_translations`, read by `admin_faq_translations`). Changing the English clears them in the
+database. The buyer app shows a stored translation first and falls back to its catalogues.
+
 `/faqs` edits `public.faqs`, the FAQ content on the buyer Help page (`/profile/help` and
 `/help`), the vendor Subscription page, and the seller landing page (`/seller`). It's the
 panel's first real content editor; Site content followed on 2026-09-29.

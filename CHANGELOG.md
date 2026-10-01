@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-01 (Help & Support P5, content; branch `help-support/p5-content`, on top of staff registration; not merged): **FAQs → a Seller Help tab, and Hindi and Gujarati in Edit.**
+  - Seller Help is grouped by category like Buyer Help, with category suggestions taken from the open tab.
+  - Edit has a Hindi and a Gujarati question and answer. Save sends `admin_faq_update`, then `admin_faq_set_translations`. A half-filled language is refused in the page, and a note appears when the English changes, because the database clears stored translations then.
+  - The table shows `hi` and `gu` badges for the stored languages, read through `admin_faq_translations()`. If that function isn't in the database yet, the page still loads, without translations.
+  - Needs textile-spark-net `20261001130000` (rehearsed, not applied). `database.types.ts` has the new functions and the `faqs.translations` column by hand; regenerate after the apply.
+
 - 2026-10-01 (Staff registration; branch `admin-staff/registration`, not merged): **Admins → "Register a staff member" and the Staff directory.**
   - A manager or super admin enters a name, personal email, mobile number and role. The new `admin-staff` edge function generates the employee ID, the work email (the sign-in name) and a temporary password.
   - The password goes to the personal email by Resend, or is shown once to the registrar while Resend isn't set up.
