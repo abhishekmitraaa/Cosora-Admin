@@ -62,7 +62,7 @@ export type Section =
   | "chat-reasons"
   // Buyer Help / seller registration / subscription FAQs (2026-09-23). REAL
   // DATA: public.faqs, written only through admin_faq_* RPCs. The first
-  // admin-editable content that is not dev-seed ("content" still is).
+  // admin-editable content that was never dev-seed.
   | "faqs"
   // Account suspension, generalised. Not part of "vendors": buyers get
   // suspended too, and the role gate is different (support/super_admin via
@@ -78,8 +78,9 @@ export type Section =
   //   DB is already enforcing it. (Ads monitoring is NOT a section: it is a
   //   view inside "ads" and inherits that section's gate unchanged.)
   //
-  //   DEV-SEED, no table yet. Empty since admin completion Phase 10: every
-  //   section here reads the database now. `payments` left this group on
+  //   DEV-SEED, no table yet. Empty since admin completion Phase 10, and the
+  //   seed itself was deleted in Phase 11 (2026-10-02): every section here
+  //   reads the database now. `payments` left this group on
   //   2026-09-28 (Phase 5), `customers` the same day (Phase 6), `content` on
   //   2026-09-29 (Phase 9) and `discounts` the same day (Phase 10). While a
   //   section was in it, its gate was UX only in a stronger sense than the rest

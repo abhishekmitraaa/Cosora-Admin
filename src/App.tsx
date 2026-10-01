@@ -29,9 +29,9 @@ import ChatKeywords from "@/pages/ChatKeywords";
 import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
 import Faqs from "@/pages/Faqs";
-// Phase-4 sections. Geography reads real vendor rows; the five below it render
-// from a development-only seed (src/lib/devSeed/) until Phase 2 creates their
-// tables, and Live Activity is an external link with no Cosora query at all.
+// Phase-4 sections. All of them read the database now: the development-only
+// seed they started on (src/lib/devSeed/) was removed in admin completion
+// Phase 11 (2026-10-02).
 // Geography is the ONE lazily-loaded route. It pulls in maplibre-gl, which is
 // roughly a third of this app's JavaScript on its own, and three of the six
 // admin roles cannot even see the section. Making every other screen wait for a
