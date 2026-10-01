@@ -81,14 +81,13 @@ export type Section =
   //   DB is already enforcing it. (Ads monitoring is NOT a section: it is a
   //   view inside "ads" and inherits that section's gate unchanged.)
   //
-  //   DEV-SEED, no table yet. `content` and `discounts` render from a local
-  //   development fixture and write nothing. (`payments` left this group on
-  //   2026-09-28 in Phase 5, `customers` in Phase 6: both read the database.)
-  //   Their gates are declared NOW so Phase 2 only has to swap the data source,
-  //   but until the tables exist these are UX only in a stronger sense than the
-  //   rest of this file: there is no RLS behind them because there is nothing
-  //   to apply RLS to. Do not read a gate here as evidence that a write is
-  //   protected.
+  //   DEV-SEED, no table yet. Empty since admin completion Phase 10: every
+  //   section here reads the database now. `payments` left this group on
+  //   2026-09-28 (Phase 5), `customers` the same day (Phase 6), `content` on
+  //   2026-09-29 (Phase 9) and `discounts` the same day (Phase 10). While a
+  //   section was in it, its gate was UX only in a stronger sense than the rest
+  //   of this file: there was no RLS behind it because there was nothing to
+  //   apply RLS to.
   //
   //   `certificates` LEFT this group on 2026-09-13: certificate_orders exists,
   //   RLS is on it, and every write goes through certificate_fulfiller(), so
@@ -104,7 +103,8 @@ export type Section =
   // admin_embedding_pipeline_health() carries its own is_admin() guard, so the
   // gate below is defence in depth rather than the only check.
   | "system-health"
-  // Banners and theme configuration for the buyer-facing site.
+  // Vendor-dashboard banners and the site theme (admin completion Phase 9).
+  // admin_site_* admit super_admin only.
   | "content"
   // The public Cosora Journal at www.cosora.in/blogs: articles, categories and
   // the landing hero. Same gate as "content" because the admin_blog_* RPCs all
@@ -114,7 +114,9 @@ export type Section =
   | "payments"
   // Physical certificate fulfilment.
   | "certificates"
-  // Discount codes.
+  // Discount codes on vendor purchases: plans, ads and the Verified Certificate
+  // (admin completion Phase 10). admin_discount_* admit super_admin and
+  // finance_admin, read and write, and refuse everyone else in the database.
   | "discounts"
   // Buyer/vendor CRM and segmentation. Distinct from "accounts", which is
   // suspension only.

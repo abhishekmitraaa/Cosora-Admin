@@ -24,11 +24,15 @@ type GeneratedRow = Database["public"]["Functions"]["admin_payments_ledger"]["Re
 
 /**
  * One ledger row. The generated type calls every column non-null; these can be
- * null (a vendor since deleted, a row with no GST line, no gateway id yet).
+ * null (a vendor since deleted, a row with no GST line, no gateway id yet, a
+ * refund, which carries no discount of its own).
+ *
+ * discount_paise is what a discount code took off (admin completion Phase 10):
+ * total_paise is already after it, so the ledger never subtracts it again.
  */
 export type LedgerRow = Omit<
   GeneratedRow,
-  "vendor_id" | "vendor_name" | "vendor_city" | "net_paise" | "gst_paise" | "gateway_ref"
+  "vendor_id" | "vendor_name" | "vendor_city" | "net_paise" | "gst_paise" | "gateway_ref" | "discount_paise" | "discount_code"
 > & {
   vendor_id: string | null;
   vendor_name: string | null;
@@ -36,6 +40,8 @@ export type LedgerRow = Omit<
   net_paise: number | null;
   gst_paise: number | null;
   gateway_ref: string | null;
+  discount_paise: number | null;
+  discount_code: string | null;
 };
 
 export type LedgerKind = "subscription" | "ad_purchase" | "certificate" | "refund";
@@ -87,6 +93,9 @@ export interface PaymentsSummary {
   review_paise: number;
   unverified_paise: number;
   unverified: number;
+  /** What discount codes took off paid rows, and how many paid rows used one. */
+  discounts_paise: number;
+  discounted: number;
 }
 
 const IST = "+05:30";

@@ -120,6 +120,13 @@ export default function Payments() {
           </div>
         )}
 
+        {s && s.discounted > 0 && (
+          <Note>
+            {s.discounted} paid {s.discounted === 1 ? "order" : "orders"} used a discount code, {inrFromPaise(s.discounts_paise)} off
+            in total ({scope}). Every amount here is what was charged, after the discount.
+          </Note>
+        )}
+
         {s && s.unverified > 0 && (
           <Notice tone="caution" title={`${inrFromPaise(s.unverified_paise)} of "paid" has no gateway payment`}>
             {s.unverified} paid row{s.unverified === 1 ? " has" : "s have"} no Razorpay payment id: activations
@@ -129,7 +136,7 @@ export default function Payments() {
 
         <Panel
           title="Ledger"
-          description="Search matches a vendor's name, a Cosora reference (invoice number or order id) or a Razorpay id."
+          description="Search matches a vendor's name, a Cosora reference (invoice number or order id), a Razorpay id or a discount code."
           actions={
             filtersActive && (
               <Button size="sm" onClick={() => setDraft(NO_FILTERS)}>
@@ -250,6 +257,11 @@ function LedgerLine({ row: t }: { row: LedgerRow }) {
       </td>
       <td className={`px-3 py-2 tabular-nums ${t.total_paise < 0 ? "text-info-fg" : "text-ink"}`}>
         {inrFromPaise(t.total_paise)}
+        {(t.discount_paise ?? 0) > 0 && (
+          <span className="mt-0.5 block text-2xs text-ink-faint" title="Already taken off the amount">
+            {inrFromPaise(t.discount_paise!)} off with <span className="font-mono">{t.discount_code}</span>
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 tabular-nums text-ink-muted">
         {t.gst_paise === null ? <span className="text-ink-ghost">—</span> : inrFromPaise(t.gst_paise)}

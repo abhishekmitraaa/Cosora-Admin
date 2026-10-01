@@ -134,6 +134,22 @@ entry in each, from that repo's point of view.
     `category`, `page` and `api` are refused, an image block without alt text is rejected, and
     a second FAQ block on one article is rejected.
 
+- 2026-09-29 (admin completion, Phase 10): **Discounts is real.** The dev-seed fixture is gone.
+  - `lib/discounts.ts` and `pages/Discounts.tsx` on the `admin_discount_*` RPCs (textile-spark-net
+    migrations `20260929080502` and `20260929084703`): codes for a plan, an ad campaign or the Verified
+    Certificate, with their state, paid uses, checkouts in progress, the discount given, and each order
+    that carried a code. Create and edit check the fields first; once a code is used, its text, discount
+    and target are locked, as the database requires.
+  - Payments: each ledger row shows what a discount code took off, the summary counts the discounted
+    rows, and search matches a code (`admin_payments_ledger` gained `discount_paise` / `discount_code`).
+  - `roles.ts`: the "dev-seed, no table yet" group is empty; `content` and `discounts` comments say what
+    the database enforces. `database.types.ts`: the four RPCs, the ledger's two columns and the order and
+    invoice discount columns, added by hand in the generator's order (regenerated in Phase 11).
+  - `devSeed/discounts.ts` deleted. `devSeed/store.ts` and `DevSeedBanner` are now unused (Phase 11).
+  - Verified from a local build with a made-up super_admin session, every request answered in the
+    browser: the list and its stats, a create (a bad code stopped in the form, the saved body upper-cased
+    with no id and no cap), a locked edit, switch off, the uses list, and the ledger's discount line.
+    Typecheck and build pass; `dist` holds none of the fixture's codes.
 
 - 2026-09-29 (admin completion, Phase 9): **Site content is real.** The dev-seed fixture is gone.
   - `pages/Content.tsx` reads and writes through `lib/siteContent.ts` and the `admin_site_*` RPCs. The migration and the `site-config-snapshot` edge function are in textile-spark-net (`20260928195051`).
