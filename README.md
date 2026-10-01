@@ -312,6 +312,10 @@ the JavaScript and three of six roles cannot see the section.
 
 ### Dev-seed data: the rule and the trap
 
+No screen reads dev-seed data any more: Discounts was the last (admin completion Phase 10,
+2026-09-29). `src/lib/devSeed/store.ts` and `<DevSeedBanner>` are unused and go in Phase 11.
+The rule stands for anything added later.
+
 Following `textile-spark-net/src/lib/notificationsStore.ts` and the project's
 "no mock data in production" rule, each store in `src/lib/devSeed/` is seeded in
 a development build and `[]` in a production one, and every seeded screen carries
@@ -422,6 +426,26 @@ and the `admin_site_*` RPCs (textile-spark-net migration `20260928195051`, admin
   does. "Revert to saved" and "Cosora defaults".
 
 Both reach the site in about a minute (the `site-config` snapshot). Both tables are in the Admin Log.
+
+### Discounts (2026-09-29)
+
+`/discounts` (section `discounts`, super_admin and finance_admin) manages codes through `lib/discounts.ts`
+and the `admin_discount_*` RPCs (textile-spark-net migrations `20260929080502` and `20260929084703`, admin
+completion Phase 10). Only vendors pay Cosora, so a code discounts a **subscription plan** (optionally only
+some plans), an **ad campaign's lines**, or the **Verified Certificate** line.
+- **The page never prices anything.** When a vendor checks out, the payment functions price the order and
+  the database decides what the code takes off, holding one use for that order under the code's row lock.
+  That is why the old fixture had no "apply" button and this page still doesn't.
+- **Each row says why a code does or doesn't work now:** live, scheduled, expired, used up (paid uses plus
+  checkouts holding one reach the cap), or off. "Uses" lists every order that carried it: paid, in
+  checkout, replaced, or abandoned.
+- **Once a code has a confirmed use,** its text, discount and target are fixed (the database refuses the
+  edit; the form disables them). Dates, caps, the per-vendor limit, the note and on/off can change; the
+  cap can't go below the uses made.
+- **Dates are India days:** a code starts at 00:00 IST on its first day and runs to the end of its last.
+- The form sends the full state; the save function reads a missing field as "none" (no cap, no end, every
+  plan, no note).
+- Both tables are in the Admin Log. The Payments ledger shows each row's discount.
 
 ### Live Activity (2026-09-28)
 
@@ -664,6 +688,10 @@ silent and expensive:
   `amount * 100` would short the vendor the GST.
 - `ad_orders.amount` — **paise** (`razorpay-create-order` does `rupees * 100`).
   Summing it beside invoice amounts without dividing by 100 overstates ad revenue 100×.
+- **Discounts** (2026-09-29) follow each table's own unit:
+  `subscription_invoices.discount_amount` is rupees (the list price is `amount + discount_amount`),
+  `subscription_payment_orders.list_rupees` / `discount_rupees` are rupees beside a paise `amount`, and
+  `ad_orders.discount_paise` is paise. The ledger converts them all to paise, like every other amount.
 
 ---
 
