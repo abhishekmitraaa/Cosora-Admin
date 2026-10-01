@@ -234,6 +234,10 @@ changed fields before → after. Filters: admin, area, action, date range.
 
 ### Support (2026-09-30; live 2026-10-01, rollout Off)
 
+Since Help & Support P6 (2026-10-01): the Fraud board ends with **Confirmed fraud**, the lasting record of
+each report decided as fraud (`admin_fraud_findings()`). It outlives the report, which is deleted a year after
+filing by the support sweep.
+
 Answers what buyers and vendors send from Help: chats, callback requests, fraud reports
 and app feedback. The plan and its decisions are in textile-spark-net
 `documentation/help-feature-plan.md`. The data is `public.support_*`, read and written

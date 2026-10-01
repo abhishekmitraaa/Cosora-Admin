@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-01 (Help & Support P6; branch `help-support/p6-background`, on top of P5; not merged): **Support → Fraud reports gains "Confirmed fraud".**
+  - One line per report decided as fraud: when, by whom, who it was, what they did (the reviewer's note), the amount and date, the outcome and the account's status then.
+  - It stays after the report itself is deleted, a year after filing (textile-spark-net D-16, revised 2026-10-01). A decision later changed to "no action" shows as withdrawn.
+  - It reads `admin_fraud_findings()`, from textile-spark-net `20261001140000` (rehearsed, not applied). Until that's applied the panel says no report has been decided as fraud.
+  - `database.types.ts` gains the P6 functions by hand.
+
 - 2026-10-01 (Help & Support P5, content; branch `help-support/p5-content`, on top of staff registration; not merged): **FAQs → a Seller Help tab, and Hindi and Gujarati in Edit.**
   - Seller Help is grouped by category like Buyer Help, with category suggestions taken from the open tab.
   - Edit has a Hindi and a Gujarati question and answer. Save sends `admin_faq_update`, then `admin_faq_set_translations`. A half-filled language is refused in the page, and a note appears when the English changes, because the database clears stored translations then.

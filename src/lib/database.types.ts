@@ -3963,6 +3963,25 @@ export type Database = {
           id: string
         }[]
       }
+      admin_fraud_findings: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_status: string
+          amount_inr: number
+          decided_at: string
+          decided_by_name: string
+          id: string
+          incident_date: string
+          outcome: string
+          report_purged_at: string
+          subject_kind: string
+          subject_name: string
+          subject_profile_id: string
+          ticket_no: string
+          what_happened: string
+          withdrawn_at: string
+        }[]
+      }
       admin_fraud_set_outcome: {
         Args: { p_note?: string; p_outcome: string; p_ticket_id: string }
         Returns: Json
@@ -4896,6 +4915,14 @@ export type Database = {
         }
         Returns: Json
       }
+      support_receipt_record: {
+        Args: { p_detail?: string; p_sent: boolean; p_ticket_id: string }
+        Returns: undefined
+      }
+      support_receipt_target: {
+        Args: { p_ticket_no: string; p_user: string }
+        Returns: Json
+      }
       support_reopen: { Args: { p_ticket_id: string }; Returns: Json }
       support_report_fraud: {
         Args: {
@@ -4944,6 +4971,8 @@ export type Database = {
         }
         Returns: Json
       }
+      support_sweep_purge: { Args: { p_ticket_ids: string[] }; Returns: number }
+      support_sweep_run: { Args: { p_limit?: number }; Returns: Json }
       suspend_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
         Returns: undefined
