@@ -104,10 +104,15 @@ export function resetStaffPassword(userId: string): Promise<CredentialResult> {
 
 /** The signed-in staff member replaces their temporary password. */
 export async function setOwnPassword(password: string): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const email = data.session?.user.email;
+  if (!email) throw new Error("Your session has ended. Sign in again with your temporary password.");
   await invokeStaff<{ ok: true }>({ action: "set_password", password });
-  // The new app_metadata (must_change_password false) arrives with a fresh token.
-  const { error } = await supabase.auth.refreshSession();
-  if (error) throw new Error(error.message);
+  // Changing the password through the Auth admin API ends the account's sessions, so the
+  // old refresh token is gone (refreshSession fails with "Refresh Token Not Found"). Sign
+  // in again with the new password: that session carries must_change_password = false.
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(`Your password was saved, but signing in again failed: ${error.message}`);
 }
 
 /** True while the signed-in account still has a temporary password to replace. */
