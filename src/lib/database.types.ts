@@ -4044,7 +4044,6 @@ export type Database = {
           id: string
         }[]
       }
-      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       admin_fraud_findings: {
         Args: { p_limit?: number }
         Returns: {
@@ -5031,12 +5030,10 @@ export type Database = {
         }
         Returns: Json
       }
-      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_receipt_record: {
         Args: { p_detail?: string; p_sent: boolean; p_ticket_id: string }
         Returns: undefined
       }
-      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_receipt_target: {
         Args: { p_ticket_no: string; p_user: string }
         Returns: Json
@@ -5089,9 +5086,7 @@ export type Database = {
         }
         Returns: Json
       }
-      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_sweep_purge: { Args: { p_ticket_ids: string[] }; Returns: number }
-      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_sweep_run: { Args: { p_limit?: number }; Returns: Json }
       suspend_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
