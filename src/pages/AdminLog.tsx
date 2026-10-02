@@ -53,6 +53,10 @@ type LogRow = {
 /** What each audited table is called here. */
 const AREAS: Record<string, string> = {
   "public.faqs": "FAQ",
+  "public.blog_posts": "Blog post",
+  "public.blog_categories": "Blog category",
+  "public.blog_settings": "Blog landing page",
+  "public.authors": "Blog author",
   "public.profiles": "Account status",
   "admin.account_suspensions": "Suspension record",
   "public.conversations": "Chat",
@@ -76,6 +80,14 @@ const AREAS: Record<string, string> = {
   "admin.profile_tags": "Customer tag on an account",
   "public.site_banners": "Vendor dashboard banner",
   "public.site_theme": "Site theme",
+  // Help & Support (2026-09-30). Messages are deliberately not audited here (their
+  // bodies would be copied into the log); support_events keeps each request's history.
+  "public.support_tickets": "Support request",
+  "public.support_categories": "Support topic",
+  "public.support_hours": "Support hours",
+  "public.support_holidays": "Support holiday",
+  "public.support_settings": "Support settings",
+  "public.help_guides": "Quick Guide",
 };
 
 const ACTIONS: Record<string, { label: string; tone: Tone }> = {
@@ -86,13 +98,15 @@ const ACTIONS: Record<string, { label: string; tone: Tone }> = {
   sign_out: { label: "Signed out", tone: "neutral" },
   invite: { label: "Invited", tone: "positive" },
   refund: { label: "Refund", tone: "caution" },
+  // admin_support_reveal_contact(): a staff member saw a full phone number (D-08).
+  reveal_contact: { label: "Revealed a phone number", tone: "caution" },
 };
 
 // Fields worth naming first when a whole row was created or deleted.
 const KEY_FIELDS = [
   "question", "term", "pattern", "label", "reason", "note", "title", "name", "brand_name",
   "status", "admin_role", "is_active", "account_status", "doc_type", "verified", "surface",
-  "email", "outcome", "refund_status", "amount_paise",
+  "email", "outcome", "refund_status", "amount_paise", "ticket_no", "field", "rollout", "slug",
 ];
 
 const IST = new Intl.DateTimeFormat("en-IN", {

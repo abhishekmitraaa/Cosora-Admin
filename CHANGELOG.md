@@ -15,6 +15,132 @@ entry in each, from that repo's point of view.
   - `src/lib/devSeed/store.ts` and `<DevSeedBanner>` deleted: nothing used them after Phase 10. `App.tsx` and `roles.ts` comments say so; README's role table gains the read gates, the Discounts row is real, and the dev-seed section keeps only the rule for any future fixture.
   - Regenerating `database.types.ts` waits for the pending textile-spark-net migrations (staff, P5, P6, plan changes): a regeneration now would drop their hand-added types.
 
+- 2026-10-01 (Help & Support P4, live): **The Support section works against production.** The three
+  support migrations are applied (textile-spark-net `20260930212818`, `…213143`, `…213451`), and
+  `support-attachment-verify` is deployed. Rollout is Off, so the inbox is empty until a super admin
+  opens it.
+  - `lib/database.types.ts` regenerated from the live schema: 803 lines added, none changed. It
+    replaces the hand-added function types, and adds the support tables and `csp_violations`.
+  - Opened against production as demo-admin, read-only (writes aborted in the browser), at 1440 and
+    390 wide: every Support page renders, and the Quick Guides language tabs switch without saving.
+  - Layout fixes from that check: the hours rows in Support settings overflowed on a phone (the times
+    now take their own row), and the inbox's "From" filter reads "All" instead of truncating.
+  - Verified: `npm run typecheck` 0, `npm run build`.
+
+- 2026-10-01 (Help & Support P4, review fixes): **Fixes from a review of the Support pages, before anyone has used them.**
+  - Quick Guides: clicking Hindi or Gujarati saved the guide and closed the editor, because the kit's Tabs buttons were submit buttons. `Tabs` and the Modal close button are `type="button"` now, which fixes any form that holds them.
+  - Replying with files: a retry after a failure reuses the files already checked and drops the one that failed, instead of uploading everything again. `uploadStaffFile` waits for a `clean` verdict, which the database now requires.
+  - File links are signed for 5 minutes, so opening a photo or PDF now signs a fresh link, and audio re-signs when play starts on an old one.
+  - A failed background refresh no longer replaces the request (or Support settings) with an error and loses a half-typed reply; a notice says it's showing the last version.
+  - Callbacks: the date shows as booked in IST, not in the browser's time zone; a resolved callback isn't "overdue"; a callback booked for later shows "due in …" in the inbox.
+  - Assign to: a request held by someone who left the support team shows their name, and "Nobody" frees it.
+  - Status changes: the reason field is labelled, and the dialog keeps it when the database refuses.
+  - Nav: Inbox is lit on a request page.
+  - Copy: admins can test only while rollout is Staff testing; the billing topic is named as the table shows it.
+  - Verified: `npm run typecheck` 0, `npm run build`.
+
+- 2026-09-30 (Help & Support P4, branch `help-support/p4-admin-console`): **A Support section
+  answers buyers' and vendors' requests. It runs on textile-spark-net's three support migrations
+  (applied 2026-10-01, entry above), and rollout starts Off.**
+  - **Nav:** a Support group first: Inbox (with the waiting count), Callbacks, Fraud reports,
+    App feedback, Support settings. A Support-role admin lands on `/support`.
+  - **`/support`** and the three boards (`pages/Support.tsx`): views (waiting on us, open,
+    mine, unassigned, resolved, closed, all) with counts; filters for channel, topic, side,
+    language and a search; test requests tagged, and hidden by unticking “Include test requests”; oldest waiting first; live
+    updates; a notice while rollout is Off or Staff.
+  - **`/support/:ticketNo`** (`pages/SupportTicket.tsx`): the thread (photos, audio, PDFs as
+    downloads; "checking" and "refused" states); reply or internal note with up to 5 files;
+    take, assign, resolve, reopen, close with a reason; masked phones with a logged Reveal;
+    callback attempts; fraud outcomes, with the vendor's flag log; feedback reviewed; the
+    requester's account (Account controls for super_admin and support, the status badge for a
+    manager); what the database gathered at opening; other requests; the history. Links to
+    Accounts, Vendors and Chats show only to roles that can open them.
+  - **`/support/settings`** (`pages/SupportSettings.tsx`): rollout (Off, Staff testing with up
+    to 20 test accounts, Everyone, with the launch checklist before Everyone), hours, holidays,
+    the phone and email Help shows, topics on and off (Subscription and billing, `vendor_billing`, asks first: D-11).
+    super_admin changes; the database's `can_edit` decides.
+  - **`/faqs` → Quick Guides** (`components/HelpGuides.tsx`): add, edit and delete guides in
+    English, Hindi and Gujarati; active; "checked against the app".
+  - `roles.ts`: sections `support` (read super_admin, support, manager; write super_admin,
+    support) and `support-settings` (write super_admin). The Support role's label is
+    "Support", no longer "Support (read-only)".
+  - Admin Log: labels for the support tables, Quick Guides, and "Revealed a phone number".
+  - `lib/support.ts` holds every call; `lib/database.types.ts` has the 23 new functions,
+    added by hand until the types are regenerated after the migrations are applied.
+  - Verified: `npm run typecheck` 0, `npm run build`. Not opened in a browser: the functions
+    don't exist yet.
+
+- 2026-09-30: **Articles have a real author, picked from a list.** The free-text Author box,
+  which defaulted to "Cosora Team", is now a dropdown of the rows in `public.authors`: Cosora
+  first (the default for a new post), then Anandita Mitra (CEO), Ishani Banerjee (CMO) and
+  Abhishek Mitra (CTO). The post saves `author_id` through `admin_blog_post_save`'s new
+  `p_author_id`; the Journal renders the byline, the author page and the author JSON-LD from
+  that row (a Person for a named person, an Organization for Cosora). The three existing posts
+  are on Cosora; reassigning one is a matter of picking a name and saving.
+  - `lib/blogs.ts` `useBlogAuthors` reads the table directly: every author row is public, so an
+    RPC gate would add nothing. There is no screen for editing authors; the rows are seeded by
+    migration (textile-spark-net `20260929221659_blog_authors`) and change the same way.
+  - Admin Log labels `public.authors` changes as "Blog author".
+
+- 2026-09-30: **Blog categories get their own search fields, and saves stop losing data.**
+  - Categories: the form now edits the search title and search description, with a preview
+    and counters that follow the category rules, which differ from an article's: a category's
+    search title is used exactly as written with no site name added, and the description is
+    clamped to 158 at a whole word, exactly as the blog clamps it (`lib/blogSeo.ts`
+    `categoryRenderedTitle`, `categoryRenderedDescription`). The Description box grows to six
+    rows, since it now holds the category page's body copy. These two fields were already
+    saved, but only by SQL; this is what lets editors fix thin category pages themselves.
+  - Articles: saving an existing post no longer erases its `og_image`. The editor never loaded
+    the field and always sent null.
+  - The editor preview shows entities as the page does (`&plusmn;` as ±), and the counters
+    decode every entity the way the blog now does.
+
+- 2026-09-29: **The blog's search title counter counts what the page actually shows.** It
+  measured the Search title field alone, but the blog appends " · The Cosora Journal" (21
+  characters) to every article title, so every count read 21 short: the GSM article's
+  66-character title showed "66 of 60" while its real `<title>` was 87. `lib/blogSeo.ts` now
+  mirrors the blog's title and description logic in one place, including the legacy Markdown
+  body fallback that two of the three live posts still use, and the preview shows the full
+  tag. Verified byte-for-byte against the live `<title>` and meta description of every
+  published post. The Categories tab's Description hint no longer claims the field is the
+  search description; the separate search description overrides it when set.
+
+- 2026-09-29 (admin completion, Phase 10): **The blog is editable.** The Cosora Journal at
+  www.cosora.in/blogs is written here instead of by hand in SQL.
+  - `pages/Blogs.tsx` reads and writes through `lib/blogs.ts` and the `admin_blog_*` RPCs.
+    Three tabs: Articles, Categories and Landing page. The migrations are in
+    textile-spark-net (`20260929114553` to `20260929123402`, renamed 2026-09-30 from
+    `20260929120000` to `20260929120300` to match the versions Supabase recorded).
+    - Articles: create, edit, reorder, publish, unpublish, schedule and delete. An article is
+      built from ordered blocks (text, heading, list, image, table, FAQ, quote, call to action,
+      divider), and the block order is the order it renders in.
+    - Formatting is bold, italic, underline, a link and two font-size steps, applied by a
+      toolbar over a textarea with a live preview. No editor dependency was added: the stored
+      format is HTML, so a richer editor can replace the toolbar later with no data migration.
+      Font size is two named steps rather than a picker, so an author cannot fake a heading
+      with large text and cost the page its heading structure.
+    - Images upload to `site-content/blog/<uuid>.<ext>`. Alt text is required on every article
+      image, enforced by the database, not just the form.
+    - Search appearance: a live preview of the title, address and description as a result will
+      show them, character counts against 60 and 158, tags, a canonical link and a no-index
+      switch. Blank fields fall back to the title and excerpt, so a post is never published
+      without meta tags.
+    - Categories: add, rename, describe and delete, each with its own search title and
+      description because a category page is an indexable URL. Deleting refuses while articles
+      still point at it.
+    - Landing page: the hero banner shown above the masthead on the blog home.
+  - `ui.tsx`: `Textarea` now forwards a ref, which the formatting toolbar needs to read the
+    selection. No other component changed.
+  - `AdminLog.tsx` names the three blog tables. `roles.ts` adds `blogs`, mirroring
+    `admin.require_content_admin()`, super_admin only.
+  - `database.types.ts` regenerated (additive).
+  - Verified: `npm run typecheck` 0, `npm run build` 0. `copy-audit` reports 43 issues, all of
+    them pre-existing in Leads, Payments and SystemHealth; none in the new files. Against the
+    live database: every `admin_blog_*` RPC returns 401 to the anon key, the reserved slugs
+    `category`, `page` and `api` are refused, an image block without alt text is rejected, and
+    a second FAQ block on one article is rejected.
+
+
 - 2026-09-29 (admin completion, Phase 10): **Discounts is real.** The dev-seed fixture is gone.
   - `lib/discounts.ts` and `pages/Discounts.tsx` on the `admin_discount_*` RPCs (textile-spark-net
     migrations `20260929080502` and `20260929084703`): codes for a plan, an ad campaign or the Verified
@@ -31,6 +157,7 @@ entry in each, from that repo's point of view.
     browser: the list and its stats, a create (a bad code stopped in the form, the saved body upper-cased
     with no id and no cap), a locked edit, switch off, the uses list, and the ledger's discount line.
     Typecheck and build pass; `dist` holds none of the fixture's codes.
+
 
 - 2026-09-29 (admin completion, Phase 9): **Site content is real.** The dev-seed fixture is gone.
   - `pages/Content.tsx` reads and writes through `lib/siteContent.ts` and the `admin_site_*` RPCs. The migration and the `site-config-snapshot` edge function are in textile-spark-net (`20260928195051`).

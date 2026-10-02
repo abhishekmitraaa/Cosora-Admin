@@ -1,6 +1,9 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useEffect } from "react";
+import {
+  forwardRef,
+  useEffect,
+} from "react";
 import { Inbox, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import { setTheme, useTheme, type ThemeChoice } from "@/lib/theme";
 import type {
@@ -189,9 +192,17 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return <input {...props} className={cn(FIELD, className)} />;
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn(FIELD, "resize-y leading-relaxed", className)} />;
-}
+/**
+ * forwardRef because the blog editor's formatting toolbar needs the element to
+ * read selectionStart/selectionEnd; every other caller can ignore the ref.
+ */
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function Textarea({ className, ...props }, ref) {
+    return (
+      <textarea {...props} ref={ref} className={cn(FIELD, "resize-y leading-relaxed", className)} />
+    );
+  },
+);
 
 /**
  * Labelled field wrapper. `label` is required on purpose: there is no code path
@@ -637,6 +648,7 @@ export function Modal({
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 className="font-display text-base font-bold tracking-tight text-ink">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
             className="-mr-1 -mt-1 rounded-md p-1 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
@@ -694,6 +706,9 @@ export function Tabs<T extends string>({
       {tabs.map((t) => (
         <button
           key={t.id}
+          // Not a submit button: Tabs can sit inside a form (the Quick Guide editor's
+          // language tabs), and a bare <button> there saved and closed the form.
+          type="button"
           onClick={() => onChange(t.id)}
           aria-current={active === t.id ? "page" : undefined}
           className={cn(

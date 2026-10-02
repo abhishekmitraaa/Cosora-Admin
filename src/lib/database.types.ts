@@ -5,16 +5,7 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
-/*
- * GENERATED from the live schema of Supabase project vxdhhgdfubqedfpwfyrb.
- * Do not hand-edit. Regenerate after every migration.
- *
- * This file was previously generated-plus-hand-maintained, and the hand-written
- * region went stale: it still typed `vendor_profiles.account_status`, a column
- * migration 20260801095820 had already DROPPED. TypeScript therefore accepted
- * queries that were 400-ing at runtime on Vendors, VendorDetail, Products and
- * Ads. Regenerating is what caught it; keep it generated.
- */
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -250,6 +241,228 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      authors: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          description: string | null
+          entity_type: string
+          id: string
+          linkedin_url: string | null
+          logo_url: string | null
+          name: string
+          role: string | null
+          slug: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          description?: string | null
+          entity_type: string
+          id?: string
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name: string
+          role?: string | null
+          slug: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          description?: string | null
+          entity_type?: string
+          id?: string
+          linkedin_url?: string | null
+          logo_url?: string | null
+          name?: string
+          role?: string | null
+          slug?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      blog_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_posts: {
+        Row: {
+          author: string | null
+          author_id: string | null
+          blocks: Json | null
+          body: string | null
+          canonical_url: string | null
+          category_id: string | null
+          created_at: string
+          excerpt: string | null
+          hero_image: string | null
+          hero_image_alt: string | null
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          og_image: string | null
+          published_at: string | null
+          read_time: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[] | null
+          thumbnail: string | null
+          thumbnail_alt: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author?: string | null
+          author_id?: string | null
+          blocks?: Json | null
+          body?: string | null
+          canonical_url?: string | null
+          category_id?: string | null
+          created_at?: string
+          excerpt?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          id?: string
+          is_featured?: boolean
+          noindex?: boolean
+          og_image?: string | null
+          published_at?: string | null
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          sort_order?: number
+          status?: string
+          tags?: string[] | null
+          thumbnail?: string | null
+          thumbnail_alt?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author?: string | null
+          author_id?: string | null
+          blocks?: Json | null
+          body?: string | null
+          canonical_url?: string | null
+          category_id?: string | null
+          created_at?: string
+          excerpt?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          id?: string
+          is_featured?: boolean
+          noindex?: boolean
+          og_image?: string | null
+          published_at?: string | null
+          read_time?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          sort_order?: number
+          status?: string
+          tags?: string[] | null
+          thumbnail?: string | null
+          thumbnail_alt?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "blog_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_settings: {
+        Row: {
+          hero_cta_href: string | null
+          hero_cta_label: string | null
+          hero_enabled: boolean
+          hero_eyebrow: string | null
+          hero_image: string | null
+          hero_image_alt: string | null
+          hero_subtitle: string | null
+          hero_title: string | null
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          hero_cta_href?: string | null
+          hero_cta_label?: string | null
+          hero_enabled?: boolean
+          hero_eyebrow?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          hero_cta_href?: string | null
+          hero_cta_label?: string | null
+          hero_enabled?: boolean
+          hero_eyebrow?: string | null
+          hero_image?: string | null
+          hero_image_alt?: string | null
+          hero_subtitle?: string | null
+          hero_title?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       buyer_profiles: {
         Row: {
@@ -587,6 +800,45 @@ export type Database = {
           },
         ]
       }
+      csp_violations: {
+        Row: {
+          blocked: string
+          directive: string
+          disposition: string
+          document_path: string
+          first_seen: string
+          hits: number
+          id: number
+          last_seen: string
+          sample: string | null
+          source: string
+        }
+        Insert: {
+          blocked: string
+          directive: string
+          disposition?: string
+          document_path: string
+          first_seen?: string
+          hits?: number
+          id?: never
+          last_seen?: string
+          sample?: string | null
+          source?: string
+        }
+        Update: {
+          blocked?: string
+          directive?: string
+          disposition?: string
+          document_path?: string
+          first_seen?: string
+          hits?: number
+          id?: never
+          last_seen?: string
+          sample?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
       embed_query_rate_limit: {
         Row: {
           caller: string
@@ -810,6 +1062,48 @@ export type Database = {
           rates_date?: string
           source?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      help_guides: {
+        Row: {
+          active: boolean
+          audience: string
+          body: Json
+          created_at: string
+          id: string
+          position: number
+          slug: string
+          title: Json
+          updated_at: string
+          updated_by: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          audience: string
+          body: Json
+          created_at?: string
+          id?: string
+          position?: number
+          slug: string
+          title: Json
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          audience?: string
+          body?: Json
+          created_at?: string
+          id?: string
+          position?: number
+          slug?: string
+          title?: Json
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2079,6 +2373,509 @@ export type Database = {
           },
         ]
       }
+      support_attachments: {
+        Row: {
+          bytes: number
+          checked_at: string | null
+          created_at: string
+          duration_ms: number | null
+          id: string
+          kind: string
+          message_id: string | null
+          mime: string
+          requester_can_view: boolean
+          status: string
+          storage_path: string
+          ticket_id: string
+          uploader_id: string | null
+          uploader_kind: string
+        }
+        Insert: {
+          bytes: number
+          checked_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          kind: string
+          message_id?: string | null
+          mime: string
+          requester_can_view?: boolean
+          status?: string
+          storage_path: string
+          ticket_id: string
+          uploader_id?: string | null
+          uploader_kind: string
+        }
+        Update: {
+          bytes?: number
+          checked_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: string
+          kind?: string
+          message_id?: string | null
+          mime?: string
+          requester_can_view?: boolean
+          status?: string
+          storage_path?: string
+          ticket_id?: string
+          uploader_id?: string | null
+          uploader_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attachments_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_callbacks: {
+        Row: {
+          attempts: number
+          created_at: string
+          last_attempt_at: string | null
+          outcome: string
+          phone: string
+          preferred_date: string
+          ticket_id: string
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          outcome?: string
+          phone: string
+          preferred_date: string
+          ticket_id: string
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          last_attempt_at?: string | null
+          outcome?: string
+          phone?: string
+          preferred_date?: string
+          ticket_id?: string
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_callbacks_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_categories: {
+        Row: {
+          active: boolean
+          audience: string
+          channels: string[]
+          code: string
+          label: Json
+          position: number
+          restricted: boolean
+        }
+        Insert: {
+          active?: boolean
+          audience: string
+          channels: string[]
+          code: string
+          label: Json
+          position?: number
+          restricted?: boolean
+        }
+        Update: {
+          active?: boolean
+          audience?: string
+          channels?: string[]
+          code?: string
+          label?: Json
+          position?: number
+          restricted?: boolean
+        }
+        Relationships: []
+      }
+      support_events: {
+        Row: {
+          actor_id: string | null
+          actor_kind: string
+          at: string
+          detail: Json
+          event: string
+          from_status: string | null
+          id: number
+          ticket_id: string
+          to_status: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_kind: string
+          at?: string
+          detail?: Json
+          event: string
+          from_status?: string | null
+          id?: never
+          ticket_id: string
+          to_status?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_kind?: string
+          at?: string
+          detail?: Json
+          event?: string
+          from_status?: string | null
+          id?: never
+          ticket_id?: string
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_fraud_details: {
+        Row: {
+          amount_inr: number | null
+          city: string | null
+          created_at: string
+          incident_date: string | null
+          reported_entity_id: string | null
+          reported_entity_type: string | null
+          reported_name: string | null
+          reported_phone: string | null
+          reported_url: string | null
+          ticket_id: string
+        }
+        Insert: {
+          amount_inr?: number | null
+          city?: string | null
+          created_at?: string
+          incident_date?: string | null
+          reported_entity_id?: string | null
+          reported_entity_type?: string | null
+          reported_name?: string | null
+          reported_phone?: string | null
+          reported_url?: string | null
+          ticket_id: string
+        }
+        Update: {
+          amount_inr?: number | null
+          city?: string | null
+          created_at?: string
+          incident_date?: string | null
+          reported_entity_id?: string | null
+          reported_entity_type?: string | null
+          reported_name?: string | null
+          reported_phone?: string | null
+          reported_url?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_fraud_details_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_holidays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          day: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          day: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          day?: string
+          label?: string
+        }
+        Relationships: []
+      }
+      support_hours: {
+        Row: {
+          close_time: string | null
+          is_open: boolean
+          open_time: string | null
+          weekday: number
+        }
+        Insert: {
+          close_time?: string | null
+          is_open: boolean
+          open_time?: string | null
+          weekday: number
+        }
+        Update: {
+          close_time?: string | null
+          is_open?: boolean
+          open_time?: string | null
+          weekday?: number
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          author_id: string | null
+          author_kind: string
+          body: string | null
+          created_at: string
+          event: string | null
+          id: string
+          kind: string
+          meta: Json
+          ticket_id: string
+          visibility: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_kind: string
+          body?: string | null
+          created_at?: string
+          event?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          ticket_id: string
+          visibility?: string
+        }
+        Update: {
+          author_id?: string | null
+          author_kind?: string
+          body?: string | null
+          created_at?: string
+          event?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          ticket_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_settings: {
+        Row: {
+          rollout: string
+          singleton: boolean
+          support_email: string
+          support_phone: string
+          test_profile_ids: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          rollout?: string
+          singleton?: boolean
+          support_email?: string
+          support_phone?: string
+          test_profile_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          rollout?: string
+          singleton?: boolean
+          support_email?: string
+          support_phone?: string
+          test_profile_ids?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      support_ticket_staff: {
+        Row: {
+          assigned_at: string | null
+          assignee_id: string | null
+          context: Json
+          fraud_outcome: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assignee_id?: string | null
+          context?: Json
+          fraud_outcome?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assignee_id?: string | null
+          context?: Json
+          fraud_outcome?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_staff_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_staff_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_staff_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          category: string
+          channel: string
+          closed_at: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          first_staff_reply_at: string | null
+          id: string
+          is_test: boolean
+          language: string
+          last_message_at: string
+          reopen_count: number
+          requester_id: string | null
+          requester_last_read_at: string | null
+          requester_side: string
+          resolved_at: string | null
+          restricted: boolean
+          status: string
+          subject: string
+          ticket_no: string
+        }
+        Insert: {
+          category: string
+          channel: string
+          closed_at?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          first_staff_reply_at?: string | null
+          id?: string
+          is_test?: boolean
+          language?: string
+          last_message_at?: string
+          reopen_count?: number
+          requester_id?: string | null
+          requester_last_read_at?: string | null
+          requester_side: string
+          resolved_at?: string | null
+          restricted?: boolean
+          status?: string
+          subject: string
+          ticket_no?: string
+        }
+        Update: {
+          category?: string
+          channel?: string
+          closed_at?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          first_staff_reply_at?: string | null
+          id?: string
+          is_test?: boolean
+          language?: string
+          last_message_at?: string
+          reopen_count?: number
+          requester_id?: string | null
+          requester_last_read_at?: string | null
+          requester_side?: string
+          resolved_at?: string | null
+          restricted?: boolean
+          status?: string
+          subject?: string
+          ticket_no?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_category_fkey"
+            columns: ["category"]
+            isOneToOne: false
+            referencedRelation: "support_categories"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "support_tickets_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_ad_verifications: {
         Row: {
           created_at: string
@@ -2714,6 +3511,166 @@ export type Database = {
           reason: string
         }[]
       }
+      admin_blog_category_delete: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      admin_blog_category_list: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          name: string
+          posts: number
+          seo_description: string
+          seo_title: string
+          slug: string
+          sort_order: number
+        }[]
+      }
+      admin_blog_category_reorder: {
+        Args: { p_ids: string[] }
+        Returns: undefined
+      }
+      admin_blog_category_save: {
+        Args: {
+          p_description?: string
+          p_id?: string
+          p_name?: string
+          p_seo_description?: string
+          p_seo_title?: string
+          p_slug?: string
+        }
+        Returns: string
+      }
+      admin_blog_post_delete: {
+        Args: { p_id: string }
+        Returns: {
+          id: string
+          images: string[]
+        }[]
+      }
+      admin_blog_post_get: {
+        Args: { p_id: string }
+        Returns: {
+          author_id: string
+          blocks: Json
+          body: string
+          canonical_url: string
+          category_id: string
+          created_at: string
+          excerpt: string
+          hero_image: string
+          hero_image_alt: string
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          og_image: string
+          published_at: string
+          read_time: string
+          seo_description: string
+          seo_title: string
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[]
+          thumbnail: string
+          thumbnail_alt: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_post_list: {
+        Args: never
+        Returns: {
+          category_id: string
+          category_name: string
+          excerpt: string
+          has_blocks: boolean
+          hero_image: string
+          id: string
+          is_featured: boolean
+          noindex: boolean
+          published_at: string
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[]
+          thumbnail: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_post_reorder: { Args: { p_ids: string[] }; Returns: undefined }
+      admin_blog_post_save: {
+        Args: {
+          p_author?: string
+          p_author_id?: string
+          p_blocks?: Json
+          p_canonical_url?: string
+          p_category_id?: string
+          p_excerpt?: string
+          p_hero_image?: string
+          p_hero_image_alt?: string
+          p_id?: string
+          p_is_featured?: boolean
+          p_noindex?: boolean
+          p_og_image?: string
+          p_published_at?: string
+          p_seo_description?: string
+          p_seo_title?: string
+          p_slug?: string
+          p_status?: string
+          p_tags?: string[]
+          p_thumbnail?: string
+          p_thumbnail_alt?: string
+          p_title?: string
+        }
+        Returns: string
+      }
+      admin_blog_post_set_status: {
+        Args: { p_id: string; p_published_at?: string; p_status: string }
+        Returns: {
+          id: string
+          published_at: string
+          status: string
+        }[]
+      }
+      admin_blog_settings_get: {
+        Args: never
+        Returns: {
+          hero_cta_href: string
+          hero_cta_label: string
+          hero_enabled: boolean
+          hero_eyebrow: string
+          hero_image: string
+          hero_image_alt: string
+          hero_subtitle: string
+          hero_title: string
+          updated_at: string
+        }[]
+      }
+      admin_blog_settings_save: {
+        Args: {
+          p_hero_cta_href?: string
+          p_hero_cta_label?: string
+          p_hero_enabled?: boolean
+          p_hero_eyebrow?: string
+          p_hero_image?: string
+          p_hero_image_alt?: string
+          p_hero_subtitle?: string
+          p_hero_title?: string
+        }
+        Returns: {
+          hero_image: string
+        }[]
+      }
+      admin_callback_log_attempt: {
+        Args: { p_note?: string; p_outcome: string; p_ticket_id: string }
+        Returns: Json
+      }
       admin_conversation_review_list: {
         Args: { p_conversation_id?: string; p_status?: string }
         Returns: {
@@ -2924,6 +3881,10 @@ export type Database = {
           surface: string
         }[]
       }
+      admin_feedback_mark_reviewed: {
+        Args: { p_note?: string; p_ticket_id: string }
+        Returns: Json
+      }
       admin_flag_add: {
         Args: { p_entity_id: string; p_entity_type: string; p_note: string }
         Returns: {
@@ -2985,6 +3946,10 @@ export type Database = {
           id: string
         }[]
       }
+      admin_fraud_set_outcome: {
+        Args: { p_note?: string; p_outcome: string; p_ticket_id: string }
+        Returns: Json
+      }
       admin_grant: {
         Args: {
           p_role: Database["public"]["Enums"]["admin_role_type"]
@@ -2995,6 +3960,21 @@ export type Database = {
           id: string
           is_active: boolean
         }[]
+      }
+      admin_help_guide_delete: { Args: { p_id: string }; Returns: undefined }
+      admin_help_guide_list: { Args: never; Returns: Json }
+      admin_help_guide_save: {
+        Args: {
+          p_active?: boolean
+          p_audience: string
+          p_body: Json
+          p_id: string
+          p_position?: number
+          p_slug: string
+          p_title: Json
+          p_verified?: boolean
+        }
+        Returns: string
       }
       admin_keyword_add: {
         Args: { p_term: string }
@@ -3215,6 +4195,112 @@ export type Database = {
         Args: { p_plan_id: string; p_reason: string; p_subscription_id: string }
         Returns: undefined
       }
+      admin_support_assignees: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          role: string
+        }[]
+      }
+      admin_support_category_set_active: {
+        Args: { p_active: boolean; p_code: string }
+        Returns: undefined
+      }
+      admin_support_claim: { Args: { p_ticket_id: string }; Returns: Json }
+      admin_support_counts: { Args: never; Returns: Json }
+      admin_support_get: { Args: { p_ticket_no: string }; Returns: Json }
+      admin_support_holiday_add: {
+        Args: { p_day: string; p_label: string }
+        Returns: undefined
+      }
+      admin_support_holiday_remove: {
+        Args: { p_day: string }
+        Returns: undefined
+      }
+      admin_support_list: {
+        Args: {
+          p_category?: string
+          p_channel?: string
+          p_include_test?: boolean
+          p_language?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_side?: string
+          p_view?: string
+        }
+        Returns: {
+          assignee_id: string
+          assignee_name: string
+          awaiting_staff: boolean
+          callback_attempts: number
+          callback_date: string
+          callback_end: string
+          callback_outcome: string
+          callback_start: string
+          category: string
+          category_label: Json
+          channel: string
+          created_at: string
+          first_staff_reply_at: string
+          id: string
+          is_test: boolean
+          language: string
+          last_message_at: string
+          message_count: number
+          requester_id: string
+          requester_name: string
+          requester_side: string
+          restricted: boolean
+          status: string
+          subject: string
+          ticket_no: string
+          total_count: number
+          waiting_since: string
+        }[]
+      }
+      admin_support_prepare_upload: {
+        Args: {
+          p_bytes: number
+          p_duration_ms?: number
+          p_kind: string
+          p_mime: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      admin_support_reassign: {
+        Args: { p_assignee_id: string; p_ticket_id: string }
+        Returns: undefined
+      }
+      admin_support_reply: {
+        Args: {
+          p_attachment_ids?: string[]
+          p_body: string
+          p_internal?: boolean
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      admin_support_reveal_contact: {
+        Args: { p_field: string; p_ticket_id: string }
+        Returns: Json
+      }
+      admin_support_set_contact: {
+        Args: { p_email: string; p_phone: string }
+        Returns: undefined
+      }
+      admin_support_set_hours: { Args: { p_hours: Json }; Returns: undefined }
+      admin_support_set_rollout: {
+        Args: { p_rollout: string; p_test_profile_ids?: string[] }
+        Returns: undefined
+      }
+      admin_support_set_status: {
+        Args: { p_note?: string; p_status: string; p_ticket_id: string }
+        Returns: Json
+      }
+      admin_support_settings: { Args: never; Returns: Json }
       admin_vendor_private: {
         Args: { p_ids: string[] }
         Returns: {
@@ -3263,6 +4349,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      blog_assert_slug: {
+        Args: { p_id: string; p_slug: string }
+        Returns: string
+      }
+      blog_blocks_valid: { Args: { p_blocks: Json }; Returns: boolean }
+      blog_inline_text: { Args: { p_html: string }; Returns: string }
+      blog_read_time: { Args: { p_blocks: Json }; Returns: string }
+      blog_read_time_markdown: { Args: { p_body: string }; Returns: string }
+      blog_slugify: { Args: { p_text: string }; Returns: string }
+      blog_word_count: { Args: { p_blocks: Json }; Returns: number }
       build_video_search_text: {
         Args: { v: Database["public"]["Tables"]["product_videos"]["Row"] }
         Returns: string
@@ -3335,9 +4431,44 @@ export type Database = {
         Returns: string
       }
       confirm_account_deletion: { Args: { p_code: string }; Returns: Json }
+      csp_report_ingest: { Args: { p_reports: Json }; Returns: undefined }
       discard_account_deletion_code: {
         Args: { p_request: string }
         Returns: undefined
+      }
+      discount_check: {
+        Args: {
+          p_ad_rupees?: number
+          p_certificate_rupees?: number
+          p_code: string
+          p_order_kind: string
+          p_plan_id?: string
+          p_plan_rupees?: number
+          p_vendor: string
+        }
+        Returns: Json
+      }
+      discount_confirm: {
+        Args: { p_order_ref: string; p_redemption: string }
+        Returns: Json
+      }
+      discount_release: {
+        Args: { p_order_ref: string; p_redemption: string }
+        Returns: Json
+      }
+      discount_reserve: {
+        Args: {
+          p_ad_rupees?: number
+          p_certificate_rupees?: number
+          p_code: string
+          p_expected_rupees?: number
+          p_order_kind: string
+          p_order_ref: string
+          p_plan_id?: string
+          p_plan_rupees?: number
+          p_vendor: string
+        }
+        Returns: Json
       }
       drain_vendor_catalog_recompute: {
         Args: { p_limit?: number }
@@ -3659,6 +4790,88 @@ export type Database = {
           p_reported_reason?: string
         }
         Returns: undefined
+      }
+      support_attachment_checked: {
+        Args: { p_attachment_id: string; p_clean: boolean }
+        Returns: undefined
+      }
+      support_attachment_read_allowed: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      support_attachment_upload_allowed: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      support_callback_slots: { Args: { p_days?: number }; Returns: Json }
+      support_end_chat: { Args: { p_ticket_id: string }; Returns: Json }
+      support_mark_read: { Args: { p_ticket_id: string }; Returns: undefined }
+      support_my_requests: { Args: { p_limit?: number }; Returns: Json }
+      support_post_message: {
+        Args: {
+          p_attachment_ids?: string[]
+          p_body?: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      support_prepare_upload: {
+        Args: {
+          p_bytes: number
+          p_duration_ms?: number
+          p_kind: string
+          p_mime: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
+      support_reopen: { Args: { p_ticket_id: string }; Returns: Json }
+      support_report_fraud: {
+        Args: {
+          p_amount_inr?: number
+          p_city?: string
+          p_description: string
+          p_incident_date?: string
+          p_language?: string
+          p_reported_entity_id?: string
+          p_reported_entity_type?: string
+          p_reported_name?: string
+          p_reported_phone?: string
+          p_reported_url?: string
+        }
+        Returns: Json
+      }
+      support_request_callback: {
+        Args: {
+          p_category: string
+          p_date: string
+          p_language?: string
+          p_note?: string
+          p_phone: string
+          p_window_start: string
+        }
+        Returns: Json
+      }
+      support_request_detail: { Args: { p_ticket_no: string }; Returns: Json }
+      support_start_chat: {
+        Args: {
+          p_body: string
+          p_category: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_language?: string
+        }
+        Returns: Json
+      }
+      support_status: { Args: never; Returns: Json }
+      support_submit_feedback: {
+        Args: {
+          p_body: string
+          p_kind: string
+          p_language?: string
+          p_page?: string
+        }
+        Returns: Json
       }
       suspend_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string; p_reason_code: string }

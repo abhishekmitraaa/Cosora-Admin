@@ -18,7 +18,10 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   vendor_ops: "Vendor ops",
   ads_moderator: "Ads moderator",
   finance_admin: "Finance admin",
-  support: "Support (read-only)",
+  // Was "Support (read-only)". Support has written chat reviews, FAQs, customer tags and
+  // account status for a while, and since Help & Support (2026-09-30) it answers every
+  // support request, so "read-only" was wrong everywhere it rendered.
+  support: "Support",
   // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. Since
   // 2026-09-26 it also adds, changes and removes teammates in TEAM_ROLES on the
   // Admins page. It sees no moderation or commerce section.
@@ -104,6 +107,10 @@ export type Section =
   // Vendor-dashboard banners and the site theme (admin completion Phase 9).
   // admin_site_* admit super_admin only.
   | "content"
+  // The public Cosora Journal at www.cosora.in/blogs: articles, categories and
+  // the landing hero. Same gate as "content" because the admin_blog_* RPCs all
+  // call admin.require_content_admin().
+  | "blogs"
   // Transaction ledger. Distinct from "reports", which keeps its KPI view.
   | "payments"
   // Physical certificate fulfilment.
@@ -122,7 +129,18 @@ export type Section =
   | "traction"
   // Every admin's changes and sign-ins, with date and time (MPF-26). Mirrors
   // admin_audit_log_list(), which admits super_admin and manager only.
-  | "admin-log";
+  | "admin-log"
+  // Help & Support (2026-09-30, textile-spark-net documentation/help-feature-plan.md):
+  // the inbox, the ticket workspace, and the callback, fraud-report and feedback boards.
+  // REAL DATA: public.support_* through the admin_support_* functions, which gate with
+  // admin.support_can_read() (super_admin, support, manager) and
+  // admin.support_can_write() (super_admin, support). Manager reads (Andy, D-08), and
+  // every phone number it reveals is written to the Admin Log.
+  | "support"
+  // Hours, holidays, rollout, the contact details Help shows, and which topics are on.
+  // Everyone who reads support may look; only a super admin changes it
+  // (admin.require_content_admin() in each admin_support_set_* function).
+  | "support-settings";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -187,6 +205,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // mirroring admin.require_content_admin() in the admin_site_* RPCs (admin
   // completion Phase 9). Widen both together if a marketing role is ever added.
   content: ["super_admin"],
+  // Mirrors admin.require_content_admin() in every admin_blog_* RPC. Widen the
+  // SQL gate and this line together; either alone is wrong.
+  blogs: ["super_admin"],
   // Finance reads and acts; support reads, because "did this vendor's payment
   // land" is a support question. Mirrors the subscriptions split.
   payments: ["super_admin", "finance_admin", "support"],
@@ -212,6 +233,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   traction: ALL_ROLES,
   // admin_audit_log_list() and admin_audit_log_actors() admit exactly these two.
   "admin-log": ["super_admin", "manager"],
+  // Mirrors admin.support_can_read(). Change the SQL gate and this line together.
+  support: ["super_admin", "support", "manager"],
+  "support-settings": ["super_admin", "support", "manager"],
 };
 
 /**
@@ -254,6 +278,7 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // role can write it from a browser even if a page tried.
   "system-health": [],
   content: ["super_admin"],
+  blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
   // Mirrors certificate_fulfiller() exactly. Add "delivery_team" here at the
   // same time as in SECTION_READ and in the SQL, once the enum value exists.
@@ -268,6 +293,11 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.
   "admin-log": [],
+  // Mirrors admin.support_can_write(): claim, reply, resolve, callbacks, fraud outcomes,
+  // feedback. Manager is read-only here (D-08).
+  support: ["super_admin", "support"],
+  // admin.require_content_admin(): super admins only.
+  "support-settings": ["super_admin"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  Newspaper,
   Activity,
   Ban,
   BarChart3,
@@ -29,9 +30,15 @@ import {
   Users,
   X,
   Inbox,
+  Headset,
+  PhoneCall,
+  Siren,
+  Lightbulb,
+  Clock,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
+import { useSupportCounts } from "@/lib/support";
 import { cn, Logo, ThemeToggle } from "./ui";
 
 interface NavItem {
@@ -39,6 +46,10 @@ interface NavItem {
   section: Section;
   label: string;
   icon: typeof Boxes;
+  /** Active only on this exact path, so /support is not lit on /support/callbacks. */
+  end?: boolean;
+  /** Shows the number of support requests waiting on staff. */
+  badge?: "support";
 }
 
 /**
@@ -58,6 +69,17 @@ interface NavItem {
  * A group whose items are all hidden by role renders nothing, heading included.
  */
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    // Help & Support (2026-09-30). First, because a person is waiting on each item here.
+    title: "Support",
+    items: [
+      { to: "/support", section: "support", label: "Inbox", icon: Headset, end: true, badge: "support" },
+      { to: "/support/callbacks", section: "support", label: "Callbacks", icon: PhoneCall },
+      { to: "/support/fraud", section: "support", label: "Fraud reports", icon: Siren },
+      { to: "/support/feedback", section: "support", label: "App feedback", icon: Lightbulb },
+      { to: "/support/settings", section: "support-settings", label: "Support settings", icon: Clock },
+    ],
+  },
   {
     title: "Moderation",
     items: [
@@ -99,6 +121,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Settings",
     items: [
       { to: "/content", section: "content", label: "Site content", icon: Palette },
+      { to: "/blogs", section: "blogs", label: "Blog", icon: Newspaper },
       { to: "/chat-keywords", section: "chat-keywords", label: "Keyword blocklist", icon: Ban },
       { to: "/chat-patterns", section: "chat-patterns", label: "Flag patterns", icon: Regex },
       { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
@@ -134,6 +157,8 @@ export default function Shell() {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
   const role = identity?.role ?? null;
+  const supportCounts = useSupportCounts(canSee(role, "support"));
+  const waiting = supportCounts.data?.awaiting ?? 0;
 
   const groups = useMemo(
     () =>
@@ -150,6 +175,11 @@ export default function Shell() {
   const activeGroup = groups.find((g) =>
     g.items.some((i) => location.pathname === i.to || location.pathname.startsWith(`${i.to}/`)),
   )?.title;
+
+  // One request (/support/CS-000123) belongs to the Inbox. The Inbox link is `end` so it
+  // isn't lit on the boards and settings, which are its siblings under /support/.
+  const onTicket = /^\/support\/(?!(callbacks|fraud|feedback|settings)$)[^/]+$/.test(location.pathname);
+  const lit = (to: string, isActive: boolean) => isActive || (to === "/support" && onTicket);
 
   function toggleGroup(title: string) {
     setCollapsed((prev) => {
@@ -237,14 +267,15 @@ export default function Shell() {
 
                 {isOpen && (
                   <div className="mt-0.5 space-y-0.5 pb-1.5">
-                    {group.items.map(({ to, label, icon: Icon }) => (
+                    {group.items.map(({ to, label, icon: Icon, end, badge }) => (
                       <NavLink
                         key={to}
                         to={to}
+                        end={end}
                         className={({ isActive }) =>
                           cn(
                             "group relative flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-2.5 text-sm font-medium transition-colors",
-                            isActive
+                            lit(to, isActive)
                               ? "bg-white/[0.09] text-rail-fg"
                               : "text-rail-muted hover:bg-white/[0.04] hover:text-rail-fg",
                           )
@@ -256,12 +287,20 @@ export default function Shell() {
                             <span
                               className={cn(
                                 "absolute left-0 top-1/2 w-[3px] -translate-y-1/2 rounded-sm bg-rail-fg transition-all duration-200",
-                                isActive ? "h-5 opacity-100" : "h-0 opacity-0",
+                                lit(to, isActive) ? "h-5 opacity-100" : "h-0 opacity-0",
                               )}
                               aria-hidden
                             />
                             <Icon size={16} className="shrink-0" />
                             {label}
+                            {badge === "support" && waiting > 0 && (
+                              <span
+                                className="ml-auto rounded-md bg-white/[0.12] px-1.5 py-0.5 text-2xs tabular-nums text-rail-fg"
+                                aria-label={`${waiting} waiting`}
+                              >
+                                {waiting > 99 ? "99+" : waiting}
+                              </span>
+                            )}
                           </>
                         )}
                       </NavLink>
