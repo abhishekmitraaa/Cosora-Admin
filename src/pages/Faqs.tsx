@@ -28,7 +28,8 @@ import {
 } from "@/components/ui";
 
 /**
- * FAQs for three surfaces of the buyer/vendor app (2026-09-23). The first real,
+ * FAQs for four surfaces of the buyer/vendor app (2026-09-23; Seller Help added in
+ * Help & Support P5, 2026-10-01). The first real,
  * table-backed admin-editable content. Site content (Content.tsx) is still
  * dev-seed.
  *
@@ -45,17 +46,23 @@ import {
  * by the rebuild; measured, every visitor has the new file ~47 s after the edit. If
  * a snapshot can't be read, the apps read public.faqs directly (textile-spark-net
  * Phase 23).
+ *
+ * Translations (P5): Hindi and Gujarati are stored with the FAQ and edited in Edit
+ * (admin_faq_set_translations, read back through admin_faq_translations). Changing the
+ * English question or answer clears them in the database, so a translation never
+ * outlives the text it translated. Without one, the app falls back to its catalogues.
  */
 
-type Surface = "buyer_help" | "subscription" | "seller_registration";
+type Surface = "buyer_help" | "seller_help" | "subscription" | "seller_registration";
 
 const SURFACES: { id: Surface; label: string; where: string; grouped: boolean }[] = [
   { id: "buyer_help", label: "Buyer Help", where: "the buyer Help page (/profile/help and /help), grouped by category", grouped: true },
+  { id: "seller_help", label: "Seller Help", where: "the Help page for sellers (/help on the seller side), grouped by category", grouped: true },
   { id: "subscription", label: "Subscription", where: "the vendor Subscription page (/subscription), above the Contact us button", grouped: false },
   { id: "seller_registration", label: "Seller Registration", where: "the seller landing page (/seller), which signed-out visitors see before registering", grouped: false },
 ];
 
-const SUBTITLE = "Questions and answers shown on the buyer Help page and vendor pages. Support and super admin can edit them.";
+const SUBTITLE = "Questions and answers shown on the buyer and seller Help pages and vendor pages. Support and super admin can edit them.";
 
 interface FaqRow {
   id: string;
@@ -69,7 +76,16 @@ interface FaqRow {
   updated_at: string;
   creator_full_name: string | null;
   creator_email: string | null;
+  /** From admin_faq_translations(), merged by id. */
+  translations: Translations;
 }
+
+type Lang = "hi" | "gu";
+type Translations = Partial<Record<Lang, { question: string; answer: string }>>;
+const LANGS: { id: Lang; label: string }[] = [
+  { id: "hi", label: "Hindi" },
+  { id: "gu", label: "Gujarati" },
+];
 
 interface Draft {
   category: string;
@@ -77,7 +93,13 @@ interface Draft {
   answer: string;
 }
 
+interface EditDraft extends Draft {
+  hi: { question: string; answer: string };
+  gu: { question: string; answer: string };
+}
+
 const EMPTY_DRAFT: Draft = { category: "", question: "", answer: "" };
+const EMPTY_EDIT: EditDraft = { ...EMPTY_DRAFT, hi: { question: "", answer: "" }, gu: { question: "", answer: "" } };
 
 export default function Faqs() {
   const role = useRole();
@@ -86,7 +108,7 @@ export default function Faqs() {
   const [surface, setSurface] = useState<Surface>("buyer_help");
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editing, setEditing] = useState<FaqRow | null>(null);
-  const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [editDraft, setEditDraft] = useState<EditDraft>(EMPTY_EDIT);
   const [deleting, setDeleting] = useState<FaqRow | null>(null);
   // Quick Guides (Help & Support P4d) share this page and its audience, not its table.
   const [guides, setGuides] = useState(false);
@@ -97,9 +119,16 @@ export default function Faqs() {
     queryKey: ["faqs", "admin"],
     queryFn: async (): Promise<FaqRow[]> => {
       // Every surface in one call: the tab counts need them all, and the list is small.
-      const { data, error } = await supabase.rpc("admin_faq_list");
+      const [{ data, error }, tr] = await Promise.all([
+        supabase.rpc("admin_faq_list"),
+        supabase.rpc("admin_faq_translations"),
+      ]);
       if (error) throw new Error(error.message);
-      return (data ?? []) as FaqRow[];
+      // PGRST202: the function isn't in the database yet (this page deployed before the
+      // P5 migration). Show the FAQs without translations rather than no page at all.
+      if (tr.error && tr.error.code !== "PGRST202") throw new Error(tr.error.message);
+      const byId = new Map((tr.data ?? []).map((t) => [t.id, (t.translations ?? {}) as Translations]));
+      return (data ?? []).map((r) => ({ ...r, translations: byId.get(r.id) ?? {} })) as FaqRow[];
     },
   });
 
@@ -146,6 +175,47 @@ export default function Faqs() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // The Edit dialog: the English through admin_faq_update, then the translations. The
+  // update clears stored translations when the English changes, so they're written
+  // after it whenever there's anything to keep.
+  const saveEdit = useMutation({
+    mutationFn: async ({ row, d }: { row: FaqRow; d: EditDraft }) => {
+      const next: Translations = {};
+      for (const { id, label } of LANGS) {
+        const q = d[id].question.trim();
+        const a = d[id].answer.trim();
+        if (Boolean(q) !== Boolean(a)) throw new Error(`Fill in both the ${label} question and answer, or leave both empty.`);
+        if (q) next[id] = { question: q, answer: a };
+      }
+      const englishChanged = d.question.trim() !== row.question || d.answer.trim() !== row.answer;
+      assertWrote(
+        await supabase.rpc("admin_faq_update", {
+          p_id: row.id,
+          // Grouped surfaces only. "" clears the category in the RPC.
+          p_category_label: meta.grouped ? d.category.trim() : undefined,
+          p_question: d.question.trim(),
+          p_answer: d.answer.trim(),
+        }),
+        "update FAQ",
+      );
+      const changed = englishChanged
+        ? Object.keys(next).length > 0
+        : JSON.stringify(next) !== JSON.stringify(row.translations ?? {});
+      if (changed) {
+        assertWrote(
+          await supabase.rpc("admin_faq_set_translations", { p_id: row.id, p_translations: next }),
+          "save translations",
+        );
+      }
+    },
+    onSuccess: () => {
+      toast.success("FAQ updated");
+      setEditing(null);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const remove = useMutation({
     mutationFn: async (id: string) => {
       assertWrote(await supabase.rpc("admin_faq_delete", { p_id: id }), "delete FAQ");
@@ -183,9 +253,10 @@ export default function Faqs() {
     return Array.from(m, ([label, list]) => ({ label, rows: list }));
   }, [rows, meta.grouped]);
 
+  // Suggestions from the categories already on this surface.
   const categories = useMemo(
-    () => Array.from(new Set(all.filter((r) => r.surface === "buyer_help").map((r) => r.category_label?.trim()).filter(Boolean))) as string[],
-    [all],
+    () => Array.from(new Set(rows.map((r) => r.category_label?.trim()).filter(Boolean))) as string[],
+    [rows],
   );
 
   if (faqs.isLoading) {
@@ -236,7 +307,8 @@ export default function Faqs() {
       <Note className="mb-4">
         Shown on {meta.where}. Changes reach the live page within about a minute of saving, with no deploy.{" "}
         <span className="font-medium text-ink">Deactivate</span> hides a question and keeps it here;{" "}
-        <span className="font-medium text-ink">Delete</span> removes it for good. Order with the arrows.
+        <span className="font-medium text-ink">Delete</span> removes it for good. Order with the arrows. Add the
+        Hindi and Gujarati in <span className="font-medium text-ink">Edit</span>; changing the English clears them.
       </Note>
 
       <Card className="mb-4">
@@ -252,7 +324,7 @@ export default function Faqs() {
               <Input
                 id="faq-category"
                 list="faq-categories"
-                placeholder="Getting Started"
+                placeholder={surface === "seller_help" ? "KYC and verification" : "Getting Started"}
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
               />
@@ -326,7 +398,14 @@ export default function Faqs() {
                       <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{r.answer}</p>
                     </td>
                     <td className="px-3 py-2">
-                      {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
+                        {LANGS.map((l) =>
+                          r.translations[l.id] ? (
+                            <Badge key={l.id} tone="info">{l.id}</Badge>
+                          ) : null,
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">
                       {format(new Date(r.updated_at), "d MMM yyyy")}
@@ -339,7 +418,13 @@ export default function Faqs() {
                           disabled={!writable}
                           onClick={() => {
                             setEditing(r);
-                            setEditDraft({ category: r.category_label ?? "", question: r.question, answer: r.answer });
+                            setEditDraft({
+                              category: r.category_label ?? "",
+                              question: r.question,
+                              answer: r.answer,
+                              hi: { question: r.translations.hi?.question ?? "", answer: r.translations.hi?.answer ?? "" },
+                              gu: { question: r.translations.gu?.question ?? "", answer: r.translations.gu?.answer ?? "" },
+                            });
                           }}
                         >
                           Edit
@@ -398,34 +483,45 @@ export default function Faqs() {
               onChange={(e) => setEditDraft({ ...editDraft, answer: e.target.value })}
             />
           </Field>
+          {editing &&
+            (editDraft.question.trim() !== editing.question || editDraft.answer.trim() !== editing.answer) &&
+            (editing.translations.hi || editing.translations.gu) && (
+              <Note>
+                You changed the English. Check that the Hindi and Gujarati below still say the same thing, or clear
+                them: the app then falls back to its own translation, or to English.
+              </Note>
+            )}
+          {LANGS.map((l) => (
+            <div key={l.id} className="space-y-2 rounded-lg border border-line p-3">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-ink-faint">{l.label}</p>
+              <Field label={`Question in ${l.label}`} htmlFor={`edit-faq-${l.id}-q`}>
+                <Input
+                  id={`edit-faq-${l.id}-q`}
+                  lang={l.id}
+                  value={editDraft[l.id].question}
+                  onChange={(e) => setEditDraft({ ...editDraft, [l.id]: { ...editDraft[l.id], question: e.target.value } })}
+                />
+              </Field>
+              <Field label={`Answer in ${l.label}`} htmlFor={`edit-faq-${l.id}-a`}>
+                <Textarea
+                  id={`edit-faq-${l.id}-a`}
+                  lang={l.id}
+                  rows={3}
+                  value={editDraft[l.id].answer}
+                  onChange={(e) => setEditDraft({ ...editDraft, [l.id]: { ...editDraft[l.id], answer: e.target.value } })}
+                />
+              </Field>
+            </div>
+          ))}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={() => setEditing(null)}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={!editDraft.question.trim() || !editDraft.answer.trim() || update.isPending}
-            onClick={() =>
-              editing &&
-              update.mutate(
-                {
-                  id: editing.id,
-                  patch: {
-                    // Buyer Help only. "" clears the category in the RPC.
-                    category: meta.grouped ? editDraft.category.trim() : undefined,
-                    question: editDraft.question.trim(),
-                    answer: editDraft.answer.trim(),
-                  },
-                },
-                {
-                  onSuccess: () => {
-                    toast.success("FAQ updated");
-                    setEditing(null);
-                  },
-                },
-              )
-            }
+            disabled={!editDraft.question.trim() || !editDraft.answer.trim() || saveEdit.isPending}
+            onClick={() => editing && saveEdit.mutate({ row: editing, d: editDraft })}
           >
-            Save
+            {saveEdit.isPending ? "Saving…" : "Save"}
           </Button>
         </div>
       </Modal>

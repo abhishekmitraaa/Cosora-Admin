@@ -2,6 +2,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, type Section } from "@/lib/roles";
+import { mustChangePassword } from "@/lib/staff";
+import ChangeTemporaryPassword from "@/pages/ChangeTemporaryPassword";
 import { Card, ErrorNote, Spinner } from "./ui";
 
 /**
@@ -18,6 +20,10 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
 
   if (loading) return <Spinner label="Checking admin access…" />;
   if (!session) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+
+  // A registered staff member still on their temporary password chooses their own
+  // first (admin-staff edge function; lib/staff.ts).
+  if (mustChangePassword(session.user.app_metadata)) return <ChangeTemporaryPassword />;
 
   if (error) {
     return (

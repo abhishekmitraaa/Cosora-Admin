@@ -191,6 +191,11 @@ and `vendor_profiles` has one admin field left: `is_verified`.
 
 ### FAQs (2026-09-23)
 
+Since Help & Support P5 (2026-10-01): four surfaces (Buyer Help, **Seller Help**, Subscription, Seller
+Registration), and each FAQ can store its own Hindi and Gujarati, edited in **Edit**
+(`admin_faq_set_translations`, read by `admin_faq_translations`). Changing the English clears them in the
+database. The buyer app shows a stored translation first and falls back to its catalogues.
+
 `/faqs` edits `public.faqs`, the FAQ content on the buyer Help page (`/profile/help` and
 `/help`), the vendor Subscription page, and the seller landing page (`/seller`). It's the
 panel's first real content editor; Site content followed on 2026-09-29.
@@ -247,6 +252,10 @@ changed fields before → after. Filters: admin, area, action, date range.
 ---
 
 ### Support (2026-09-30; live 2026-10-01, rollout Off)
+
+Since Help & Support P6 (2026-10-01): the Fraud board ends with **Confirmed fraud**, the lasting record of
+each report decided as fraud (`admin_fraud_findings()`). It outlives the report, which is deleted a year after
+filing by the support sweep.
 
 Answers what buyers and vendors send from Help: chats, callback requests, fraud reports
 and app feedback. The plan and its decisions are in textile-spark-net
@@ -495,6 +504,19 @@ some plans), an **ad campaign's lines**, or the **Verified Certificate** line.
 - The form sends the full state; the save function reads a missing field as "none" (no cap, no end, every
   plan, no note).
 - Both tables are in the Admin Log. The Payments ledger shows each row's discount.
+
+### The 7-day money-back guarantee (2026-10-02; built, not live)
+
+The Subscription FAQ promises first-time subscribers a full refund within 7 days. A seller asks on the
+buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
+(`RefundGuaranteePanel.tsx`, textile-spark-net migration `20261002100100`).
+- **Refund first, then close.** Each payment in the request has Refund (`admin-refund-payment`, Razorpay).
+  "Close and end the plan" (`admin_refund_guarantee_close`, super_admin and finance_admin) is refused until
+  every one has a Razorpay refund id; then the subscription is cancelled and the seller is told.
+- **Only money taken through Razorpay is offered**, so nothing appears while checkouts run in demo mode, and
+  refunds can't run here until the Razorpay keys are set (Status per part, row 6).
+- Plan changes are priced in the database (`admin.subscription_quote`): an upgrade credits the unused part of
+  what's paid; a downgrade is paid now and shows as scheduled under the current period.
 
 ### Live Activity (2026-09-28)
 
@@ -765,6 +787,23 @@ silent and expensive:
 | My Profile Phase 15 — MPF-5 | **Working in this code** (2026-09-24). `account_status` is shown by one `AccountStatusBadge` on Accounts, Vendors and the Account status card. `deleted` is a grey badge, with no Suspend or Reinstate, because `set_account_status()` refuses a deleted account. Verified by textile-spark-net's `tests/admin-deleted-status.spec.ts` with the status rewritten in the browser: no deleted account exists, and deletion can't be undone. **Needs a deploy to reach `cosora-admin.vercel.app`** |
 | My Profile Phase 22 — support writes FAQs | **Working in this code and in the database** (2026-09-24). The RPC gates are live (migration `20260924170736`). The live panel still shows support the read-only view until this repo is deployed. Verified by textile-spark-net's `tests/faqs-support-write.spec.ts` (2/2) on :5174: support adds, edits, reorders, deactivates and deletes on all three tabs; product_moderator has no FAQs entry and gets 42501 from every RPC |
 | My Profile Phase 23 — FAQ read path on the CDN | **Working** (2026-09-24). No change to how this page writes. Every FAQ write now also rebuilds the site's CDN snapshots (a database trigger in textile-spark-net), and the page says changes reach the live page "within about a minute". Verified by textile-spark-net's `tests/faqs-snapshot.spec.ts` and `faqs-admin-editable.spec.ts` against this panel |
+
+## Registering staff (`admin-staff`, 2026-10-01)
+
+Admins → **Register a staff member**, for `super_admin` and `manager` (team roles only for a manager). It is for
+people joining the Cosora team who don't have an address to sign in with yet:
+
+- the `admin-staff` edge function (`verify_jwt: true`) generates the **employee ID** (`EMP-0001`), the **work email**
+  (`first.last@cosora.in`, the sign-in name) and a **temporary password**;
+- the password goes to the person's **personal email** by Resend (`RESEND_API_KEY`, `RESEND_FROM`). While Resend
+  isn't set up, the panel shows it **once** to the registrar, and nothing stores it;
+- at first sign-in `RequireAdmin` shows `ChangeTemporaryPassword` until they choose their own
+  (`app_metadata.must_change_password`).
+
+The **Staff directory** (`admin_staff_list()`) shows everyone registered, with **New temporary password** for when
+someone is locked out. Their work email has no mailbox yet, so "Forgot password" can't reach them. The formats are
+interim; the task to settle them is in textile-spark-net `documentation/ToDo.md`. Inviting by email (below) stays
+for people who already have an address.
 
 ## Inviting admins by email (`admin-invite`)
 

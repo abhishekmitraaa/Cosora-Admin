@@ -45,14 +45,39 @@ interface KycDocRow {
   created_at: string;
   rejection_reason: string | null;
   reviewed_at: string | null;
+  /** A registration's kind and number, an Aadhaar's consent, a catalogue file's name (2026-10-02). */
+  detail?: Record<string, unknown> | null;
 }
 
+// The Seller Registration FAQ's documents (2026-10-02): PAN, GST certificate, a
+// business registration, the owner's masked Aadhaar, and a product catalogue.
 const DOC_LABELS: Record<string, string> = {
   pan: "PAN",
   gst: "GST",
   cin: "CIN",
-  aadhaar: "Aadhaar",
+  aadhaar: "Aadhaar (masked)",
+  business_registration: "Business registration",
+  catalog: "Product catalogue",
 };
+
+const REG_KIND_LABELS: Record<string, string> = {
+  udyam: "Udyam (MSME) certificate",
+  incorporation: "Certificate of incorporation",
+  shop_establishment: "Shop and establishment licence",
+  partnership: "Partnership deed",
+  other: "Other registration",
+};
+
+/** What came with the file, in a line: the registration's kind and number, the catalogue file's name. */
+function detailLine(d: KycDocRow): string | null {
+  const x = d.detail ?? {};
+  if (d.doc_type === "business_registration") {
+    return [REG_KIND_LABELS[String(x.kind ?? "")] ?? String(x.kind ?? ""), x.number ? String(x.number) : null].filter(Boolean).join(" · ") || null;
+  }
+  if (d.doc_type === "catalog") return x.name ? String(x.name) : null;
+  if (d.doc_type === "aadhaar") return "Masked copy; check that only the last 4 digits show";
+  return null;
+}
 
 /** Matches the vendor app: never reviewed is not the same as rejected. */
 function isRejected(d: KycDocRow): boolean {
@@ -75,13 +100,17 @@ export function useVendorKycDocs(vendorId: string | undefined) {
     queryKey: ["vendor-kyc", vendorId],
     enabled: Boolean(vendorId),
     queryFn: async (): Promise<KycDocRow[]> => {
-      const { data, error } = await supabase
+      const columns = "id, doc_type, file_url, verified, created_at, rejection_reason, reviewed_at";
+      const read = (cols: string) => supabase
         .from("vendor_documents")
-        .select("id, doc_type, file_url, verified, created_at, rejection_reason, reviewed_at")
+        .select(cols)
         .eq("vendor_id", vendorId!)
         .order("created_at", { ascending: true });
+      let { data, error } = await read(`${columns}, detail`);
+      // Before the 2026-10-02 migration there's no `detail` column (42703).
+      if (error?.code === "42703") ({ data, error } = await read(columns));
       if (error) throw new Error(error.message);
-      return (data ?? []) as KycDocRow[];
+      return (data ?? []) as unknown as KycDocRow[];
     },
   });
 }
@@ -187,6 +216,7 @@ export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-ink">{DOC_LABELS[d.doc_type] ?? d.doc_type}</p>
+                  {detailLine(d) && <p className="text-2xs text-ink-muted">{detailLine(d)}</p>}
                   <p className="text-2xs text-ink-faint">
                     Submitted {format(new Date(d.created_at), "d MMM yyyy")}
                     {d.reviewed_at && ` · reviewed ${format(new Date(d.reviewed_at), "d MMM yyyy")}`}
