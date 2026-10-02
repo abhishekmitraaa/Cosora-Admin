@@ -9,6 +9,8 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-02 (release, applied and deployed): **Staff registration, the P5 FAQ translations, the 7-day guarantee panel and the new KYC documents reach production.** textile-spark-net applied six migrations (`20261002104116` staff, `20261002104545`/`104949` P5, `20261002105236` documents, `20261002105804` plan changes and the guarantee, `20261002110739` content) and deployed `admin-staff` v1. `database.types.ts` is regenerated from production; P6's five functions stay hand-written and marked, because its migration (`20261001140000`) isn't applied yet (the Supabase tool declines it). Until it is, Fraud reports → Confirmed fraud shows nothing decided.
+
 - 2026-10-02 (FAQ input; branch `faq-truth/registration-plans-refunds`, not merged): **Subscriptions → the 7-day money-back guarantee, and the KYC panel names the new registration documents.** textile-spark-net made three live FAQs true (its `documentation/changelog.md`, same date).
   - **"7-day money-back guarantee"** on `/subscriptions` (`RefundGuaranteePanel.tsx`): each open request with its seller, reason, total and payments. Refund each payment with Refund, which is `admin-refund-payment` as before (Razorpay, full amount); "Close and end the plan" stays off until every payment in the request is refunded, then `admin_refund_guarantee_close` cancels the subscription and tells the seller. Super admin and finance close; support sees the list. Hidden until textile-spark-net `20261002100100` is applied (PGRST202) or for a role it refuses (42501).
   - **A paid downgrade** shows under the subscription's period ("Silver (paid) from 1 Nov 2026"), from `vendor_subscriptions.scheduled_*`; the page loads without it before the apply (42703).

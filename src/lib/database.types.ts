@@ -3315,6 +3315,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vendor_subscriptions_scheduled_plan_id_fkey"
+            columns: ["scheduled_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vendor_subscriptions_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: true
@@ -4037,6 +4044,7 @@ export type Database = {
           id: string
         }[]
       }
+      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       admin_fraud_findings: {
         Args: { p_limit?: number }
         Returns: {
@@ -4221,7 +4229,10 @@ export type Database = {
           id: string
         }[]
       }
-      admin_refund_guarantee_close: { Args: { p_note?: string; p_request_id: string }; Returns: undefined }
+      admin_refund_guarantee_close: {
+        Args: { p_note?: string; p_request_id: string }
+        Returns: undefined
+      }
       admin_refund_guarantee_requests: {
         Args: { p_status?: string }
         Returns: {
@@ -4978,7 +4989,10 @@ export type Database = {
         Args: { p_cycle: string; p_plan: string; p_vendor: string }
         Returns: Json
       }
-      subscription_change_preview: { Args: { p_cycle: string; p_plan: string }; Returns: Json }
+      subscription_change_preview: {
+        Args: { p_cycle: string; p_plan: string }
+        Returns: Json
+      }
       subscription_quote_for: {
         Args: { p_cycle: string; p_plan: string; p_vendor: string }
         Returns: Json
@@ -5017,10 +5031,12 @@ export type Database = {
         }
         Returns: Json
       }
+      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_receipt_record: {
         Args: { p_detail?: string; p_sent: boolean; p_ticket_id: string }
         Returns: undefined
       }
+      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_receipt_target: {
         Args: { p_ticket_no: string; p_user: string }
         Returns: Json
@@ -5073,7 +5089,9 @@ export type Database = {
         }
         Returns: Json
       }
+      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_sweep_purge: { Args: { p_ticket_ids: string[] }; Returns: number }
+      // Help & Support P6 (20261001140000): not applied yet; hand-written until it is.
       support_sweep_run: { Args: { p_limit?: number }; Returns: Json }
       suspend_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string; p_reason_code: string }
@@ -5095,6 +5113,7 @@ export type Database = {
         Args: { p_days?: number; v?: string }
         Returns: Json
       }
+      vendor_cap_plan: { Args: { p_vendor: string }; Returns: string }
     }
     Enums: {
       account_status_type: "active" | "suspended" | "deleted"
