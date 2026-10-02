@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { Inbox } from "lucide-react";
+import { toast } from "sonner";
+import FlagLog from "@/components/FlagLog";
+import { useRole } from "@/hooks/useAdminSession";
+import { canWrite } from "@/lib/roles";
 import {
   hoursBetween,
   NO_FILTERS,
@@ -10,6 +14,7 @@ import {
   useLeadDetail,
   useLeads,
   useLeadsSummary,
+  useRemoveLead,
   type LeadFilters,
   type LeadRow,
   type LeadStage,
@@ -33,6 +38,7 @@ import {
   Stack,
   Stat,
   Table,
+  Textarea,
   cn,
   type Tone,
 } from "@/components/ui";
@@ -44,8 +50,12 @@ import {
  * come from admin_leads_list() and the numbers from admin_leads_summary()
  * (src/lib/leads.ts); filters, search and paging run in the database.
  *
- * Read-only for every role: nothing here changes an RFQ or a quote. roles.ts,
- * section "leads": super_admin, vendor_ops, product_moderator, support.
+ * Readable by roles.ts section "leads": super_admin, vendor_ops, product_moderator,
+ * support. super_admin and product_moderator may also, in a request's detail,
+ * REMOVE it (admin_lead_remove: closes it for good, with a reason the buyer reads;
+ * quotes stay as history) or FLAG it (the flagged-items log, entity 'rfq'). An
+ * RFQ goes live the moment it's posted; this is oversight after the fact, not a
+ * gate (RFQ/leads R3, Mitra 2026-10-02). Nobody deletes an RFQ.
  */
 
 const STAGE_TONE: Record<LeadStage, Tone> = {
@@ -54,9 +64,10 @@ const STAGE_TONE: Record<LeadStage, Tone> = {
   quoted: "info",
   won: "positive",
   closed: "neutral",
+  removed: "critical",
 };
 
-const STAGE_FILTERS: StageFilter[] = ["all", "new", "unanswered", "overdue", "quoted", "won", "closed"];
+const STAGE_FILTERS: StageFilter[] = ["all", "new", "unanswered", "overdue", "quoted", "won", "closed", "removed"];
 const WINDOWS: { days: number | null; label: string }[] = [
   { days: 7, label: "Last 7 days" },
   { days: 30, label: "Last 30 days" },
@@ -95,7 +106,7 @@ export default function Leads() {
     <Page width="wide">
       <PageHeader
         title="Leads"
-        subtitle="Every buyer request (RFQ) and where it stands: waiting for a first quote, quoted, won or closed. Read-only."
+        subtitle="Every buyer request (RFQ) and where it stands: waiting for a first quote, quoted, won, closed or removed. Super admins and product moderators can remove or flag a lead."
       />
 
       <Stack>
@@ -144,7 +155,7 @@ export default function Leads() {
               {s && (
                 <Note>
                   {windowLabel(days)}: {s.window.rfqs} RFQ{s.window.rfqs === 1 ? "" : "s"} ({s.window.direct} direct),{" "}
-                  {s.window.won} won, {s.window.closed} closed. {s.open.quoted} open RFQ
+                  {s.window.won} won, {s.window.closed} closed, {s.window.removed} removed. {s.open.quoted} open RFQ
                   {s.open.quoted === 1 ? " has" : "s have"} quotes waiting on the buyer.
                 </Note>
               )}
@@ -331,6 +342,7 @@ function LeadLine({ lead: r, onOpen }: { lead: LeadRow; onOpen: () => void }) {
 function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
   const detail = useLeadDetail(id);
   const d = detail.data;
+  const writable = canWrite(useRole(), "leads");
 
   return (
     <Modal open={id !== null} title={d ? d.title : "Request"} onClose={onClose} width="lg">
@@ -359,6 +371,17 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
               )}
             </span>
           </div>
+
+          {d.removal && (
+            <div className="rounded-md border border-critical-line bg-critical-bg p-3 text-xs">
+              <span className="font-semibold text-critical-fg">Removed by {d.removal.by ?? "an admin"}</span>{" "}
+              <span className="text-ink-faint">{format(new Date(d.removal.at), "d MMM yyyy, HH:mm")}</span>
+              <p className="mt-1 whitespace-pre-line text-ink" data-no-translate>
+                {d.removal.reason}
+              </p>
+            </div>
+          )}
+          {writable && !d.removal && <RemoveLead id={d.id} />}
 
           <div className="grid grid-cols-2 gap-2 text-xs text-ink-muted sm:grid-cols-4">
             <span>Product: {d.product_name ?? "—"}</span>
@@ -414,8 +437,62 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
               ))}
             </Table>
           )}
+
+          <FlagLog entityType="rfq" entityId={d.id} canAdd={writable} />
         </div>
       ) : null}
     </Modal>
+  );
+}
+
+function RemoveLead({ id }: { id: string }) {
+  const remove = useRemoveLead();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  if (!open) {
+    return (
+      <Button variant="danger" size="sm" onClick={() => setOpen(true)}>
+        Remove lead
+      </Button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-md border border-line bg-surface-2 p-3">
+      <p className="text-xs text-ink-muted">
+        Removing takes this request out of every vendor's leads and closes it for good. Quotes already sent stay as
+        history. The buyer sees "Removed by Cosora" and this reason.
+      </p>
+      <Textarea
+        rows={3}
+        autoFocus
+        value={reason}
+        placeholder="Why is this being removed? The buyer will read this."
+        onChange={(e) => setReason(e.target.value)}
+      />
+      <div className="flex justify-end gap-2">
+        <Button size="sm" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          disabled={!reason.trim() || remove.isPending}
+          onClick={() =>
+            remove.mutate(
+              { id, reason },
+              {
+                onSuccess: () => {
+                  setOpen(false);
+                  toast.success("Lead removed");
+                },
+                onError: (e) => toast.error(e.message),
+              },
+            )
+          }
+        >
+          Remove for good
+        </Button>
+      </div>
+    </div>
   );
 }

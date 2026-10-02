@@ -1814,6 +1814,9 @@ export type Database = {
           product_id: string | null
           product_name: string | null
           quantity: number | null
+          removed_at: string | null
+          removed_by: string | null
+          removed_reason: string | null
           search_text: string | null
           sizes_breakdown: Json | null
           status: Database["public"]["Enums"]["rfq_status"]
@@ -1838,6 +1841,9 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
           search_text?: string | null
           sizes_breakdown?: Json | null
           status?: Database["public"]["Enums"]["rfq_status"]
@@ -1862,6 +1868,9 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
           search_text?: string | null
           sizes_breakdown?: Json | null
           status?: Database["public"]["Enums"]["rfq_status"]
@@ -1888,6 +1897,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfqs_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4120,6 +4136,13 @@ export type Database = {
         }[]
       }
       admin_lead_detail: { Args: { p_rfq_id: string }; Returns: Json }
+      admin_lead_remove: {
+        Args: { p_reason: string; p_rfq_id: string }
+        Returns: {
+          id: string
+          removed_at: string
+        }[]
+      }
       admin_leads_list: {
         Args: {
           p_category?: string

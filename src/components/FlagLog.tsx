@@ -10,9 +10,11 @@ import { Button, Textarea } from "./ui";
 /**
  * Mirrors admin_flags_entity_type_check EXACTLY. The column is `text`, but it
  * carries a CHECK constraint — adding a value here without widening that
- * constraint gets a 23514 on insert. 'conversation' was added by 20260802140000.
+ * constraint gets a 23514 on insert. 'conversation' was added by 20260802140000;
+ * 'rfq' by RFQ/leads R3 (20261003090200), written by super_admin and
+ * product_moderator only (admin_flag_add checks the role).
  */
-export type FlagEntity = "vendor" | "product" | "ad" | "conversation";
+export type FlagEntity = "vendor" | "product" | "ad" | "conversation" | "rfq";
 
 interface FlagRow {
   id: string;
@@ -39,7 +41,16 @@ interface FlagRow {
  * separation, Phase 3b): the table is moving behind the admin wall, where a
  * direct query cannot reach it. Both RPCs re-check that same policy inside.
  */
-export default function FlagLog({ entityType, entityId }: { entityType: FlagEntity; entityId: string }) {
+export default function FlagLog({
+  entityType,
+  entityId,
+  canAdd = true,
+}: {
+  entityType: FlagEntity;
+  entityId: string;
+  /** False hides the note box (e.g. a lead, for roles that may only read it). */
+  canAdd?: boolean;
+}) {
   const qc = useQueryClient();
   const { identity } = useAdminSession();
   const [note, setNote] = useState("");
@@ -92,22 +103,26 @@ export default function FlagLog({ entityType, entityId }: { entityType: FlagEnti
         visible to all admins.
       </p>
 
-      <div className="flex gap-2">
-        <Textarea
-          rows={2}
-          value={note}
-          placeholder="Add an internal note…"
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <Button
-          variant="primary"
-          className="self-start"
-          disabled={!note.trim() || addNote.isPending}
-          onClick={() => addNote.mutate(note)}
-        >
-          Add
-        </Button>
-      </div>
+      {canAdd ? (
+        <div className="flex gap-2">
+          <Textarea
+            rows={2}
+            value={note}
+            placeholder="Add an internal note…"
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <Button
+            variant="primary"
+            className="self-start"
+            disabled={!note.trim() || addNote.isPending}
+            onClick={() => addNote.mutate(note)}
+          >
+            Add
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-ink-faint">Only super admins and product moderators can add a note here.</p>
+      )}
 
       <div className="mt-3 space-y-2">
         {flags.isLoading && <p className="text-xs text-ink-faint">Loading notes…</p>}

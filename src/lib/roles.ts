@@ -123,7 +123,8 @@ export type Section =
   // suspension only.
   | "customers"
   // The RFQ pipeline (admin completion Phase 7): every buyer request's stage and
-  // how fast vendors answer. Read-only. admin_leads_* admit exactly these roles.
+  // how fast vendors answer. admin_leads_* admit exactly these roles; super_admin
+  // and product_moderator may also remove or flag a lead (RFQ/leads R3).
   | "leads"
   // Third-party website analytics. An external link, not a built feature.
   | "traction"
@@ -287,8 +288,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // Tags only (admin completion Phase 6): admin_customer_tag_* refuse every
   // other role in the database. Nothing on the screen edits an account.
   customers: ["super_admin", "support"],
-  // Read-only: nothing on the page changes an RFQ or a quote.
-  leads: [],
+  // Remove (admin_lead_remove, reason required) and flag ('rfq'): super_admin and
+  // product_moderator; the database refuses everyone else (RFQ/leads R3).
+  leads: ["super_admin", "product_moderator"],
   // Read-only: nothing on Live Activity writes.
   traction: [],
   // Append-only, written by the database itself: nobody edits the log.

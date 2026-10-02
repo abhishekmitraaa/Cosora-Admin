@@ -1,5 +1,5 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assertWrote, supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/database.types";
 
 /**
@@ -12,8 +12,11 @@ import type { Database } from "@/lib/database.types";
  *   quoted      active, at least one quote, none accepted
  *   won         a quote was accepted
  *   closed      no longer active, none accepted
- * An RFQ addressed to one vendor is "direct". Read-only: nothing here changes an
- * RFQ or a quote. Readable by super_admin, vendor_ops, product_moderator, support.
+ *   removed     taken down by an admin (admin_lead_remove), whatever its stage was;
+ *               checked first (RFQ/leads R3, migration 20261003090200 in textile-spark-net)
+ * An RFQ addressed to one vendor is "direct". Readable by super_admin, vendor_ops,
+ * product_moderator, support. super_admin and product_moderator may remove a lead
+ * (with a reason the buyer reads) or flag it; the database checks the role again.
  */
 
 type GeneratedRow = Database["public"]["Functions"]["admin_leads_list"]["Returns"][number];
@@ -35,7 +38,7 @@ export type LeadRow = Omit<
   accepted_vendor_name: string | null;
 };
 
-export type LeadStage = "new" | "unanswered" | "quoted" | "won" | "closed";
+export type LeadStage = "new" | "unanswered" | "quoted" | "won" | "closed" | "removed";
 export type StageFilter = LeadStage | "overdue" | "all";
 
 export const STAGE_LABELS: Record<LeadStage | "overdue", string> = {
@@ -45,6 +48,7 @@ export const STAGE_LABELS: Record<LeadStage | "overdue", string> = {
   quoted: "Quoted",
   won: "Won",
   closed: "Closed",
+  removed: "Removed",
 };
 
 export const STAGE_RULES: Record<LeadStage | "overdue", string> = {
@@ -53,7 +57,8 @@ export const STAGE_RULES: Record<LeadStage | "overdue", string> = {
   overdue: "Unanswered for 48 hours or more.",
   quoted: "At least one quote, none accepted yet.",
   won: "The buyer accepted a quote.",
-  closed: "Closed without accepting a quote.",
+  closed: "Closed by the buyer without accepting a quote.",
+  removed: "Taken down by Cosora, with a reason the buyer reads.",
 };
 
 export interface LeadFilters {
@@ -75,6 +80,7 @@ export interface LeadsSummary {
     direct: number;
     won: number;
     closed: number;
+    removed: number;
     answered: number;
     median_first_quote_hours: number | null;
     eligible_24h: number;
@@ -99,6 +105,8 @@ export interface LeadDetail {
   direct: boolean;
   buyer: { id: string; name: string };
   target_vendor: { id: string; name: string | null } | null;
+  /** Set when an admin removed the RFQ; `by` is the admin's name. */
+  removal: { at: string; by: string | null; reason: string } | null;
   quotes: {
     id: string;
     vendor_id: string;
@@ -162,6 +170,17 @@ export function useLeadDetail(id: string | null) {
       if (error) throw new Error(error.message);
       return data as unknown as LeadDetail;
     },
+  });
+}
+
+/** Take a lead down (super_admin, product_moderator). The reason is shown to the buyer. */
+export function useRemoveLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      assertWrote(await supabase.rpc("admin_lead_remove", { p_rfq_id: id, p_reason: reason.trim() }), "remove lead");
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }
 
