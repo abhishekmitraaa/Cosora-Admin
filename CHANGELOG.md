@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-02 (admin completion, Phase 11; branch `admin-completion/p11-cleanup`, not merged): **Each admin role reads only what its section needs, and the dev seed is gone.**
+  - **Database** (textile-spark-net `20261002064904_admin_least_privilege_reads`, applied 2026-10-02; harness 15 17/17 live): seven tables stop letting every admin role read every row. Vendor documents and contracts: super_admin, vendor_ops, support. Invoices and subscriptions: super_admin, finance_admin, support. Ad orders: those plus ads_moderator. Certificate orders: super_admin, finance_admin. Analytics events: super_admin. These are the roles `roles.ts` already shows each section to, so no page changes for the roles that can open it; Reports, Payments, Customers, Leads, Live Activity and Support read through definer functions and are unaffected.
+  - A product moderator re-approving a rejected listing still gets the vendor's real plan cap: the cap triggers read the plan through a new definer helper, `vendor_cap_plan()`.
+  - `src/lib/devSeed/store.ts` and `<DevSeedBanner>` deleted: nothing used them after Phase 10. `App.tsx` and `roles.ts` comments say so; README's role table gains the read gates, the Discounts row is real, and the dev-seed section keeps only the rule for any future fixture.
+  - Regenerating `database.types.ts` waits for the pending textile-spark-net migrations (staff, P5, P6, plan changes): a regeneration now would drop their hand-added types.
+
 - 2026-10-01 (Help & Support P4, live): **The Support section works against production.** The three
   support migrations are applied (textile-spark-net `20260930212818`, `…213143`, `…213451`), and
   `support-attachment-verify` is deployed. Rollout is Off, so the inbox is empty until a super admin
@@ -133,6 +139,7 @@ entry in each, from that repo's point of view.
     live database: every `admin_blog_*` RPC returns 401 to the anon key, the reserved slugs
     `category`, `page` and `api` are refused, an image block without alt text is rejected, and
     a second FAQ block on one article is rejected.
+
 
 - 2026-09-29 (admin completion, Phase 10): **Discounts is real.** The dev-seed fixture is gone.
   - `lib/discounts.ts` and `pages/Discounts.tsx` on the `admin_discount_*` RPCs (textile-spark-net

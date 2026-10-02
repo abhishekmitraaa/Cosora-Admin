@@ -79,12 +79,31 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 
 `support` can additionally write the flagged-items log (`admin_flags`).
 
+**Reads are role-gated in the database too** (admin completion Phase 11, 2026-10-02,
+textile-spark-net `20261002064904_admin_least_privilege_reads`). Seven tables used to let every admin role
+read every row. Each now names the roles whose section reads it, so a page opened by
+another role gets no rows rather than someone else's data:
+
+| Table | Admin roles that read it | Section |
+|---|---|---|
+| `vendor_documents`, `vendor_contracts` | `super_admin`, `vendor_ops`, `support` | Vendors |
+| `subscription_invoices`, `vendor_subscriptions` | `super_admin`, `finance_admin`, `support` | Subscriptions |
+| `ad_orders` | `super_admin`, `ads_moderator`, `finance_admin`, `support` | Ads (monitoring) |
+| `certificate_orders` | `super_admin`, `finance_admin` | Certificates |
+| `buyer_profiles` | `super_admin`, `support` (since Phase 1) | Accounts |
+| `engagement_events` | `super_admin` | none (Live Activity reads it through `admin_live_activity()`) |
+
+Reports, Payments, Customers, Leads, Live Activity and Support read across these tables
+through SECURITY DEFINER functions with their own role checks, so they are unaffected. A
+new page that selects one of these tables directly must be readable by the same roles, or
+widen the policy in a migration on purpose.
+
 The Phase-4 sections sit alongside these, and the difference in what is behind
 them matters. `geography` reads the same `vendor_profiles` rows the Vendors table
 lists, so its gate mirrors that one exactly and the database is already enforcing
-it. The dev-seed sections have no table yet, so `roles.ts` is UX in a
-stronger sense there than anywhere else in this file: **there is nothing behind
-those gates enforcing anything.** See "Phase-4 sections" below.
+it. The other Phase-4 sections started on a development-only seed and all read the
+database now (Discounts was the last, in Phase 10), so their gates mirror an RPC or RLS
+check like the rest.
 
 | Role | Geography | Content | Payments | Certificates | Discounts | Customers | Live Activity |
 |---|---|---|---|---|---|---|---|
@@ -285,15 +304,9 @@ fixture (admin completion Phase 10).
 | `content` | **real** since 2026-09-29: vendor-dashboard banners and the buyer site's theme (`admin_site_*`) | `super_admin` (the RPCs refuse anyone else) | `super_admin` |
 | `payments` | **real** since 2026-09-28: `admin_payments_ledger()` / `admin_payments_summary()` | `super_admin`, `finance_admin`, `support` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` (nothing on the page writes) |
 | `certificates` | **real**: `certificate_orders` and the `certificate_*` RPCs | `super_admin`, `finance_admin` *(see below)* | `super_admin`, `finance_admin` *(see below)* |
-| `discounts` | dev-seed | `super_admin`, `finance_admin` | `super_admin`, `finance_admin` |
+| `discounts` | **real** since 2026-09-29: the `admin_discount_*` RPCs | `super_admin`, `finance_admin` (the RPCs refuse anyone else) | `super_admin`, `finance_admin` |
 | `customers` | **real** since 2026-09-28: `admin_customer_list()`, `admin_customer_segment_counts()`, tags | `super_admin`, `support`, `finance_admin` | `super_admin`, `support` (tags only; the RPCs refuse anyone else) |
 | `traction` | **real** since 2026-09-28: `admin_live_activity()`, plus links to Microsoft Clarity | all roles | none |
-
-**Read the gates on the dev-seed rows differently from the rest of this file.**
-`roles.ts` is UX everywhere, and the database is the real gate — but for the
-dev-seed sections there is no database behind them yet, so there is nothing enforcing
-anything. Do not read a gate there as evidence a write is protected. Phase 2
-creates the tables and their RLS at the same time.
 
 ### Ads monitoring: what this schema can and cannot tell you
 
@@ -357,27 +370,16 @@ for which.
 This is the only lazily-loaded route in the app: maplibre is roughly a third of
 the JavaScript and three of six roles cannot see the section.
 
-### Dev-seed data: the rule and the trap
+### Dev-seed data: gone, and the rule if it comes back
 
-No screen reads dev-seed data any more: Discounts was the last (admin completion Phase 10,
-2026-09-29). `src/lib/devSeed/store.ts` and `<DevSeedBanner>` are unused and go in Phase 11.
-The rule stands for anything added later.
-
-Following `textile-spark-net/src/lib/notificationsStore.ts` and the project's
-"no mock data in production" rule, each store in `src/lib/devSeed/` is seeded in
-a development build and `[]` in a production one, and every seeded screen carries
-a `<DevSeedBanner>` so nothing is mistaken for a real Cosora figure.
-
-**The gate must be at the declaration site.** With the check only inside the
-shared `createDevStore`, Rollup inlined three of the five call sites and kept the
-other two, and the banner and discount fixtures shipped in the production bundle.
-`devSeed(SEED)` folds to `[]` at build time and the array beside it is dropped.
-After any change there:
-
-```bash
-npm run build
-grep -c "TIRUPPUR500\|banner-seed-1\|cert-seed-01" dist/assets/*.js   # must be 0
-```
+No screen reads dev-seed data: Discounts was the last (admin completion Phase 10,
+2026-09-29), and `src/lib/devSeed/` and `<DevSeedBanner>` were deleted in Phase 11
+(2026-10-02). If a fixture is ever needed again, the project's "no mock data in
+production" rule applies: seed it in a development build only, `[]` in a production one,
+with a visible banner on the screen. **Put the `import.meta.env.DEV` check at the
+declaration site**, not inside a shared helper: with the check only in the helper, Rollup
+inlined three of five call sites and kept the other two, and fixtures shipped in the
+production bundle. Then build and grep `dist/` for a fixture string; the count must be 0.
 
 ### Certificates is built on an unconfirmed decision
 
@@ -599,7 +601,7 @@ reasoning this codebase is written around can use whatever punctuation it likes.
 a colour the tokens do not cover, the token set is what is missing.
 
 `Page` `Stack` `Panel` `Card` `Field` `Input` `Select` `Textarea` `Checkbox`
-`Button` `Badge` `StatusBadge` `Notice` `Note` `ReadOnlyBanner` `DevSeedBanner`
+`Button` `Badge` `StatusBadge` `Notice` `Note` `ReadOnlyBanner`
 `Empty` `SkeletonList` `Modal` `Table` `Tabs` `Attr` `AttrGrid` `DataField`
 `Stat` `Meter` `PageHeader` `SubHeading` `ThemeToggle` `Logo` `AuthLayout`
 

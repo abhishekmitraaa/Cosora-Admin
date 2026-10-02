@@ -569,23 +569,6 @@ export function Note({ children, className }: { children: ReactNode; className?:
   );
 }
 
-/**
- * Marks a screen whose numbers are a local development fixture.
- *
- * Rendered only where `devOnly*()` supplied the rows, and worded so it cannot
- * be mistaken for a styling flourish. In a production build these pages render
- * their empty state instead and this banner never mounts.
- */
-export function DevSeedBanner({ what }: { what: string }) {
-  return (
-    <Notice tone="info" title="Development sample data" className="mb-4">
-      {what} is not wired to a database table yet. Everything below comes from a local seed array
-      that ships only in a development build, so nothing here is a real Cosora figure. A production
-      build renders this screen empty until Phase 2 creates the table.
-    </Notice>
-  );
-}
-
 export function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong bg-surface/60 px-6 py-12 text-center">
