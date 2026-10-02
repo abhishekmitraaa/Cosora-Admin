@@ -80,7 +80,7 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 `support` can additionally write the flagged-items log (`admin_flags`).
 
 **Reads are role-gated in the database too** (admin completion Phase 11, 2026-10-02,
-textile-spark-net `admin_least_privilege_reads`). Seven tables used to let every admin role
+textile-spark-net `20261002064904_admin_least_privilege_reads`). Seven tables used to let every admin role
 read every row. Each now names the roles whose section reads it, so a page opened by
 another role gets no rows rather than someone else's data:
 
