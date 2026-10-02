@@ -75,6 +75,7 @@ const AREAS: Record<string, string> = {
   "public.vendor_profiles": "Vendor profile",
   "public.vendor_subscriptions": "Subscription",
   "public.subscription_invoices": "Invoice (refund)",
+  "public.refund_guarantee_requests": "Refund request (7-day guarantee)",
   "public.subscription_plans": "Subscription plan",
   "admin.customer_tags": "Customer tag",
   "admin.profile_tags": "Customer tag on an account",

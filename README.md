@@ -503,6 +503,19 @@ some plans), an **ad campaign's lines**, or the **Verified Certificate** line.
   plan, no note).
 - Both tables are in the Admin Log. The Payments ledger shows each row's discount.
 
+### The 7-day money-back guarantee (2026-10-02; built, not live)
+
+The Subscription FAQ promises first-time subscribers a full refund within 7 days. A seller asks on the
+buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
+(`RefundGuaranteePanel.tsx`, textile-spark-net migration `20261002100100`).
+- **Refund first, then close.** Each payment in the request has Refund (`admin-refund-payment`, Razorpay).
+  "Close and end the plan" (`admin_refund_guarantee_close`, super_admin and finance_admin) is refused until
+  every one has a Razorpay refund id; then the subscription is cancelled and the seller is told.
+- **Only money taken through Razorpay is offered**, so nothing appears while checkouts run in demo mode, and
+  refunds can't run here until the Razorpay keys are set (Status per part, row 6).
+- Plan changes are priced in the database (`admin.subscription_quote`): an upgrade credits the unused part of
+  what's paid; a downgrade is paid now and shows as scheduled under the current period.
+
 ### Live Activity (2026-09-28)
 
 `/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`

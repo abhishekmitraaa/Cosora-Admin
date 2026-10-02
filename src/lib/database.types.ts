@@ -1698,6 +1698,53 @@ export type Database = {
           },
         ]
       }
+      refund_guarantee_requests: {
+        Row: {
+          close_note: string | null
+          closed_at: string | null
+          closed_by: string | null
+          id: string
+          invoice_ids: string[]
+          reason: string | null
+          requested_at: string
+          status: string
+          total_rupees: number
+          vendor_id: string
+        }
+        Insert: {
+          close_note?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          id?: string
+          invoice_ids: string[]
+          reason?: string | null
+          requested_at?: string
+          status?: string
+          total_rupees: number
+          vendor_id: string
+        }
+        Update: {
+          close_note?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          id?: string
+          invoice_ids?: string[]
+          reason?: string | null
+          requested_at?: string
+          status?: string
+          total_rupees?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_guarantee_requests_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           body: string | null
@@ -2138,7 +2185,9 @@ export type Database = {
           amount: number
           billing_period_end: string | null
           billing_period_start: string | null
+          change_kind: string | null
           created_at: string
+          credit_rupees: number | null
           currency: string
           discount_amount: number | null
           discount_code: string | null
@@ -2157,6 +2206,7 @@ export type Database = {
           refunded_at: string | null
           status: string
           subscription_id: string | null
+          superseded_at: string | null
           tds_amount: number | null
           vendor_id: string
         }
@@ -2164,7 +2214,9 @@ export type Database = {
           amount?: number
           billing_period_end?: string | null
           billing_period_start?: string | null
+          change_kind?: string | null
           created_at?: string
+          credit_rupees?: number | null
           currency?: string
           discount_amount?: number | null
           discount_code?: string | null
@@ -2183,6 +2235,7 @@ export type Database = {
           refunded_at?: string | null
           status?: string
           subscription_id?: string | null
+          superseded_at?: string | null
           tds_amount?: number | null
           vendor_id: string
         }
@@ -2190,7 +2243,9 @@ export type Database = {
           amount?: number
           billing_period_end?: string | null
           billing_period_start?: string | null
+          change_kind?: string | null
           created_at?: string
+          credit_rupees?: number | null
           currency?: string
           discount_amount?: number | null
           discount_code?: string | null
@@ -2209,6 +2264,7 @@ export type Database = {
           refunded_at?: string | null
           status?: string
           subscription_id?: string | null
+          superseded_at?: string | null
           tds_amount?: number | null
           vendor_id?: string
         }
@@ -2240,7 +2296,9 @@ export type Database = {
         Row: {
           amount: number
           billing_cycle: string
+          change_kind: string | null
           created_at: string
+          credit_rupees: number
           discount_code: string | null
           discount_redemption_id: string | null
           discount_rupees: number
@@ -2255,7 +2313,9 @@ export type Database = {
         Insert: {
           amount: number
           billing_cycle?: string
+          change_kind?: string | null
           created_at?: string
+          credit_rupees?: number
           discount_code?: string | null
           discount_redemption_id?: string | null
           discount_rupees?: number
@@ -2270,7 +2330,9 @@ export type Database = {
         Update: {
           amount?: number
           billing_cycle?: string
+          change_kind?: string | null
           created_at?: string
+          credit_rupees?: number
           discount_code?: string | null
           discount_redemption_id?: string | null
           discount_rupees?: number
@@ -2975,6 +3037,7 @@ export type Database = {
       vendor_documents: {
         Row: {
           created_at: string
+          detail: Json
           doc_type: string
           file_url: string | null
           id: string
@@ -2986,6 +3049,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          detail?: Json
           doc_type: string
           file_url?: string | null
           id?: string
@@ -2997,6 +3061,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          detail?: Json
           doc_type?: string
           file_url?: string | null
           id?: string
@@ -3193,6 +3258,9 @@ export type Database = {
           id: string
           plan_id: string
           real_time_alerts_enabled: boolean
+          scheduled_billing_cycle: string | null
+          scheduled_from: string | null
+          scheduled_plan_id: string | null
           status: string
           updated_at: string
           vendor_id: string
@@ -3207,6 +3275,9 @@ export type Database = {
           id?: string
           plan_id: string
           real_time_alerts_enabled?: boolean
+          scheduled_billing_cycle?: string | null
+          scheduled_from?: string | null
+          scheduled_plan_id?: string | null
           status?: string
           updated_at?: string
           vendor_id: string
@@ -3221,6 +3292,9 @@ export type Database = {
           id?: string
           plan_id?: string
           real_time_alerts_enabled?: boolean
+          scheduled_billing_cycle?: string | null
+          scheduled_from?: string | null
+          scheduled_plan_id?: string | null
           status?: string
           updated_at?: string
           vendor_id?: string
@@ -4147,6 +4221,23 @@ export type Database = {
           id: string
         }[]
       }
+      admin_refund_guarantee_close: { Args: { p_note?: string; p_request_id: string }; Returns: undefined }
+      admin_refund_guarantee_requests: {
+        Args: { p_status?: string }
+        Returns: {
+          close_note: string
+          closed_at: string
+          closed_by_name: string
+          id: string
+          invoices: Json
+          reason: string
+          requested_at: string
+          status: string
+          total_rupees: number
+          vendor_id: string
+          vendor_name: string
+        }[]
+      }
       admin_report_summary: {
         Args: { p_from?: string; p_to?: string }
         Returns: Json
@@ -4779,6 +4870,8 @@ export type Database = {
         Returns: string
       }
       record_embedding_pipeline_health: { Args: never; Returns: string }
+      refund_guarantee_request: { Args: { p_reason?: string }; Returns: Json }
+      refund_guarantee_status: { Args: never; Returns: Json }
       regex_probe: {
         Args: { p_pattern: string; p_sample: string }
         Returns: Json
@@ -4880,6 +4973,15 @@ export type Database = {
           p_reported_reason?: string
         }
         Returns: undefined
+      }
+      subscription_activate: {
+        Args: { p_cycle: string; p_plan: string; p_vendor: string }
+        Returns: Json
+      }
+      subscription_change_preview: { Args: { p_cycle: string; p_plan: string }; Returns: Json }
+      subscription_quote_for: {
+        Args: { p_cycle: string; p_plan: string; p_vendor: string }
+        Returns: Json
       }
       support_attachment_checked: {
         Args: { p_attachment_id: string; p_clean: boolean }

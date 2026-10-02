@@ -25,6 +25,7 @@ import {
   Table,
   Textarea,
 } from "@/components/ui";
+import { RefundGuaranteePanel } from "@/components/RefundGuaranteePanel";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -44,6 +45,9 @@ interface SubRow {
   current_period_end: string | null;
   auto_renew: boolean;
   vendor: { brand_name: string | null; city: string | null } | null;
+  /** A paid downgrade waiting for the period to end (2026-10-02); absent before that migration. */
+  scheduled_plan_id?: string | null;
+  scheduled_from?: string | null;
 }
 
 interface InvoiceRow {
@@ -98,16 +102,16 @@ export default function Subscriptions() {
     queryKey: ["subscriptions"],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<(SubRow & { created_at: string })[]> => {
-      let q = supabase
-        .from("vendor_subscriptions")
-        .select(
-          `id, vendor_id, plan_id, billing_cycle, status, current_period_start,
-           current_period_end, auto_renew, created_at, vendor:vendor_profiles(brand_name, city)`,
-        )
-        .order("created_at", { ascending: false })
-        .limit(PAGE);
-      if (pageParam) q = q.lt("created_at", pageParam);
-      const { data, error } = await q;
+      const base = `id, vendor_id, plan_id, billing_cycle, status, current_period_start,
+           current_period_end, auto_renew, created_at, vendor:vendor_profiles(brand_name, city)`;
+      const read = (columns: string) => {
+        let q = supabase.from("vendor_subscriptions").select(columns).order("created_at", { ascending: false }).limit(PAGE);
+        if (pageParam) q = q.lt("created_at", pageParam);
+        return q;
+      };
+      let { data, error } = await read(`${base}, scheduled_plan_id, scheduled_from`);
+      // Before the 2026-10-02 migration there are no scheduled_* columns (42703).
+      if (error?.code === "42703") ({ data, error } = await read(base));
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as (SubRow & { created_at: string })[];
     },
@@ -234,6 +238,8 @@ export default function Subscriptions() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "subscriptions")} />}
 
       <Stack>
+        <RefundGuaranteePanel writable={writable} />
+
         <Panel title="Subscriptions">
           {subRows.length === 0 ? (
             <Empty>No vendor subscriptions.</Empty>
@@ -270,6 +276,11 @@ export default function Subscriptions() {
                       <>
                         {format(new Date(s.current_period_start), "d MMM yyyy")} to{" "}
                         {format(new Date(s.current_period_end), "d MMM yyyy")}
+                        {s.scheduled_plan_id && s.scheduled_from && (
+                          <span className="block text-2xs text-ink-faint">
+                            {`${planName(s.scheduled_plan_id)} (paid) from ${format(new Date(s.scheduled_from), "d MMM yyyy")}`}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <span className="text-ink-ghost">not set</span>

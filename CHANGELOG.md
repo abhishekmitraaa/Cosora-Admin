@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-02 (FAQ input; branch `faq-truth/registration-plans-refunds`, not merged): **Subscriptions → the 7-day money-back guarantee, and the KYC panel names the new registration documents.** textile-spark-net made three live FAQs true (its `documentation/changelog.md`, same date).
+  - **"7-day money-back guarantee"** on `/subscriptions` (`RefundGuaranteePanel.tsx`): each open request with its seller, reason, total and payments. Refund each payment with Refund, which is `admin-refund-payment` as before (Razorpay, full amount); "Close and end the plan" stays off until every payment in the request is refunded, then `admin_refund_guarantee_close` cancels the subscription and tells the seller. Super admin and finance close; support sees the list. Hidden until textile-spark-net `20261002100100` is applied (PGRST202) or for a role it refuses (42501).
+  - **A paid downgrade** shows under the subscription's period ("Silver (paid) from 1 Nov 2026"), from `vendor_subscriptions.scheduled_*`; the page loads without it before the apply (42703).
+  - **KYC panel:** "Business registration" (with its kind and number, from `vendor_documents.detail`), "Aadhaar (masked)" with a reminder to check only the last 4 digits show, and "Product catalogue" for each file.
+  - **Admin Log** names `refund_guarantee_requests`. `database.types.ts` gains the new columns, table and functions by hand; regenerate after the apply.
+
 - 2026-10-01 (Help & Support P7, the launch gate; branch `help-support/p7-fixes`, on top of P6; not merged): **Two fixes the local end-to-end run found.** The run itself is in textile-spark-net (`tests/local/`, `documentation/test.md`).
   - **A newly registered staff member could not get past "Choose your password".** Saving the new password through `admin-staff` (the Auth admin API) ends the account's sessions, so the panel's `refreshSession()` failed with "Invalid Refresh Token: Refresh Token Not Found" and the screen stayed. `setOwnPassword()` (`src/lib/staff.ts`) now signs in again with the new password; that session carries `must_change_password = false`.
   - **Confirming fraud needs a note.** On Warned, Suspended or Escalated to legal, the Fraud panel's note becomes "What they did (kept on the lasting record)" and Save waits for it. It is the line the Confirmed fraud record keeps after the report is deleted a year after filing; before, a decision saved without a note left the record saying "No note was written."
