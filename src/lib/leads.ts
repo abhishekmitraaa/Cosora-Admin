@@ -107,6 +107,8 @@ export interface LeadDetail {
   target_vendor: { id: string; name: string | null } | null;
   /** Set when an admin removed the RFQ; `by` is the admin's name. */
   removal: { at: string; by: string | null; reason: string } | null;
+  /** The buyer's category answers, keyed by the requirement form's question keys (Ranking F1). */
+  attributes: Record<string, unknown>;
   quotes: {
     id: string;
     vendor_id: string;
@@ -182,6 +184,30 @@ export function useRemoveLead() {
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
+}
+
+/**
+ * A requirement's category answers as label/value pairs, ordered by key. Labels are
+ * humanised from the form's question keys ("fabricType" -> "Fabric type") until labelled
+ * definitions arrive (Ranking F3). Mirrors textile-spark-net's src/lib/formAttributes.ts.
+ */
+export function attributeDetails(attributes: Record<string, unknown> | null | undefined): { label: string; value: string }[] {
+  if (!attributes) return [];
+  const humanise = (key: string) => {
+    const words = key.replace(/[_-]+/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").trim().toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  };
+  return Object.keys(attributes)
+    .sort((a, b) => a.localeCompare(b))
+    .flatMap((key) => {
+      const v = attributes[key];
+      const value =
+        v === true ? "Yes"
+        : Array.isArray(v) ? v.map(String).filter((x) => x.trim() !== "").join(", ")
+        : typeof v === "string" || typeof v === "number" ? String(v).trim()
+        : "";
+      return value ? [{ label: humanise(key), value }] : [];
+    });
 }
 
 /** Hours between two ISO times, rounded for display ("3 h", "2.5 d"). */

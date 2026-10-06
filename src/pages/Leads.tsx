@@ -15,6 +15,7 @@ import {
   useLeads,
   useLeadsSummary,
   useRemoveLead,
+  attributeDetails,
   type LeadFilters,
   type LeadRow,
   type LeadStage,
@@ -389,6 +390,19 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
             <span>Quantity: {d.quantity != null ? d.quantity.toLocaleString("en-IN") : "—"}</span>
             <span>Budget: {budget(d.budget_min, d.budget_max) ?? "—"}</span>
           </div>
+
+          {attributeDetails(d.attributes).length > 0 && (
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 rounded-md bg-surface-2 p-3 text-xs sm:grid-cols-2">
+              {attributeDetails(d.attributes).map((a) => (
+                <div key={a.label} className="flex gap-2">
+                  <dt className="text-ink-faint">{a.label}</dt>
+                  <dd className="text-ink" data-no-translate>
+                    {a.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
 
           {d.description && (
             <p className="whitespace-pre-line rounded-md bg-surface-2 p-3 text-ink" data-no-translate>
