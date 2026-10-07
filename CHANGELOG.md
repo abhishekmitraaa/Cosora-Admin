@@ -9,6 +9,8 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-07 (product moderation; branch `product-moderation/removal`, NOT merged; textile-spark-net migration `20261007160000` NOT applied): **Products: remove, flag and reinstate with a reason picked in the dialog; Moderation reasons page; managers moderate products.** `ProductModerationDialog` (reason required, details, preview), Removed tab, Reinstate, moderation history, keyset paging; `/moderation-reasons`; `roles.ts` (manager on `products`, section `moderation-reasons`); Admin Log names the reason table; `FlagLog` copy; `database.types.ts` by hand until regenerated. Checked against the local stack: textile-spark-net's `tests/local/product-moderation.spec.ts` 2/2; typecheck; build; copy audit adds nothing.
+
 - 2026-10-07 (Ranking Part 1, F2 live): **The Admin Log names vendor capacity.** textile-spark-net's `20261007052605_vendor_type_location_capacity` adds `india_states`, the vendor's state code, type, capabilities and served states, and `vendor_capacity` (audited), so the log calls its rows "Vendor capacity". `database.types.ts` is regenerated from production.
 
 - 2026-10-02 (Help & Support P6 live): **Fraud reports → Confirmed fraud now has data behind it.** textile-spark-net's `20261001140000` was run in the Supabase SQL editor (the tool declines it), so `admin_fraud_findings()` exists in production and a decided report writes its lasting record. `database.types.ts` is regenerated from production; the hand-written P6 entries are gone.
