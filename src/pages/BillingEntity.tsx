@@ -31,7 +31,7 @@ const FIELDS: { key: keyof Entity; label: string; hint?: string; upper?: boolean
   { key: "gstin", label: "GSTIN", upper: true },
   { key: "pan", label: "PAN", upper: true },
   { key: "sac_code", label: "SAC code", hint: "6 digits, for the service on the invoice. Confirm with your CA." },
-  { key: "invoice_prefix", label: "Invoice number prefix", hint: "2 to 6 letters, e.g. INV.", upper: true },
+  { key: "invoice_prefix", label: "Invoice number prefix", hint: "2 to 4 letters, e.g. INV. Invoice numbers look like INV/2627/000123.", upper: true },
   { key: "email", label: "Billing email", hint: "Optional. Printed on invoices." },
   { key: "phone", label: "Billing phone", hint: "Optional. Printed on invoices." },
 ];

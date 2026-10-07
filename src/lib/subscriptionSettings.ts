@@ -157,7 +157,7 @@ export function billingEntityProblems(e: BillingEntity, states: IndiaState[]): P
   if (!isValidPan(pan)) p.pan = "Enter a valid 10-character PAN.";
   else if (isValidGstin(gstin) && gstin.slice(2, 12) !== pan) p.pan = "The PAN must match characters 3 to 12 of the GSTIN.";
   if (e.sac_code.trim() && !/^[0-9]{6}$/.test(e.sac_code.trim())) p.sac_code = "A SAC code is 6 digits.";
-  if (!/^[A-Z]{2,6}$/.test(e.invoice_prefix.trim().toUpperCase())) p.invoice_prefix = "2 to 6 letters.";
+  if (!/^[A-Z]{2,4}$/.test(e.invoice_prefix.trim().toUpperCase())) p.invoice_prefix = "2 to 4 letters.";
   if (e.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.email.trim())) p.email = "Enter a valid email address.";
   if (e.phone.trim() && !/^\+?[0-9 ]{8,16}$/.test(e.phone.trim())) p.phone = "Enter a valid phone number.";
   return p;
