@@ -9,6 +9,8 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-07 (Ranking Part 1, F2 live): **The Admin Log names vendor capacity.** textile-spark-net's `20261007052605_vendor_type_location_capacity` adds `india_states`, the vendor's state code, type, capabilities and served states, and `vendor_capacity` (audited), so the log calls its rows "Vendor capacity". `database.types.ts` is regenerated from production.
+
 - 2026-10-02 (Help & Support P6 live): **Fraud reports → Confirmed fraud now has data behind it.** textile-spark-net's `20261001140000` was run in the Supabase SQL editor (the tool declines it), so `admin_fraud_findings()` exists in production and a decided report writes its lasting record. `database.types.ts` is regenerated from production; the hand-written P6 entries are gone.
 
 - 2026-10-02 (release, applied and deployed): **Staff registration, the P5 FAQ translations, the 7-day guarantee panel and the new KYC documents reach production.** textile-spark-net applied six migrations (`20261002104116` staff, `20261002104545`/`104949` P5, `20261002105236` documents, `20261002105804` plan changes and the guarantee, `20261002110739` content) and deployed `admin-staff` v1. `database.types.ts` is regenerated from production; P6's five functions stay hand-written and marked, because its migration (`20261001140000`) isn't applied yet (the Supabase tool declines it). Until it is, Fraud reports → Confirmed fraud shows nothing decided.

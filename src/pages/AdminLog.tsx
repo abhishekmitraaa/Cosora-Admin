@@ -73,6 +73,8 @@ const AREAS: Record<string, string> = {
   "admin.admin_flags": "Flag",
   "admin.chat_block_reasons": "Block reason",
   "public.vendor_profiles": "Vendor profile",
+  // Ranking F2 (2026-10-07): a vendor's monthly capacity per category.
+  "public.vendor_capacity": "Vendor capacity",
   "public.vendor_subscriptions": "Subscription",
   "public.subscription_invoices": "Invoice (refund)",
   "public.refund_guarantee_requests": "Refund request (7-day guarantee)",

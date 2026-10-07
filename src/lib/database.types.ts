@@ -485,6 +485,7 @@ export type Database = {
           regional: Json | null
           social: Json | null
           state: string | null
+          state_code: string | null
           street: string | null
           website: string | null
         }
@@ -508,6 +509,7 @@ export type Database = {
           regional?: Json | null
           social?: Json | null
           state?: string | null
+          state_code?: string | null
           street?: string | null
           website?: string | null
         }
@@ -531,6 +533,7 @@ export type Database = {
           regional?: Json | null
           social?: Json | null
           state?: string | null
+          state_code?: string | null
           street?: string | null
           website?: string | null
         }
@@ -541,6 +544,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_profiles_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "india_states"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -1110,6 +1120,30 @@ export type Database = {
         }
         Relationships: []
       }
+      india_states: {
+        Row: {
+          aliases: string[]
+          code: string
+          name: string
+          name_gu: string
+          name_hi: string
+        }
+        Insert: {
+          aliases?: string[]
+          code: string
+          name: string
+          name_gu: string
+          name_hi: string
+        }
+        Update: {
+          aliases?: string[]
+          code?: string
+          name?: string
+          name_gu?: string
+          name_hi?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string | null
@@ -1427,6 +1461,7 @@ export type Database = {
       }
       products: {
         Row: {
+          attributes: Json
           category_id: string | null
           category_name: string | null
           collar_type: string | null
@@ -1467,6 +1502,7 @@ export type Database = {
           waist_sizes: string[] | null
         }
         Insert: {
+          attributes?: Json
           category_id?: string | null
           category_name?: string | null
           collar_type?: string | null
@@ -1507,6 +1543,7 @@ export type Database = {
           waist_sizes?: string[] | null
         }
         Update: {
+          attributes?: Json
           category_id?: string | null
           category_name?: string | null
           collar_type?: string | null
@@ -1797,6 +1834,7 @@ export type Database = {
       }
       rfqs: {
         Row: {
+          attributes: Json
           budget_max: number | null
           budget_min: number | null
           buyer_id: string
@@ -1824,6 +1862,7 @@ export type Database = {
           vendor_id: string | null
         }
         Insert: {
+          attributes?: Json
           budget_max?: number | null
           budget_min?: number | null
           buyer_id: string
@@ -1851,6 +1890,7 @@ export type Database = {
           vendor_id?: string | null
         }
         Update: {
+          attributes?: Json
           budget_max?: number | null
           budget_min?: number | null
           buyer_id?: string
@@ -2989,6 +3029,38 @@ export type Database = {
           },
         ]
       }
+      vendor_capacity: {
+        Row: {
+          category_root: string
+          monthly_capacity: number
+          unit: string
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          category_root: string
+          monthly_capacity: number
+          unit: string
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          category_root?: string
+          monthly_capacity?: number
+          unit?: string
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_capacity_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_catalog_recompute_queue: {
         Row: {
           queued_at: string
@@ -3114,6 +3186,7 @@ export type Database = {
           banner_url: string | null
           brand_name: string | null
           business_type: string | null
+          capabilities: string[]
           capacity: string[]
           catalog_embedding: unknown
           catalog_embedding_updated_at: string | null
@@ -3141,13 +3214,16 @@ export type Database = {
           plan_expires_at: string | null
           plan_id: string | null
           postal_code: string | null
+          primary_type: string | null
           profile_score: number
           rating_avg: number
           recommended_product_ids: string[]
           regional: Json | null
           reviews_count: number
+          served_states: string[]
           social: Json | null
           state: string | null
+          state_code: string | null
           website: string | null
           whatsapp: string | null
           year_established: number | null
@@ -3161,6 +3237,7 @@ export type Database = {
           banner_url?: string | null
           brand_name?: string | null
           business_type?: string | null
+          capabilities?: string[]
           capacity?: string[]
           catalog_embedding?: unknown
           catalog_embedding_updated_at?: string | null
@@ -3188,13 +3265,16 @@ export type Database = {
           plan_expires_at?: string | null
           plan_id?: string | null
           postal_code?: string | null
+          primary_type?: string | null
           profile_score?: number
           rating_avg?: number
           recommended_product_ids?: string[]
           regional?: Json | null
           reviews_count?: number
+          served_states?: string[]
           social?: Json | null
           state?: string | null
+          state_code?: string | null
           website?: string | null
           whatsapp?: string | null
           year_established?: number | null
@@ -3208,6 +3288,7 @@ export type Database = {
           banner_url?: string | null
           brand_name?: string | null
           business_type?: string | null
+          capabilities?: string[]
           capacity?: string[]
           catalog_embedding?: unknown
           catalog_embedding_updated_at?: string | null
@@ -3235,13 +3316,16 @@ export type Database = {
           plan_expires_at?: string | null
           plan_id?: string | null
           postal_code?: string | null
+          primary_type?: string | null
           profile_score?: number
           rating_avg?: number
           recommended_product_ids?: string[]
           regional?: Json | null
           reviews_count?: number
+          served_states?: string[]
           social?: Json | null
           state?: string | null
+          state_code?: string | null
           website?: string | null
           whatsapp?: string | null
           year_established?: number | null
@@ -3260,6 +3344,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_profiles_state_code_fkey"
+            columns: ["state_code"]
+            isOneToOne: false
+            referencedRelation: "india_states"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -4552,6 +4643,7 @@ export type Database = {
         Returns: number
       }
       archive_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
+      attributes_search_text: { Args: { p: Json }; Returns: string }
       block_account_from_review: {
         Args: {
           p_profile_id: string
@@ -4999,6 +5091,8 @@ export type Database = {
         Args: { p_embedding: string; p_id: string }
         Returns: boolean
       }
+      state_code_for: { Args: { p: string }; Returns: string }
+      state_name_key: { Args: { p: string }; Returns: string }
       submit_report: {
         Args: {
           p_conversation_id: string
@@ -5132,6 +5226,13 @@ export type Database = {
         Returns: Json
       }
       vendor_cap_plan: { Args: { p_vendor: string }; Returns: string }
+      vendor_type_from_labels: {
+        Args: { p_business_type: string; p_labels: string[] }
+        Returns: {
+          capabilities: string[]
+          primary_type: string
+        }[]
+      }
     }
     Enums: {
       account_status_type: "active" | "suspended" | "deleted"
