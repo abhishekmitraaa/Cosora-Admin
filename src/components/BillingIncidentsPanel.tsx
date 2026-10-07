@@ -33,7 +33,7 @@ const KIND: Record<Incident["kind"], { label: string; tone: "critical" | "cautio
   dispute: {
     label: "Payment disputed",
     tone: "critical",
-    help: "The vendor's bank raised a dispute (chargeback). Respond in the Razorpay dashboard before its deadline.",
+    help: "The payer's bank raised a dispute (chargeback). Respond in the Razorpay dashboard before its deadline; Razorpay's later updates on it appear here. Resolve this once the dispute is closed.",
   },
   reconcile_mismatch: {
     label: "Needs reconciling",
@@ -110,6 +110,9 @@ export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
             const amount = rupees(r.detail?.amount_paise ?? r.detail?.amount);
             const reason = typeof r.detail?.reason === "string" ? r.detail.reason : null;
             const number = typeof r.detail?.invoice_number === "string" ? r.detail.invoice_number : null;
+            // A dispute keeps one incident; each Razorpay event (under review, won, lost…) updates it.
+            const disputeStep = r.kind === "dispute" && typeof r.detail?.event === "string"
+              ? r.detail.event.replace("payment.dispute.", "").replace(/_/g, " ") : null;
             return (
               <div key={r.id} className="rounded-xl border border-line bg-surface-2 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -118,6 +121,7 @@ export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
                       <Badge tone={r.resolved_at ? "neutral" : k.tone}>{k.label}</Badge>
                       <span className="text-sm font-medium text-ink">{r.vendor_name ?? "Unknown vendor"}</span>
                       {amount && <span className="text-sm tabular-nums text-ink-muted">{amount}</span>}
+                      {disputeStep && <Badge tone="neutral">{`Razorpay: ${disputeStep}`}</Badge>}
                     </div>
                     <p className="mt-1 text-2xs text-ink-faint">
                       {format(new Date(r.created_at), "d MMM yyyy, HH:mm")}
