@@ -2239,92 +2239,185 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_credit_notes: {
+        Row: {
+          cgst_paise: number
+          created_at: string
+          credit_note_number: string
+          id: string
+          igst_paise: number
+          invoice_id: string
+          razorpay_refund_id: string | null
+          reason: string
+          sgst_paise: number
+          taxable_paise: number
+          total_paise: number
+          vendor_id: string
+        }
+        Insert: {
+          cgst_paise?: number
+          created_at?: string
+          credit_note_number: string
+          id?: string
+          igst_paise?: number
+          invoice_id: string
+          razorpay_refund_id?: string | null
+          reason: string
+          sgst_paise?: number
+          taxable_paise: number
+          total_paise: number
+          vendor_id: string
+        }
+        Update: {
+          cgst_paise?: number
+          created_at?: string
+          credit_note_number?: string
+          id?: string
+          igst_paise?: number
+          invoice_id?: string
+          razorpay_refund_id?: string | null
+          reason?: string
+          sgst_paise?: number
+          taxable_paise?: number
+          total_paise?: number
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_credit_notes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_credit_notes_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_invoices: {
         Row: {
           amount: number
           billing_period_end: string | null
           billing_period_start: string | null
+          cgst_paise: number | null
           change_kind: string | null
           created_at: string
           credit_rupees: number | null
           currency: string
           discount_amount: number | null
           discount_code: string | null
+          document_type: string
           gst_amount: number | null
           gst_number: string | null
           id: string
+          igst_paise: number | null
           invoice_number: string | null
+          payment_mode: string
           pdf_url: string | null
+          place_of_supply: string | null
           plan_id: string | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           razorpay_refund_id: string | null
+          recipient: Json | null
           refund_requested_at: string | null
           refund_status: string | null
           refunded_amount: number | null
           refunded_at: string | null
+          sac_code: string | null
+          sgst_paise: number | null
           status: string
           subscription_id: string | null
           superseded_at: string | null
+          supplier: Json | null
+          supply_type: string | null
           tds_amount: number | null
+          total_paise: number | null
           vendor_id: string
         }
         Insert: {
           amount?: number
           billing_period_end?: string | null
           billing_period_start?: string | null
+          cgst_paise?: number | null
           change_kind?: string | null
           created_at?: string
           credit_rupees?: number | null
           currency?: string
           discount_amount?: number | null
           discount_code?: string | null
+          document_type: string
           gst_amount?: number | null
           gst_number?: string | null
           id?: string
+          igst_paise?: number | null
           invoice_number?: string | null
+          payment_mode: string
           pdf_url?: string | null
+          place_of_supply?: string | null
           plan_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_refund_id?: string | null
+          recipient?: Json | null
           refund_requested_at?: string | null
           refund_status?: string | null
           refunded_amount?: number | null
           refunded_at?: string | null
+          sac_code?: string | null
+          sgst_paise?: number | null
           status?: string
           subscription_id?: string | null
           superseded_at?: string | null
+          supplier?: Json | null
+          supply_type?: string | null
           tds_amount?: number | null
+          total_paise?: number | null
           vendor_id: string
         }
         Update: {
           amount?: number
           billing_period_end?: string | null
           billing_period_start?: string | null
+          cgst_paise?: number | null
           change_kind?: string | null
           created_at?: string
           credit_rupees?: number | null
           currency?: string
           discount_amount?: number | null
           discount_code?: string | null
+          document_type?: string
           gst_amount?: number | null
           gst_number?: string | null
           id?: string
+          igst_paise?: number | null
           invoice_number?: string | null
+          payment_mode?: string
           pdf_url?: string | null
+          place_of_supply?: string | null
           plan_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_refund_id?: string | null
+          recipient?: Json | null
           refund_requested_at?: string | null
           refund_status?: string | null
           refunded_amount?: number | null
           refunded_at?: string | null
+          sac_code?: string | null
+          sgst_paise?: number | null
           status?: string
           subscription_id?: string | null
           superseded_at?: string | null
+          supplier?: Json | null
+          supply_type?: string | null
           tds_amount?: number | null
+          total_paise?: number | null
           vendor_id?: string
         }
         Relationships: [
@@ -2365,7 +2458,10 @@ export type Database = {
           list_rupees: number | null
           order_id: string
           paid_at: string | null
+          payment_mode: string
+          payment_ref: string | null
           plan_id: string
+          reconciled_at: string | null
           status: string
           vendor_id: string
         }
@@ -2382,7 +2478,10 @@ export type Database = {
           list_rupees?: number | null
           order_id: string
           paid_at?: string | null
+          payment_mode: string
+          payment_ref?: string | null
           plan_id: string
+          reconciled_at?: string | null
           status?: string
           vendor_id: string
         }
@@ -2399,7 +2498,10 @@ export type Database = {
           list_rupees?: number | null
           order_id?: string
           paid_at?: string | null
+          payment_mode?: string
+          payment_ref?: string | null
           plan_id?: string
+          reconciled_at?: string | null
           status?: string
           vendor_id?: string
         }
@@ -3677,6 +3779,23 @@ export type Database = {
       admin_audit_session: { Args: { p_action: string }; Returns: undefined }
       admin_billing_entity: { Args: never; Returns: Json }
       admin_billing_entity_save: { Args: { p: Json; p_reason: string }; Returns: Json }
+      admin_billing_incident_resolve: { Args: { p_id: string; p_resolution: string }; Returns: undefined }
+      admin_billing_incidents: {
+        Args: { p_open_only?: boolean }
+        Returns: {
+          created_at: string
+          detail: Json
+          id: string
+          kind: string
+          order_ref: string
+          payment_ref: string
+          resolution: string
+          resolved_at: string
+          resolved_by_name: string
+          vendor_id: string
+          vendor_name: string
+        }[]
+      }
       admin_block_reason_add: {
         Args: { p_reason: string }
         Returns: {
@@ -4670,6 +4789,17 @@ export type Database = {
       }
       archive_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
       attributes_search_text: { Args: { p: Json }; Returns: string }
+      billing_dispute_event: { Args: { p_detail: Json; p_event: string; p_payment_ref: string }; Returns: string }
+      billing_reconcile_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          created_at: string
+          order_id: string
+          payment_mode: string
+          vendor_id: string
+        }[]
+      }
+      billing_reconcile_mark: { Args: { p_order_ref: string }; Returns: undefined }
       block_account_from_review: {
         Args: {
           p_profile_id: string
@@ -5010,6 +5140,19 @@ export type Database = {
         Args: { p_ad_id: string; p_reason_code?: string }
         Returns: undefined
       }
+      payment_event_finish: { Args: { p_detail: Json; p_event_id: string; p_outcome: string }; Returns: undefined }
+      payment_event_record: {
+        Args: {
+          p_event: string
+          p_event_id: string
+          p_order_ref: string
+          p_payload_sha256: string
+          p_payment_ref: string
+          p_refund_ref: string
+          p_source: string
+        }
+        Returns: Json
+      }
       process_due_account_deletions: {
         Args: { p_min_overdue?: string }
         Returns: number
@@ -5146,8 +5289,18 @@ export type Database = {
         Returns: Json
       }
       subscription_checkout_gate: { Args: { p_vendor: string }; Returns: Json }
+      subscription_fulfil: { Args: { p_order_ref: string; p_payment_ref: string; p_source: string }; Returns: Json }
       subscription_quote_for: {
         Args: { p_cycle: string; p_plan: string; p_vendor: string }
+        Returns: Json
+      }
+      subscription_refund_event: {
+        Args: {
+          p_amount_paise: number
+          p_payment_ref: string
+          p_refund_ref: string
+          p_status: string
+        }
         Returns: Json
       }
       support_attachment_checked: {

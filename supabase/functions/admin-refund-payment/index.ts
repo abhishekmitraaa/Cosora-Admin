@@ -62,6 +62,8 @@ interface InvoiceRow {
   razorpay_payment_id: string | null;
   refund_status: string | null;
   razorpay_refund_id: string | null;
+  /** Subscriptions P1 (2026-10-08); absent on a database without that migration. */
+  total_paise?: number | null;
 }
 
 const REST = (key: string) => ({
@@ -121,10 +123,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!invoiceId) return json({ error: "missing_invoice_id" }, 400);
 
   // ── Load the invoice ──────────────────────────────────────────────────────
-  const invResp = await fetch(
-    `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&select=id,vendor_id,amount,gst_amount,currency,status,razorpay_payment_id,refund_status,razorpay_refund_id`,
-    { headers: REST(serviceKey) },
-  );
+  const readInvoice = (extra: string) =>
+    fetch(
+      `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&select=id,vendor_id,amount,gst_amount,currency,status,razorpay_payment_id,refund_status,razorpay_refund_id${extra}`,
+      { headers: REST(serviceKey) },
+    );
+  // total_paise (subscriptions P1, 2026-10-08) is what was charged, to the paisa. A
+  // database without that migration answers 400 for the column: read without it.
+  let invResp = await readInvoice(",total_paise");
+  if (invResp.status === 400) invResp = await readInvoice("");
   const invRows = invResp.ok ? await invResp.json() : [];
   const invoice: InvoiceRow | null = Array.isArray(invRows) && invRows.length ? invRows[0] : null;
   if (!invoice) return json({ error: "invoice_not_found" }, 404);
@@ -149,9 +156,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  // The gateway captured (base + GST); the invoice stores them separately, in
-  // rupees. Refunding amount alone would silently short the vendor the GST.
-  const amountPaise = (invoice.amount + (invoice.gst_amount ?? 0)) * 100;
+  // The gateway captured (base + GST). Invoices since 2026-10-08 store that total in
+  // paise; older ones store base and GST separately, in rupees. Refunding amount alone
+  // would silently short the vendor the GST.
+  const amountPaise = invoice.total_paise ?? (invoice.amount + (invoice.gst_amount ?? 0)) * 100;
   if (amountPaise <= 0) return json({ error: "zero_amount" }, 400);
 
   // ── Claim it, so a double-click can't double-refund ───────────────────────
@@ -244,9 +252,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // ── Record the outcome, exactly as the gateway reported it ────────────────
   // 'processed' -> money is on its way back; the invoice is genuinely refunded.
   // 'pending'   -> Razorpay accepted it but hasn't settled. The invoice stays
-  //                'paid' until it does. NOTE: there is no refund webhook in this
-  //                project, so a pending refund will not auto-finalise — it must
-  //                be reconciled manually (see README).
+  //                'paid' until it does: Razorpay's refund.processed / refund.failed
+  //                event reaches subscription-webhook, which finishes it
+  //                (public.subscription_refund_event, subscriptions P1, 2026-10-08).
+  // A processed refund issues a credit note (trg_subscription_invoices_credit_note).
+  // This function writes with the service role, which the invoice-immutability
+  // trigger allows; a browser can't.
   const gatewayStatus = refund.status === "processed" ? "processed" : refund.status === "failed" ? "failed" : "pending";
 
   const patch: Record<string, unknown> = {

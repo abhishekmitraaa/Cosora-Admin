@@ -530,6 +530,20 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   code and that its PAN matches, the same rules the table enforces. Invoices issued from subscriptions P1 freeze these
   details at issue.
 
+### Billing incidents and invoice documents (2026-10-08; built, not live)
+
+- **Billing incidents** (panel on `/subscriptions`, `BillingIncidentsPanel.tsx`): opened by the payment functions
+  through `admin.billing_incident_open()`, which also rings the bell for active super and finance admins. Kinds: a paid
+  order whose plan couldn't be activated (change the plan by hand or refund it), a receipt issued for a live payment
+  before Cosora's billing details were set (issue the tax invoice), a disputed payment (answer it in Razorpay's
+  dashboard). `admin_billing_incidents()` reads (super_admin, finance_admin, support); `admin_billing_incident_resolve()`
+  closes one with a note (super_admin, finance_admin; the note is the Admin Log reason). "Show resolved" lists closed
+  ones with who closed them.
+- **Invoices are documents now:** each shows its type (tax invoice, receipt, test, demo) and its total to the paisa.
+  An issued invoice can't be edited or deleted from this panel or any browser; a processed refund issues a credit note
+  (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
+  `invoices` bucket; the link is signed for 5 minutes with your own session).
+
 ### Live Activity (2026-09-28)
 
 `/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`
@@ -972,9 +986,11 @@ So the refund path is authorization-verified and gateway-correct, but the actual
 Razorpay call is **unproven** until keys are set and a real payment flows through.
 Nothing is ever marked refunded without a refund id from Razorpay.
 
-**Pending refunds don't auto-finalise.** There is no refund webhook. A Razorpay
-`pending` refund is recorded as `refund_status = 'pending'` and the invoice stays
-`paid` until reconciled by hand. Only `processed` sets `status = 'refunded'`.
+**Pending refunds finish through the webhook** (subscriptions P1, 2026-10-08; built, not live). A Razorpay
+`pending` refund is recorded as `refund_status = 'pending'` and the invoice stays `paid`; Razorpay's
+`refund.processed` or `refund.failed` event reaches the buyer repo's `subscription-webhook`, which completes or
+fails it (a full refund sets `status = 'refunded'`, and a processed one issues a credit note). The Razorpay dashboard
+must send those events to that webhook. Until P1 is live, a pending refund is reconciled by hand.
 
 **Ads: pause is reversible by the vendor, reject is not.** `guard_ad_activation`
 only permits reactivation from `paused`, so a vendor can resume a *paused*

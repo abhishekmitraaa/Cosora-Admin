@@ -26,6 +26,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { RefundGuaranteePanel } from "@/components/RefundGuaranteePanel";
+import { BillingIncidentsPanel } from "@/components/BillingIncidentsPanel";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -67,6 +68,38 @@ interface InvoiceRow {
   billing_period_end: string | null;
   created_at: string;
   vendor: { brand_name: string | null } | null;
+  /** Subscriptions P1 (2026-10-08); absent before the billing-core migration. */
+  document_type?: "tax_invoice" | "receipt" | "test" | "demo" | null;
+  payment_mode?: "live" | "test" | "demo" | "free" | null;
+  total_paise?: number | null;
+}
+
+/** What each kind of document is, as the list shows it. */
+const DOCUMENT: Record<string, { label: string; tone: "positive" | "neutral" | "info" | "caution" }> = {
+  tax_invoice: { label: "Tax invoice", tone: "positive" },
+  receipt: { label: "Receipt", tone: "neutral" },
+  test: { label: "Test", tone: "info" },
+  demo: { label: "Demo", tone: "caution" },
+};
+
+const inr = (rupees: number) => `₹${rupees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+/** Open an invoice's PDF: invoice-render draws it once, the admin's own session signs it for 5 minutes. */
+async function openInvoicePdf(invoiceId: string): Promise<void> {
+  // Opened first, in the click, so a popup blocker allows it; pointed at the PDF once signed.
+  const win = window.open("about:blank", "_blank");
+  try {
+    const { data, error } = await supabase.functions.invoke("invoice-render", { body: { invoiceId } });
+    const path = (data as { path?: string } | null)?.path;
+    if (error || !path) throw new Error("The PDF couldn't be prepared.");
+    const signed = await supabase.storage.from("invoices").createSignedUrl(path, 300);
+    if (signed.error || !signed.data?.signedUrl) throw new Error("The PDF couldn't be signed.");
+    if (win) win.location.href = signed.data.signedUrl;
+    else window.location.assign(signed.data.signedUrl);
+  } catch (e) {
+    win?.close();
+    toast.error((e as Error).message);
+  }
 }
 
 interface PlanRow {
@@ -76,7 +109,7 @@ interface PlanRow {
   yearly_price: number;
 }
 
-const SUBTITLE = "Plans, invoices and refunds.";
+const SUBTITLE = "Plans, invoices, refunds and billing incidents.";
 
 export default function Subscriptions() {
   const role = useRole();
@@ -122,18 +155,18 @@ export default function Subscriptions() {
     queryKey: ["invoices"],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<InvoiceRow[]> => {
-      let q = supabase
-        .from("subscription_invoices")
-        .select(
-          `id, vendor_id, plan_id, amount, gst_amount, currency, status, invoice_number,
+      const base = `id, vendor_id, plan_id, amount, gst_amount, currency, status, invoice_number,
            razorpay_payment_id, razorpay_refund_id, refund_status, refunded_at,
            billing_period_start, billing_period_end, created_at,
-           vendor:vendor_profiles(brand_name)`,
-        )
-        .order("created_at", { ascending: false })
-        .limit(PAGE);
-      if (pageParam) q = q.lt("created_at", pageParam);
-      const { data, error } = await q;
+           vendor:vendor_profiles(brand_name)`;
+      const read = (columns: string) => {
+        let q = supabase.from("subscription_invoices").select(columns).order("created_at", { ascending: false }).limit(PAGE);
+        if (pageParam) q = q.lt("created_at", pageParam);
+        return q;
+      };
+      let { data, error } = await read(`${base}, document_type, payment_mode, total_paise`);
+      // Before the billing-core migration (2026-10-08) there are no such columns (42703).
+      if (error?.code === "42703") ({ data, error } = await read(base));
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as InvoiceRow[];
     },
@@ -238,6 +271,8 @@ export default function Subscriptions() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "subscriptions")} />}
 
       <Stack>
+        <BillingIncidentsPanel writable={writable} />
+
         <RefundGuaranteePanel writable={writable} />
 
         <Panel title="Subscriptions">
@@ -333,12 +368,18 @@ export default function Subscriptions() {
           ) : (
             <Table head={["Invoice", "Vendor", "Plan", "Amount", "Period", "Status", "Refund", ""]}>
               {invRows.map((inv) => {
-                const total = inv.amount + (inv.gst_amount ?? 0);
+                const total = inv.total_paise != null ? inv.total_paise / 100 : inv.amount + (inv.gst_amount ?? 0);
                 const refundable = Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !inv.razorpay_refund_id;
+                const doc = inv.document_type ? DOCUMENT[inv.document_type] : null;
                 return (
                   <tr key={inv.id} className={ROW_HOVER}>
                     <td className="px-3 py-2 font-mono text-xs text-ink-muted">
                       {inv.invoice_number ?? inv.id.slice(0, 8)}
+                      {doc && (
+                        <span className="mt-0.5 block font-sans">
+                          <Badge tone={doc.tone}>{doc.label}</Badge>
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-ink">
                       {inv.vendor?.brand_name ?? <span className="text-ink-ghost">unknown</span>}
@@ -347,10 +388,10 @@ export default function Subscriptions() {
                       {inv.plan_id ?? <span className="text-ink-ghost">none</span>}
                     </td>
                     <td className="px-3 py-2 tabular-nums text-ink">
-                      ₹{total}
+                      {inr(total)}
                       {inv.gst_amount ? (
                         <span className="block text-2xs text-ink-faint">
-                          ₹{inv.amount} + ₹{inv.gst_amount} GST
+                          {inr(inv.amount)} + {inr(inv.gst_amount)} GST
                         </span>
                       ) : null}
                     </td>
@@ -379,23 +420,28 @@ export default function Subscriptions() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        disabled={!writable || !refundable || refund.isPending}
-                        title={
-                          !inv.razorpay_payment_id
-                            ? "No gateway payment on this invoice, so there is nothing to refund"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!confirm(`Refund ₹${total} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
-                            return;
-                          refund.mutate(inv.id);
-                        }}
-                      >
-                        Refund
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" onClick={() => void openInvoicePdf(inv.id)}>
+                          PDF
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={!writable || !refundable || refund.isPending}
+                          title={
+                            !inv.razorpay_payment_id
+                              ? "No gateway payment on this invoice, so there is nothing to refund"
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (!confirm(`Refund ${inr(total)} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
+                              return;
+                            refund.mutate(inv.id);
+                          }}
+                        >
+                          Refund
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
