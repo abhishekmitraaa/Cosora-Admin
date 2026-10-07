@@ -12,7 +12,8 @@ import { Button, Textarea } from "./ui";
  * carries a CHECK constraint — adding a value here without widening that
  * constraint gets a 23514 on insert. 'conversation' was added by 20260802140000;
  * 'rfq' by RFQ/leads R3 (20261003090200), written by super_admin and
- * product_moderator only (admin_flag_add checks the role).
+ * product_moderator only (admin_flag_add checks the role). Since product moderation
+ * (2026-10-07) a 'product' note needs super_admin, product_moderator or manager.
  */
 export type FlagEntity = "vendor" | "product" | "ad" | "conversation" | "rfq";
 
@@ -121,7 +122,11 @@ export default function FlagLog({
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-ink-faint">Only super admins and product moderators can add a note here.</p>
+        <p className="text-xs text-ink-faint">
+          {entityType === "product"
+            ? "Only super admins, product moderators and managers can add a note here."
+            : "Only super admins and product moderators can add a note here."}
+        </p>
       )}
 
       <div className="mt-3 space-y-2">

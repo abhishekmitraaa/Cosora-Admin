@@ -28,6 +28,7 @@ import ChatReview from "@/pages/ChatReview";
 import ChatKeywords from "@/pages/ChatKeywords";
 import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
+import ModerationReasons from "@/pages/ModerationReasons";
 import Faqs from "@/pages/Faqs";
 // Phase-4 sections. All of them read the database now: the development-only
 // seed they started on (src/lib/devSeed/) was removed in admin completion
@@ -207,6 +208,14 @@ export default function App() {
                 element={
                   <RequireSection section="chat-patterns">
                     <ChatPatterns />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/moderation-reasons"
+                element={
+                  <RequireSection section="moderation-reasons">
+                    <ModerationReasons />
                   </RequireSection>
                 }
               />

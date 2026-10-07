@@ -24,7 +24,8 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   support: "Support",
   // MPF-26 (2026-09-25): a managerial role that reads the Admin Log. Since
   // 2026-09-26 it also adds, changes and removes teammates in TEAM_ROLES on the
-  // Admins page. It sees no moderation or commerce section.
+  // Admins page. Since 2026-10-07 (Mitra) it moderates products in full and edits the
+  // moderation reasons; it still sees no other moderation or commerce section.
   manager: "Manager",
 };
 
@@ -63,6 +64,10 @@ export type Section =
   | "chat-keywords"
   | "chat-patterns"
   | "chat-reasons"
+  // The reasons a listing is removed or flagged for (product moderation, 2026-10-07):
+  // admin.product_moderation_reasons through admin_product_reason_save(), which admits
+  // super_admin and manager. Product moderators read the list they pick from.
+  | "moderation-reasons"
   // Buyer Help / seller registration / subscription FAQs (2026-09-23). REAL
   // DATA: public.faqs, written only through admin_faq_* RPCs. The first
   // admin-editable content that was never dev-seed.
@@ -166,7 +171,8 @@ export type Section =
 
 /** Roles for which a section renders in the nav at all. */
 const SECTION_READ: Record<Section, AdminRole[]> = {
-  products: ["super_admin", "product_moderator", "support"],
+  // Mirrors admin.product_moderation_can_read() (2026-10-07): manager moderates products.
+  products: ["super_admin", "product_moderator", "manager", "support"],
   videos: ["super_admin", "product_moderator", "support"],
   vendors: ["super_admin", "vendor_ops", "support"],
   ads: ["super_admin", "ads_moderator", "support"],
@@ -186,6 +192,7 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // `admin_role() in ('support','super_admin')`, so that was simply wrong, and
   // it hid the page from the role that uses its vocabulary daily.
   "chat-reasons": ["super_admin", "support"],
+  "moderation-reasons": ["super_admin", "manager", "product_moderator"],
   // admin_faq_list() admits support + super_admin, the same audience as block
   // reasons. Support answers the questions buyers ask, so it reads what the FAQ says.
   faqs: ["super_admin", "support"],
@@ -246,7 +253,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
  * `canWriteFlags`, which every admin including support may do).
  */
 const SECTION_WRITE: Record<Section, AdminRole[]> = {
-  products: ["super_admin", "product_moderator"],
+  // enforce_products_moderation and admin.product_moderation_can_act(): approve, reject,
+  // flag, remove. Reinstating a removal is super_admin and manager only (canEditReasons).
+  products: ["super_admin", "product_moderator", "manager"],
   videos: ["super_admin", "product_moderator"],
   vendors: ["super_admin", "vendor_ops"],
   ads: ["super_admin", "ads_moderator"],
@@ -260,6 +269,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
+  // admin.product_reasons_can_edit(): super_admin and manager.
+  "moderation-reasons": ["super_admin", "manager"],
   // admin_faq_add / update / delete / reorder admit support + super_admin, the
   // same predicate as admin_faq_list (migration 20260924170736; Mitra's answer to
   // the 2026-09-23 open question). Support answers buyers' questions, so it keeps

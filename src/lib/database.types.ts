@@ -1490,6 +1490,10 @@ export type Database = {
           price_value: number | null
           rating_avg: number
           rejection_reason: string | null
+          flag_reason: string | null
+          flagged_at: string | null
+          removed_at: string | null
+          removed_reason: string | null
           reviews_count: number
           search_text: string | null
           sizes: string[] | null
@@ -1531,6 +1535,10 @@ export type Database = {
           price_value?: number | null
           rating_avg?: number
           rejection_reason?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          removed_at?: string | null
+          removed_reason?: string | null
           reviews_count?: number
           search_text?: string | null
           sizes?: string[] | null
@@ -1572,6 +1580,10 @@ export type Database = {
           price_value?: number | null
           rating_avg?: number
           rejection_reason?: string | null
+          flag_reason?: string | null
+          flagged_at?: string | null
+          removed_at?: string | null
+          removed_reason?: string | null
           reviews_count?: number
           search_text?: string | null
           sizes?: string[] | null
@@ -4278,6 +4290,62 @@ export type Database = {
         }[]
       }
       admin_live_activity: { Args: { p_minutes?: number }; Returns: Json }
+      admin_product_flag: {
+        Args: { p_note?: string; p_product_id: string; p_reason_id: string }
+        Returns: {
+          flagged_at: string
+          id: string
+        }[]
+      }
+      admin_product_moderation_history: {
+        Args: { p_product_id: string }
+        Returns: {
+          action: string
+          actor_name: string
+          actor_role: string
+          created_at: string
+          id: string
+          message: string
+          note: string
+          reason_label: string
+        }[]
+      }
+      admin_product_reason_save: {
+        Args: {
+          p_active?: boolean
+          p_applies_to: string[]
+          p_id: string
+          p_label: string
+          p_sort?: number
+          p_vendor_message: string
+        }
+        Returns: string
+      }
+      admin_product_reasons: {
+        Args: { p_include_inactive?: boolean }
+        Returns: {
+          active: boolean
+          applies_to: string[]
+          id: string
+          label: string
+          sort: number
+          vendor_message: string
+        }[]
+      }
+      admin_product_reinstate: {
+        Args: { p_note: string; p_product_id: string }
+        Returns: {
+          id: string
+          status: string
+        }[]
+      }
+      admin_product_remove: {
+        Args: { p_note?: string; p_product_id: string; p_reason_id: string }
+        Returns: {
+          id: string
+          removed_at: string
+        }[]
+      }
       admin_payments_ledger: {
         Args: {
           p_cursor_at?: string

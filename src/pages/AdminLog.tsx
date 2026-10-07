@@ -72,6 +72,9 @@ const AREAS: Record<string, string> = {
   "admin.flag_patterns": "Flag pattern",
   "admin.admin_flags": "Flag",
   "admin.chat_block_reasons": "Block reason",
+  // Product moderation (2026-10-07): the reasons a listing is removed or flagged for. The
+  // removal or flag itself is a "Product" change, with the reason in the Reason column.
+  "admin.product_moderation_reasons": "Product moderation reason",
   "public.vendor_profiles": "Vendor profile",
   // Ranking F2 (2026-10-07): a vendor's monthly capacity per category.
   "public.vendor_capacity": "Vendor capacity",

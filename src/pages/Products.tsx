@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
+import {
+  canEditReasons,
+  useFlagProduct,
+  useModerationHistory,
+  useReinstateProduct,
+  useRemoveProduct,
+} from "@/lib/productModeration";
 import FlagLog from "@/components/FlagLog";
+import ProductModerationDialog from "@/components/ProductModerationDialog";
 import {
   Attr,
   AttrGrid,
@@ -14,6 +23,7 @@ import {
   Card,
   Empty,
   ErrorNote,
+  Field,
   Modal,
   Notice,
   Page,
@@ -26,6 +36,7 @@ import {
 } from "@/components/ui";
 
 type Status = "under_review" | "live" | "rejected";
+type Tab = Status | "removed";
 
 interface ProductRow {
   id: string;
@@ -36,8 +47,12 @@ interface ProductRow {
   fabric: string | null;
   gsm: string | null;
   colour: string | null;
-  status: Status;
+  status: Status | "draft";
   rejection_reason: string | null;
+  removed_at: string | null;
+  removed_reason: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
   vendor_id: string;
   created_at: string;
   category: { name: string } | null;
@@ -45,59 +60,73 @@ interface ProductRow {
 }
 
 const SUBTITLE =
-  "Moderate vendor-submitted products. Approving publishes to buyers; rejecting requires a reason.";
+  "Moderate vendor listings. Approving publishes to buyers; rejecting asks the vendor to fix it; flagging hides a live listing for review; removing takes it down for good.";
 
-const TABS: { id: Status; label: string }[] = [
+const TABS: { id: Tab; label: string }[] = [
   { id: "under_review", label: "Queue (under review)" },
   { id: "live", label: "Live" },
-  { id: "rejected", label: "Rejected (audit)" },
+  { id: "rejected", label: "Rejected" },
+  { id: "removed", label: "Removed" },
 ];
+
+const PAGE = 50;
+
+const COLUMNS = `id, name, price_value, currency, moq, fabric, gsm, colour, status, rejection_reason,
+  removed_at, removed_reason, flagged_at, flag_reason, vendor_id, created_at,
+  category:categories(name),
+  images:product_images(url, position)`;
+
+type Cursor = { at: string; id: string } | null;
+
+async function fetchPage(tab: Tab, cursor: Cursor) {
+  let q = supabase.from("products").select(COLUMNS);
+  // A removal is status 'rejected' plus removed_at, so the two tabs split one status.
+  if (tab === "removed") q = q.eq("status", "rejected").not("removed_at", "is", null);
+  else if (tab === "rejected") q = q.eq("status", "rejected").is("removed_at", null);
+  else q = q.eq("status", tab);
+  if (cursor) {
+    q = q.or(`created_at.lt.${cursor.at},and(created_at.eq.${cursor.at},id.lt.${cursor.id})`);
+  }
+  const { data, error } = await q
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(PAGE);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as unknown as ProductRow[];
+  const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
+  const last = rows[rows.length - 1];
+  return { rows, vendors, next: rows.length === PAGE && last ? { at: last.created_at, id: last.id } : null };
+}
+
+type Dialog = { kind: "remove" | "flag" | "reinstate" | "reject"; product: ProductRow } | null;
 
 export default function Products() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "products");
-  const [tab, setTab] = useState<Status>("under_review");
-  const [rejecting, setRejecting] = useState<ProductRow | null>(null);
-  const [reason, setReason] = useState("");
+  const [tab, setTab] = useState<Tab>("under_review");
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [text, setText] = useState("");
 
-  const products = useQuery({
+  const products = useInfiniteQuery({
     queryKey: ["products", tab],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          `id, name, price_value, currency, moq, fabric, gsm, colour, status, rejection_reason,
-           vendor_id, created_at,
-           category:categories(name),
-           images:product_images(url, position)`,
-        )
-        .eq("status", tab)
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-
-      const rows = (data ?? []) as unknown as ProductRow[];
-      const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, vendors };
-    },
+    initialPageParam: null as Cursor,
+    queryFn: ({ pageParam }) => fetchPage(tab, pageParam),
+    getNextPageParam: (last) => last.next,
   });
 
+  const remove = useRemoveProduct();
+  const flag = useFlagProduct();
+  const reinstate = useReinstateProduct();
+
   /**
-   * Both approve and reject are a single `products` UPDATE of `status` (plus the
-   * reason). The `enforce_products_moderation` trigger raises 42501 unless the
-   * caller holds super_admin/product_moderator, so support sees the DB's own
-   * refusal if it ever gets here.
+   * Approve and reject are a single `products` UPDATE of `status` (plus the reason).
+   * `enforce_products_moderation` raises 42501 unless the caller is a super admin, a
+   * product moderator or a manager, so support sees the database's own refusal if it ever
+   * gets here. Approving or rejecting a flagged listing clears its flag (the guard trigger).
    */
   const moderate = useMutation({
-    mutationFn: async ({
-      id,
-      status,
-      rejection_reason,
-    }: {
-      id: string;
-      status: Status;
-      rejection_reason: string | null;
-    }) => {
+    mutationFn: async ({ id, status, rejection_reason }: { id: string; status: Status; rejection_reason: string | null }) => {
       assertWrote(
         await supabase.from("products").update({ status, rejection_reason }).eq("id", id).select("id"),
         `set product to ${status}`,
@@ -110,6 +139,11 @@ export default function Products() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  function open(kind: NonNullable<Dialog>["kind"], product: ProductRow) {
+    setText("");
+    setDialog({ kind, product });
+  }
+
   function approve(p: ProductRow) {
     moderate.mutate(
       { id: p.id, status: "live", rejection_reason: null },
@@ -117,22 +151,8 @@ export default function Products() {
     );
   }
 
-  function submitRejection() {
-    if (!rejecting || !reason.trim()) return;
-    moderate.mutate(
-      { id: rejecting.id, status: "rejected", rejection_reason: reason.trim() },
-      {
-        onSuccess: () => {
-          toast.success(`"${rejecting.name}" rejected`);
-          setRejecting(null);
-          setReason("");
-        },
-      },
-    );
-  }
+  const busy = moderate.isPending || remove.isPending || flag.isPending || reinstate.isPending;
 
-  // A skeleton in the shape of the card list, rather than a spinner on an
-  // empty page: the layout does not jump when the rows land.
   if (products.isLoading) {
     return (
       <Page>
@@ -143,7 +163,11 @@ export default function Products() {
   }
   if (products.error) return <ErrorNote message={(products.error as Error).message} />;
 
-  const { rows, vendors } = products.data!;
+  const pages = products.data?.pages ?? [];
+  const rows = pages.flatMap((p) => p.rows);
+  const vendors = new Map<string, VendorSummary>();
+  for (const p of pages) for (const [k, v] of p.vendors) vendors.set(k, v);
+  const target = dialog?.product;
 
   return (
     <Page>
@@ -159,7 +183,9 @@ export default function Products() {
             ? "Nothing waiting for review."
             : tab === "live"
               ? "No live products."
-              : "No rejected products."}
+              : tab === "rejected"
+                ? "No rejected products."
+                : "No removed products."}
         </Empty>
       ) : (
         <div className="space-y-3">
@@ -169,36 +195,116 @@ export default function Products() {
               product={p}
               vendor={vendors.get(p.vendor_id)}
               writable={writable}
-              busy={moderate.isPending}
+              canReinstate={canEditReasons(role)}
+              busy={busy}
               onApprove={() => approve(p)}
-              onReject={() => {
-                setRejecting(p);
-                setReason("");
-              }}
+              onReject={() => open("reject", p)}
+              onFlag={() => open("flag", p)}
+              onRemove={() => open("remove", p)}
+              onReinstate={() => open("reinstate", p)}
             />
           ))}
+          {products.hasNextPage && (
+            <div className="flex justify-center pt-1">
+              <Button disabled={products.isFetchingNextPage} onClick={() => void products.fetchNextPage()}>
+                {products.isFetchingNextPage ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
-      <Modal
-        open={rejecting !== null}
-        title={`Reject "${rejecting?.name ?? ""}"`}
-        onClose={() => setRejecting(null)}
-      >
+      <ProductModerationDialog
+        action={dialog?.kind === "flag" ? "flag" : "remove"}
+        productName={target?.name ?? ""}
+        open={dialog?.kind === "remove" || dialog?.kind === "flag"}
+        busy={remove.isPending || flag.isPending}
+        onClose={() => setDialog(null)}
+        onConfirm={(reasonId, note) => {
+          if (!target || !dialog) return;
+          const run = dialog.kind === "flag" ? flag : remove;
+          run.mutate(
+            { productId: target.id, reasonId, note },
+            {
+              onSuccess: () => {
+                toast.success(
+                  dialog.kind === "flag"
+                    ? `"${target.name}" is hidden and back in the queue. The vendor has been told why.`
+                    : `"${target.name}" was removed. The vendor has been told why.`,
+                );
+                setDialog(null);
+              },
+            },
+          );
+        }}
+      />
+
+      <Modal open={dialog?.kind === "reject"} title={`Reject "${target?.name ?? ""}"`} onClose={() => setDialog(null)}>
         <p className="mb-2 text-sm text-ink-muted">
-          A reason is required. It's stored on the product and visible in the Rejected tab.
+          A reason is required. The vendor can fix the listing and submit it again. To take it down for good, use
+          Remove instead.
         </p>
         <Textarea
           rows={4}
           autoFocus
-          value={reason}
+          value={text}
           placeholder="Why is this being rejected?"
-          onChange={(e) => setReason(e.target.value)}
+          onChange={(e) => setText(e.target.value)}
         />
         <div className="mt-3 flex justify-end gap-2">
-          <Button onClick={() => setRejecting(null)}>Cancel</Button>
-          <Button variant="danger" disabled={!reason.trim() || moderate.isPending} onClick={submitRejection}>
+          <Button onClick={() => setDialog(null)}>Cancel</Button>
+          <Button
+            variant="danger"
+            disabled={!text.trim() || moderate.isPending}
+            onClick={() =>
+              target &&
+              moderate.mutate(
+                { id: target.id, status: "rejected", rejection_reason: text.trim() },
+                {
+                  onSuccess: () => {
+                    toast.success(`"${target.name}" rejected`);
+                    setDialog(null);
+                  },
+                },
+              )
+            }
+          >
             Reject product
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={dialog?.kind === "reinstate"}
+        title={`Reinstate "${target?.name ?? ""}"`}
+        onClose={() => setDialog(null)}
+      >
+        <p className="mb-3 text-sm leading-relaxed text-ink-muted">
+          The listing goes back to the vendor's drafts, and they are told. It reaches buyers only after they submit
+          it again and it is approved.
+        </p>
+        <Field label="Why the removal is being undone (required)" htmlFor="pm-reinstate" hint="Recorded in the Admin Log.">
+          <Textarea id="pm-reinstate" rows={3} autoFocus value={text} onChange={(e) => setText(e.target.value)} />
+        </Field>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={() => setDialog(null)}>Cancel</Button>
+          <Button
+            variant="primary"
+            disabled={!text.trim() || text.trim().length > 500 || reinstate.isPending}
+            onClick={() =>
+              target &&
+              reinstate.mutate(
+                { productId: target.id, note: text },
+                {
+                  onSuccess: () => {
+                    toast.success(`"${target.name}" is back in the vendor's drafts`);
+                    setDialog(null);
+                  },
+                },
+              )
+            }
+          >
+            {reinstate.isPending ? "Reinstating…" : "Reinstate"}
           </Button>
         </div>
       </Modal>
@@ -210,21 +316,31 @@ function ProductCard({
   product: p,
   vendor,
   writable,
+  canReinstate,
   busy,
   onApprove,
   onReject,
+  onFlag,
+  onRemove,
+  onReinstate,
 }: {
   product: ProductRow;
   vendor: VendorSummary | undefined;
   writable: boolean;
+  canReinstate: boolean;
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onFlag: () => void;
+  onRemove: () => void;
+  onReinstate: () => void;
 }) {
   const [showLog, setShowLog] = useState(false);
   const images = [...(p.images ?? [])].sort((a, b) => a.position - b.position);
+  const removed = p.removed_at !== null;
 
   return (
+    <div data-testid={`product-${p.id}`}>
     <Card className="transition-shadow hover:shadow-card-hover">
       <div className="flex flex-wrap gap-4">
         <div className="flex flex-wrap gap-1.5">
@@ -247,7 +363,8 @@ function ProductCard({
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-section font-bold text-ink">{p.name}</h3>
-            <StatusBadge status={p.status} />
+            {removed ? <Badge tone="critical" dot>removed</Badge> : <StatusBadge status={p.status} />}
+            {p.flagged_at && <Badge tone="caution" dot>flagged</Badge>}
           </div>
 
           <div className="mt-1 text-sm tabular-nums text-ink-muted">
@@ -270,7 +387,23 @@ function ProductCard({
             {vendor?.account_status === "suspended" && <Badge tone="critical">suspended</Badge>}
           </div>
 
-          {p.status === "rejected" && p.rejection_reason && (
+          {p.flagged_at && p.flag_reason && (
+            <Notice tone="caution" className="mt-2.5 text-xs">
+              <span className="font-semibold">
+                Flagged {formatDistanceToNow(new Date(p.flagged_at), { addSuffix: true })}.
+              </span>{" "}
+              <span className="whitespace-pre-wrap">{p.flag_reason}</span>
+            </Notice>
+          )}
+          {removed && p.removed_reason && (
+            <Notice tone="critical" className="mt-2.5 text-xs">
+              <span className="font-semibold">
+                Removed {formatDistanceToNow(new Date(p.removed_at as string), { addSuffix: true })}.
+              </span>{" "}
+              <span className="whitespace-pre-wrap">{p.removed_reason}</span>
+            </Notice>
+          )}
+          {!removed && p.status === "rejected" && p.rejection_reason && (
             <Notice tone="critical" className="mt-2.5 text-xs">
               <span className="font-semibold">Rejection reason.</span> {p.rejection_reason}
             </Notice>
@@ -278,27 +411,82 @@ function ProductCard({
         </div>
 
         <div className="flex w-full flex-col gap-1.5 sm:w-36">
-          {p.status !== "live" && (
+          {!removed && p.status !== "live" && (
             <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
               Approve
             </Button>
           )}
-          {p.status !== "rejected" && (
-            <Button variant="danger" disabled={!writable || busy} onClick={onReject}>
-              {p.status === "live" ? "Pull down" : "Reject"}
+          {!removed && p.status !== "rejected" && p.status !== "live" && (
+            <Button disabled={!writable || busy} onClick={onReject}>
+              Reject
+            </Button>
+          )}
+          {p.status === "live" && (
+            <Button disabled={!writable || busy} onClick={onFlag}>
+              Flag
+            </Button>
+          )}
+          {!removed && (
+            <Button variant="danger" disabled={!writable || busy} onClick={onRemove}>
+              Remove
+            </Button>
+          )}
+          {removed && (
+            <Button
+              disabled={!canReinstate || busy}
+              title={canReinstate ? undefined : "Only a super admin or a manager can reinstate"}
+              onClick={onReinstate}
+            >
+              Reinstate
             </Button>
           )}
           <Button variant="ghost" onClick={() => setShowLog((s) => !s)}>
-            {showLog ? "Hide log" : "Flag / log"}
+            {showLog ? "Hide history" : "History / notes"}
           </Button>
         </div>
       </div>
 
       {showLog && (
-        <div className="mt-3">
-          <FlagLog entityType="product" entityId={p.id} />
+        <div className="mt-3 space-y-3">
+          <ModerationHistory productId={p.id} />
+          <FlagLog entityType="product" entityId={p.id} canAdd={writable} />
         </div>
       )}
     </Card>
+    </div>
+  );
+}
+
+const ACTION_LABEL = { remove: "Removed", flag: "Flagged", reinstate: "Reinstated" } as const;
+
+function ModerationHistory({ productId }: { productId: string }) {
+  const history = useModerationHistory(productId, true);
+  if (history.isLoading) return <p className="text-xs text-ink-faint">Loading history…</p>;
+  if (history.error) return <ErrorNote message={(history.error as Error).message} />;
+  const rows = history.data ?? [];
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 p-4">
+      <div className="mb-2 text-xs font-semibold text-ink">Moderation history</div>
+      {rows.length === 0 ? (
+        <p className="text-xs text-ink-faint">Never removed, flagged or reinstated.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((h) => (
+            <div key={h.id} className="rounded-lg border border-line bg-surface p-2.5 shadow-xs">
+              <p className="text-sm text-ink">
+                <span className="font-medium">{ACTION_LABEL[h.action]}</span>
+                {h.reason_label && <span>: {h.reason_label}</span>}
+              </p>
+              {h.note && <p className="mt-0.5 whitespace-pre-wrap text-xs text-ink-muted">{h.note}</p>}
+              <p className="mt-1 text-xs text-ink-faint">
+                {h.actor_name || "Unknown admin"}
+                {h.actor_role ? ` (${h.actor_role.replace(/_/g, " ")})` : ""} ·{" "}
+                {formatDistanceToNow(new Date(h.created_at), { addSuffix: true })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
