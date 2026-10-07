@@ -518,6 +518,18 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
 - Plan changes are priced in the database (`admin.subscription_quote`): an upgrade credits the unused part of
   what's paid; a downgrade is paid now and shows as scheduled under the current period.
 
+### Feature switches and billing details (2026-10-08; built, not live)
+
+- **Feature switches** (`/feature-flags`): `admin_feature_flags()` lists each switch with the accounts it is on for;
+  `admin_feature_flag_set()` changes one (super_admin only, reason required, Admin Log). A switch is on for everyone or
+  for listed accounts only. Switches are created by the migration that ships the code reading them, so this page
+  never adds one. The first is `subscription_checkout`: plan checkouts are closed except for listed accounts while
+  Razorpay is in test mode.
+- **Billing details** (`/billing-details`): `admin_billing_entity()` / `admin_billing_entity_save()` (super_admin,
+  finance_admin, reason required). The form checks the GSTIN's checksum, that it starts with the chosen state's GST
+  code and that its PAN matches, the same rules the table enforces. Invoices issued from subscriptions P1 freeze these
+  details at issue.
+
 ### Live Activity (2026-09-28)
 
 `/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`

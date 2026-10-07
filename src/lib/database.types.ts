@@ -1124,6 +1124,7 @@ export type Database = {
         Row: {
           aliases: string[]
           code: string
+          gst_code: string
           name: string
           name_gu: string
           name_hi: string
@@ -1131,6 +1132,7 @@ export type Database = {
         Insert: {
           aliases?: string[]
           code: string
+          gst_code: string
           name: string
           name_gu: string
           name_hi: string
@@ -1138,6 +1140,7 @@ export type Database = {
         Update: {
           aliases?: string[]
           code?: string
+          gst_code?: string
           name?: string
           name_gu?: string
           name_hi?: string
@@ -3672,6 +3675,8 @@ export type Database = {
         Returns: undefined
       }
       admin_audit_session: { Args: { p_action: string }; Returns: undefined }
+      admin_billing_entity: { Args: never; Returns: Json }
+      admin_billing_entity_save: { Args: { p: Json; p_reason: string }; Returns: Json }
       admin_block_reason_add: {
         Args: { p_reason: string }
         Returns: {
@@ -4084,6 +4089,27 @@ export type Database = {
           position: number
           question: string
           surface: string
+        }[]
+      }
+      admin_feature_flag_set: {
+        Args: {
+          p_allow_profile_ids: string[]
+          p_enabled: boolean
+          p_key: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
+      admin_feature_flags: {
+        Args: never
+        Returns: {
+          allow_names: string[]
+          allow_profile_ids: string[]
+          description: string
+          enabled: boolean
+          key: string
+          updated_at: string
+          updated_by_name: string
         }[]
       }
       admin_feedback_mark_reviewed: {
@@ -4819,6 +4845,8 @@ export type Database = {
       }
       expire_subscriptions: { Args: never; Returns: number }
       faq_translations_valid: { Args: { p: Json }; Returns: boolean }
+      feature_on: { Args: { p_key: string }; Returns: boolean }
+      feature_on_for: { Args: { p_key: string; p_profile: string }; Returns: boolean }
       for_you_products: {
         Args: { match_count?: number; p_buyer_id: string }
         Returns: {
@@ -4832,6 +4860,7 @@ export type Database = {
         Args: { exp: string; src: string; v: string }
         Returns: undefined
       }
+      gstin_is_valid: { Args: { p_gstin: string }; Returns: boolean }
       halfvec_scale: { Args: { k: number; v: unknown }; Returns: unknown }
       has_query_embedding: { Args: { p_query: string }; Returns: boolean }
       image_search_rate_check: {
@@ -4933,6 +4962,13 @@ export type Database = {
         Returns: {
           email: string
           phone: string
+        }[]
+      }
+      my_feature_flags: {
+        Args: never
+        Returns: {
+          enabled: boolean
+          key: string
         }[]
       }
       my_vendor_private: {
@@ -5109,6 +5145,7 @@ export type Database = {
         Args: { p_cycle: string; p_plan: string }
         Returns: Json
       }
+      subscription_checkout_gate: { Args: { p_vendor: string }; Returns: Json }
       subscription_quote_for: {
         Args: { p_cycle: string; p_plan: string; p_vendor: string }
         Returns: Json
@@ -5226,6 +5263,7 @@ export type Database = {
         Returns: Json
       }
       vendor_cap_plan: { Args: { p_vendor: string }; Returns: string }
+      vendor_entitlements: { Args: { p_vendor?: string }; Returns: Json }
       vendor_type_from_labels: {
         Args: { p_business_type: string; p_labels: string[] }
         Returns: {

@@ -50,6 +50,8 @@ import SystemHealth from "@/pages/SystemHealth";
 import SupportInbox, { SupportCallbacks, SupportFeedback, SupportFraud } from "@/pages/Support";
 import SupportTicket from "@/pages/SupportTicket";
 import SupportSettings from "@/pages/SupportSettings";
+import FeatureFlags from "@/pages/FeatureFlags";
+import BillingEntity from "@/pages/BillingEntity";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -385,6 +387,22 @@ export default function App() {
                 element={
                   <RequireSection section="support">
                     <SupportTicket />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/feature-flags"
+                element={
+                  <RequireSection section="feature-flags">
+                    <FeatureFlags />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/billing-details"
+                element={
+                  <RequireSection section="billing-entity">
+                    <BillingEntity />
                   </RequireSection>
                 }
               />

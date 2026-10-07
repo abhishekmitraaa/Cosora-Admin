@@ -141,7 +141,15 @@ export type Section =
   // Hours, holidays, rollout, the contact details Help shows, and which topics are on.
   // Everyone who reads support may look; only a super admin changes it
   // (admin.require_content_admin() in each admin_support_set_* function).
-  | "support-settings";
+  | "support-settings"
+  // Feature switches (subscriptions P0, 2026-10-08): a new feature is turned on here,
+  // for listed test accounts and then for everyone. admin_feature_flags() admits
+  // super_admin and manager; admin_feature_flag_set() admits super_admin only.
+  | "feature-flags"
+  // Cosora's legal and tax identity on the tax invoice (subscriptions P0).
+  // admin_billing_entity() and admin_billing_entity_save() admit super_admin and
+  // finance_admin, read and write.
+  | "billing-entity";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +245,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // Mirrors admin.support_can_read(). Change the SQL gate and this line together.
   support: ["super_admin", "support", "manager"],
   "support-settings": ["super_admin", "support", "manager"],
+  // Mirror admin_feature_flags() and admin_billing_entity() exactly.
+  "feature-flags": ["super_admin", "manager"],
+  "billing-entity": ["super_admin", "finance_admin"],
 };
 
 /**
@@ -300,6 +311,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   support: ["super_admin", "support"],
   // admin.require_content_admin(): super admins only.
   "support-settings": ["super_admin"],
+  // admin_feature_flag_set(): super admins only. A manager reads.
+  "feature-flags": ["super_admin"],
+  "billing-entity": ["super_admin", "finance_admin"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */
