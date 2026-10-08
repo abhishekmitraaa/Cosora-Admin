@@ -26,6 +26,8 @@ export interface FeatureFlag {
 /** What each switch is called on screen. A key missing here shows as itself. */
 export const FEATURE_FLAG_LABELS: Record<string, string> = {
   subscription_checkout: "Plan checkout",
+  notification_delivery: "Email, WhatsApp and SMS delivery",
+  subscription_autopay: "Autopay",
 };
 
 export function useFeatureFlags() {

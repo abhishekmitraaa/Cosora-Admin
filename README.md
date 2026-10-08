@@ -544,6 +544,19 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Autopay (2026-10-08; built, not live)
+
+Vendors can renew a plan automatically through a Razorpay mandate (textile-spark-net's subscriptions P3), where the
+`subscription_autopay` switch allows it. This panel shows it in three places:
+- **Subscriptions → Autopay column:** on while the vendor's mandate is set up, active or retrying a failed charge
+  (`vendor_subscriptions.auto_renew`, which now means only this).
+- **Billing incidents:** "autopay_cancel_failed" (a plan change made a new mandate and Razorpay wouldn't cancel the
+  old one: cancel it in Razorpay's dashboard, or the vendor may be charged twice) and "autopay_amount_mismatch" (a
+  charge that wasn't the plan's amount; the plan was still renewed).
+- **Feature switches → Autopay:** list test accounts first, then turn it on for everyone.
+
+A plan's period never depends on Razorpay's status: when autopay stops, the plan runs to the end of what was paid for.
+
 ### Notification delivery (2026-10-08; built, not live)
 
 A panel on `/system-health` (`NotificationDeliveryPanel.tsx`) for the outbox that email (Resend), WhatsApp (Meta) and

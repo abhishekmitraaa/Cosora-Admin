@@ -2476,9 +2476,82 @@ export type Database = {
           },
         ]
       }
+      subscription_mandates: {
+        Row: {
+          amount_paise: number
+          billing_cycle: string
+          charge_at: string | null
+          created_at: string
+          ended_at: string | null
+          first_order_ref: string | null
+          id: string
+          list_rupees: number
+          method: string | null
+          payment_mode: string
+          plan_id: string
+          razorpay_subscription_id: string
+          start_at: string
+          status: string
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          amount_paise: number
+          billing_cycle: string
+          charge_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          first_order_ref?: string | null
+          id?: string
+          list_rupees: number
+          method?: string | null
+          payment_mode: string
+          plan_id: string
+          razorpay_subscription_id: string
+          start_at: string
+          status?: string
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          amount_paise?: number
+          billing_cycle?: string
+          charge_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          first_order_ref?: string | null
+          id?: string
+          list_rupees?: number
+          method?: string | null
+          payment_mode?: string
+          plan_id?: string
+          razorpay_subscription_id?: string
+          start_at?: string
+          status?: string
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_mandates_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_mandates_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_payment_orders: {
         Row: {
           amount: number
+          autopay: boolean
           billing_cycle: string
           change_kind: string | null
           created_at: string
@@ -2499,6 +2572,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          autopay?: boolean
           billing_cycle?: string
           change_kind?: string | null
           created_at?: string
@@ -2519,6 +2593,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          autopay?: boolean
           billing_cycle?: string
           change_kind?: string | null
           created_at?: string
@@ -4823,6 +4898,42 @@ export type Database = {
       }
       archive_ad_campaign: { Args: { p_ad_id: string }; Returns: undefined }
       attributes_search_text: { Args: { p: Json }; Returns: string }
+      autopay_charge: { Args: { p_amount_paise: number; p_payment_ref: string; p_sub_id: string }; Returns: Json }
+      autopay_gateway_plan: {
+        Args: { p_amount_paise: number; p_cycle: string; p_mode: string; p_plan: string }
+        Returns: string
+      }
+      autopay_gateway_plan_save: {
+        Args: {
+          p_amount_paise: number
+          p_cycle: string
+          p_list_rupees: number
+          p_mode: string
+          p_plan: string
+          p_razorpay_plan_id: string
+        }
+        Returns: string
+      }
+      autopay_incident: { Args: { p_detail: Json; p_kind: string; p_sub_id: string }; Returns: string }
+      autopay_mandate_create: {
+        Args: {
+          p_amount_paise: number
+          p_cycle: string
+          p_first_order_ref: string
+          p_list_rupees: number
+          p_mode: string
+          p_plan: string
+          p_start_at: string
+          p_sub_id: string
+          p_vendor: string
+        }
+        Returns: string
+      }
+      autopay_mandate_event: {
+        Args: { p_charge_at?: string; p_method?: string; p_status: string; p_sub_id: string }
+        Returns: Json
+      }
+      autopay_vendor_open: { Args: { p_vendor: string }; Returns: Json }
       billing_dispute_event: { Args: { p_detail: Json; p_event: string; p_payment_ref: string }; Returns: string }
       billing_reconcile_candidates: {
         Args: { p_limit?: number }
@@ -5121,6 +5232,7 @@ export type Database = {
           id: string
         }[]
       }
+      my_autopay: { Args: never; Returns: Json }
       my_contact_channels: { Args: never; Returns: Json }
       my_contact_info: {
         Args: never

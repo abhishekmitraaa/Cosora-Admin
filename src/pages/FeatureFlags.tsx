@@ -100,6 +100,7 @@ function FlagPanel({ flag, writable }: { flag: FeatureFlag; writable: boolean })
 
   const label = FEATURE_FLAG_LABELS[flag.key] ?? flag.key;
   return (
+    <div data-testid={`flag-${flag.key}`}>
     <Panel
       title={label}
       description={flag.description}
@@ -227,5 +228,6 @@ function FlagPanel({ flag, writable }: { flag: FeatureFlag; writable: boolean })
           : `Created ${format(new Date(flag.updatedAt), "d MMM yyyy")}; not changed since.`}
       </p>
     </Panel>
+    </div>
   );
 }

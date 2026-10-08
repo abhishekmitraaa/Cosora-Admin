@@ -279,7 +279,7 @@ export default function Subscriptions() {
           {subRows.length === 0 ? (
             <Empty>No vendor subscriptions.</Empty>
           ) : (
-            <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Auto-renew", "Actions"]}>
+            <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Autopay", "Actions"]}>
               {subRows.map((s) => (
                 <tr key={s.id} className={ROW_HOVER}>
                   <td className="px-3 py-2 font-medium text-ink">
@@ -321,7 +321,8 @@ export default function Subscriptions() {
                       <span className="text-ink-ghost">not set</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-ink-muted">{s.auto_renew ? "yes" : "no"}</td>
+                  {/* auto_renew means autopay since subscriptions P3: a Razorpay mandate renews the plan. */}
+                  <td className="px-3 py-2 text-xs text-ink-muted">{s.auto_renew ? <Badge tone="positive">on</Badge> : "off"}</td>
                   <td className="px-3 py-2">
                     <Button
                       variant="danger"
