@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Activity } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useRole } from "@/hooks/useAdminSession";
+import { NotificationDeliveryPanel } from "@/components/NotificationDeliveryPanel";
 import {
   Badge,
   Empty,
@@ -130,6 +132,8 @@ const fmt = (iso: string) =>
   });
 
 export default function SystemHealth() {
+  // Super admins may send themselves a delivery test (subscriptions P2); nothing else here writes.
+  const role = useRole();
   const { data, isPending, error } = useQuery({
     queryKey: ["admin_embedding_pipeline_health"],
     queryFn: async (): Promise<HealthRow[]> => {
@@ -182,7 +186,7 @@ export default function SystemHealth() {
     <Page>
       <PageHeader
         title="System Health"
-        subtitle="Scheduled jobs, the embedding pipeline (sampled every 10 minutes) and analytics events that couldn't be recorded. Read-only."
+        subtitle="Scheduled jobs, notification delivery, the embedding pipeline (sampled every 10 minutes) and analytics events that couldn't be recorded."
         actions={
           latest ? (
             <Badge tone={toneFor(latest.status)} dot>
@@ -194,6 +198,8 @@ export default function SystemHealth() {
 
       <Stack>
         {error && <ErrorNote message={(error as Error).message} />}
+
+        <NotificationDeliveryPanel canTest={role === "super_admin"} />
 
         <Panel
           title="Current status"

@@ -544,6 +544,17 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Notification delivery (2026-10-08; built, not live)
+
+A panel on `/system-health` (`NotificationDeliveryPanel.tsx`) for the outbox that email (Resend), WhatsApp (Meta) and
+SMS (provider not chosen yet) go out from. `admin_notification_health()` (super_admin, vendor_ops, the page's roles)
+gives, per channel: whether `notification-dispatch`'s secrets configure it (as of its last run), messages due,
+waiting to retry and being sent, and the last 24 hours' sent, failed and skipped; plus the 20 latest failures and
+skips with the provider's words and masked addresses. A channel that isn't configured skips its messages rather than
+holding them. "Messages have been due for over 5 minutes" means the `notification-dispatch` job isn't running.
+**Send a test** (super_admin, `admin_notification_test()`) queues a message to your own address on that channel, five
+an hour; it goes out on the dispatcher's next run.
+
 ### Live Activity (2026-09-28)
 
 `/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`

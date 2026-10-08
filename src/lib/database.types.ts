@@ -765,6 +765,38 @@ export type Database = {
           },
         ]
       }
+      contact_consent: {
+        Row: {
+          changed_at: string
+          channel: string
+          opted_in: boolean
+          profile_id: string
+          source: string
+        }
+        Insert: {
+          changed_at?: string
+          channel: string
+          opted_in: boolean
+          profile_id: string
+          source: string
+        }
+        Update: {
+          changed_at?: string
+          channel?: string
+          opted_in?: boolean
+          profile_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_consent_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string
@@ -4423,6 +4455,8 @@ export type Database = {
         }[]
       }
       admin_live_activity: { Args: { p_minutes?: number }; Returns: Json }
+      admin_notification_health: { Args: never; Returns: Json }
+      admin_notification_test: { Args: { p_channel: string }; Returns: Json }
       admin_payments_ledger: {
         Args: {
           p_cursor_at?: string
@@ -5087,6 +5121,7 @@ export type Database = {
           id: string
         }[]
       }
+      my_contact_channels: { Args: never; Returns: Json }
       my_contact_info: {
         Args: never
         Returns: {
@@ -5116,6 +5151,43 @@ export type Database = {
       }
       next_invoice_number: { Args: never; Returns: string }
       normalise_search_query: { Args: { q: string }; Returns: string }
+      notification_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body: string
+          channel: string
+          cta_label: string
+          cta_path: string
+          id: string
+          payload: Json
+          sms_dlt_template_id: string
+          subject: string
+          template_key: string
+          to_address: string
+          wa_language: string
+          wa_params: string[]
+          wa_template: string
+        }[]
+      }
+      notification_dispatch_heartbeat: {
+        Args: {
+          p_claimed: number
+          p_configured: Json
+          p_failed: number
+          p_sent: number
+        }
+        Returns: undefined
+      }
+      notification_mark: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_outcome: string
+          p_provider_id?: string
+        }
+        Returns: string
+      }
       notify: {
         Args: {
           p_body?: string
@@ -5125,6 +5197,16 @@ export type Database = {
           p_title: string
         }
         Returns: undefined
+      }
+      notify_deliver: {
+        Args: {
+          p_channels?: string[]
+          p_dedupe_key?: string
+          p_payload: Json
+          p_profile: string
+          p_template: string
+        }
+        Returns: Json
       }
       notify_embedding_alert_webhook: {
         Args: { p_queue_depth?: number; p_reason: string; p_status: string }
@@ -5252,6 +5334,10 @@ export type Database = {
           p_reason_id: string
           p_source: string
         }
+        Returns: undefined
+      }
+      set_contact_consent: {
+        Args: { p_channel: string; p_opted_in: boolean; p_source?: string }
         Returns: undefined
       }
       set_product_embedding: {

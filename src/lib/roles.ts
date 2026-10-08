@@ -285,10 +285,10 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // An aggregate read of rows this app already lists. Nothing on the map
   // writes, for any role.
   geography: [],
-  // Read-only by construction: there is no mutation on the System Health page,
-  // and the log table is service_role-only with RLS on and no policies, so no
-  // role can write it from a browser even if a page tried.
-  "system-health": [],
+  // The one write on System Health is a super admin sending a delivery test to their own
+  // address (admin_notification_test, subscriptions P2, which checks super_admin itself).
+  // The log tables are service_role-only with RLS on and no policies.
+  "system-health": ["super_admin"],
   content: ["super_admin"],
   blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
