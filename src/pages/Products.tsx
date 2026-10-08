@@ -25,7 +25,9 @@ import {
   Textarea,
 } from "@/components/ui";
 
-type Status = "under_review" | "live" | "rejected";
+// "paused" (subscriptions P4): over the vendor's plan limit, hidden from buyers until the
+// plan allows it again. The plan pauses and resumes it, so the tab is for looking only.
+type Status = "under_review" | "live" | "rejected" | "paused";
 
 interface ProductRow {
   id: string;
@@ -51,6 +53,7 @@ const TABS: { id: Status; label: string }[] = [
   { id: "under_review", label: "Queue (under review)" },
   { id: "live", label: "Live" },
   { id: "rejected", label: "Rejected (audit)" },
+  { id: "paused", label: "Paused (plan limit)" },
 ];
 
 export default function Products() {
@@ -159,7 +162,9 @@ export default function Products() {
             ? "Nothing waiting for review."
             : tab === "live"
               ? "No live products."
-              : "No rejected products."}
+              : tab === "paused"
+                ? "No products are paused by a plan limit."
+                : "No rejected products."}
         </Empty>
       ) : (
         <div className="space-y-3">
@@ -275,10 +280,17 @@ function ProductCard({
               <span className="font-semibold">Rejection reason.</span> {p.rejection_reason}
             </Notice>
           )}
+          {p.status === "paused" && (
+            <Notice tone="caution" className="mt-2.5 text-xs">
+              <span className="font-semibold">Paused by the vendor's plan limit.</span> Buyers can't see it. It comes
+              back when their plan allows it, or when the vendor chooses it over another listing.
+            </Notice>
+          )}
         </div>
 
         <div className="flex w-full flex-col gap-1.5 sm:w-36">
-          {p.status !== "live" && (
+          {/* A paused listing is the plan's to resume, not a moderator's to approve. */}
+          {p.status !== "live" && p.status !== "paused" && (
             <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
               Approve
             </Button>

@@ -305,6 +305,11 @@ export default function Subscriptions() {
                   <td className="px-3 py-2 text-ink-muted">{s.billing_cycle}</td>
                   <td className="px-3 py-2">
                     <StatusBadge status={s.status} />
+                    {/* Active with its period over (subscriptions P4): the plan is still in force
+                        for the vendor's grace days; the daily job lapses it after them. */}
+                    {s.status === "active" && s.current_period_end && new Date(s.current_period_end).getTime() < Date.now() && (
+                      <span className="mt-1 block text-2xs text-ink-faint" data-testid="grace-note">period over, in its grace days</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs tabular-nums text-ink-muted">
                     {s.current_period_start && s.current_period_end ? (

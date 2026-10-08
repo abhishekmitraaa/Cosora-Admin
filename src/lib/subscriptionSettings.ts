@@ -28,6 +28,7 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   subscription_checkout: "Plan checkout",
   notification_delivery: "Email, WhatsApp and SMS delivery",
   subscription_autopay: "Autopay",
+  subscription_lifecycle: "Reminders, grace days and paused listings",
 };
 
 export function useFeatureFlags() {

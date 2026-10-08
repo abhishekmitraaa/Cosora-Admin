@@ -81,6 +81,7 @@ function useChartInk() {
       under_review: tokenColor("tone-caution-dot"),
       draft: tokenColor("tone-neutral-dot"),
       rejected: tokenColor("tone-critical-dot"),
+      paused: tokenColor("tone-info-dot"),
     } as Record<string, string>,
   };
 }

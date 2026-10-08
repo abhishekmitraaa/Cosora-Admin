@@ -1522,6 +1522,8 @@ export type Database = {
           neck_type: string | null
           occasion: string[] | null
           pattern: string[] | null
+          paused_at: string | null
+          paused_from: string | null
           price_value: number | null
           rating_avg: number
           rejection_reason: string | null
@@ -1563,6 +1565,8 @@ export type Database = {
           neck_type?: string | null
           occasion?: string[] | null
           pattern?: string[] | null
+          paused_at?: string | null
+          paused_from?: string | null
           price_value?: number | null
           rating_avg?: number
           rejection_reason?: string | null
@@ -1604,6 +1608,8 @@ export type Database = {
           neck_type?: string | null
           occasion?: string[] | null
           pattern?: string[] | null
+          paused_at?: string | null
+          paused_from?: string | null
           price_value?: number | null
           rating_avg?: number
           rejection_reason?: string | null
@@ -3575,6 +3581,7 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           id: string
+          keep_product_ids: string[] | null
           plan_id: string
           real_time_alerts_enabled: boolean
           scheduled_billing_cycle: string | null
@@ -3592,6 +3599,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          keep_product_ids?: string[] | null
           plan_id: string
           real_time_alerts_enabled?: boolean
           scheduled_billing_cycle?: string | null
@@ -3609,6 +3617,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          keep_product_ids?: string[] | null
           plan_id?: string
           real_time_alerts_enabled?: boolean
           scheduled_billing_cycle?: string | null
@@ -5248,6 +5257,7 @@ export type Database = {
           key: string
         }[]
       }
+      my_product_cap: { Args: never; Returns: Json }
       my_vendor_private: {
         Args: never
         Returns: {
@@ -5615,6 +5625,8 @@ export type Database = {
       }
       vendor_cap_plan: { Args: { p_vendor: string }; Returns: string }
       vendor_entitlements: { Args: { p_vendor?: string }; Returns: Json }
+      vendor_keep_products: { Args: { p_ids: string[] }; Returns: Json }
+      vendor_set_live_products: { Args: { p_ids: string[] }; Returns: Json }
       vendor_type_from_labels: {
         Args: { p_business_type: string; p_labels: string[] }
         Returns: {
@@ -5633,7 +5645,7 @@ export type Database = {
         | "finance_admin"
         | "support"
         | "manager"
-      product_status: "draft" | "under_review" | "live" | "rejected"
+      product_status: "draft" | "under_review" | "live" | "rejected" | "paused"
       quote_status: "pending" | "shortlisted" | "accepted" | "rejected"
       rfq_status: "active" | "closed"
     }
@@ -5773,7 +5785,7 @@ export const Constants = {
         "support",
         "manager",
       ],
-      product_status: ["draft", "under_review", "live", "rejected"],
+      product_status: ["draft", "under_review", "live", "rejected", "paused"],
       quote_status: ["pending", "shortlisted", "accepted", "rejected"],
       rfq_status: ["active", "closed"],
     },

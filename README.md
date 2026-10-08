@@ -544,6 +544,20 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Reminders, grace days and paused listings (2026-10-08; built, not live)
+
+A plan now ends in three steps for vendors the `subscription_lifecycle` switch allows (textile-spark-net's
+subscriptions P4): reminders before the end, 7 grace days after it in which the plan still works in full, then the
+lapse to Free. Listings over a plan's limit are **paused** (hidden from buyers, not deleted), never removed.
+- **Products → Paused (plan limit):** what is paused, and for which vendor. There is no Approve: the listing comes
+  back when the vendor's plan allows it, or when the vendor chooses it over another. Reject still works.
+- **Subscriptions:** "period over, in its grace days" under an active plan's status. Cancelling a plan, or moving it
+  to one that allows fewer listings, pauses the listings over the new limit; the vendor is told.
+- **Vendors / Vendor detail:** the plan's seal date includes the grace days.
+- **Feature switches → Reminders, grace days and paused listings:** list test accounts first. Off, a plan lapses
+  at its end, nobody is reminded and nothing is paused.
+- The grace length is `admin.billing_settings.grace_days` (7; there is no screen for it yet).
+
 ### Autopay (2026-10-08; built, not live)
 
 Vendors can renew a plan automatically through a Razorpay mandate (textile-spark-net's subscriptions P3), where the
