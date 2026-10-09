@@ -109,6 +109,9 @@ export interface LeadDetail {
   removal: { at: string; by: string | null; reason: string } | null;
   /** The buyer's category answers, keyed by the requirement form's question keys (Ranking F1). */
   attributes: Record<string, unknown>;
+  /** Set when the requirement is from a buyer outside India (subscriptions P7): only Gold and
+   *  VIP vendors see it, and until `vip_until` only VIP. Absent before the P7 migration. */
+  overseas?: { country_code: string | null; country: string | null; vip_until: string | null } | null;
   quotes: {
     id: string;
     vendor_id: string;

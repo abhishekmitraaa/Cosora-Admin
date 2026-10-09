@@ -31,6 +31,7 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   subscription_lifecycle: "Reminders, grace days and paused listings",
   ad_state_targeting: "Ad reach by state",
   lead_alerts: "Lead alerts",
+  overseas_leads: "Overseas requirements",
 };
 
 export function useFeatureFlags() {

@@ -359,6 +359,16 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
           <div className="flex flex-wrap items-center gap-2">
             <StageBadge stage={d.stage} overdue={d.overdue} />
             {d.direct && <Badge>direct</Badge>}
+            {d.overseas && (
+              <Badge tone="info">
+                {`overseas · ${d.overseas.country ?? d.overseas.country_code ?? "unknown country"}`}
+              </Badge>
+            )}
+            {d.overseas?.vip_until && new Date(d.overseas.vip_until) > new Date() && (
+              <span className="text-2xs text-ink-faint" data-testid="lead-vip-until">
+                VIP vendors only until {format(new Date(d.overseas.vip_until), "d MMM, HH:mm")}
+              </span>
+            )}
             <span className="text-2xs text-ink-faint">
               Posted {format(new Date(d.created_at), "d MMM yyyy, HH:mm")} by{" "}
               <Link to={`/accounts?q=${encodeURIComponent(d.buyer.id)}`} className="underline-offset-2 hover:underline">

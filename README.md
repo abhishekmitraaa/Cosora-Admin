@@ -544,6 +544,13 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Overseas requirements (2026-10-09; built, not live)
+
+A requirement from a buyer outside India is visible only to Gold and VIP sellers; VIP sees it first for 24 hours
+when a VIP seller lists in its category. Staff read every requirement as before. On **Leads**, a requirement's
+detail says "overseas · <country>" and, during the head start, until when only VIP sellers see it. The switch is
+"Overseas requirements" on **Feature switches**: it marks a requirement only when it lists the buyer.
+
 ### Lead alerts (2026-10-09; built, not live)
 
 Vendors are told when a buyer posts a requirement that suits them, by their plan's channels (textile-spark-net's

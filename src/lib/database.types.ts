@@ -477,6 +477,7 @@ export type Database = {
           city: string | null
           company: string | null
           country: string | null
+          country_code: string | null
           created_at: string
           department: string | null
           display_name: string | null
@@ -501,6 +502,7 @@ export type Database = {
           city?: string | null
           company?: string | null
           country?: string | null
+          country_code?: string | null
           created_at?: string
           department?: string | null
           display_name?: string | null
@@ -525,6 +527,7 @@ export type Database = {
           city?: string | null
           company?: string | null
           country?: string | null
+          country_code?: string | null
           created_at?: string
           department?: string | null
           display_name?: string | null
@@ -847,6 +850,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      countries: {
+        Row: {
+          aliases: string[]
+          code: string
+          name: string
+          name_gu: string
+          name_hi: string
+        }
+        Insert: {
+          aliases?: string[]
+          code: string
+          name: string
+          name_gu: string
+          name_hi: string
+        }
+        Update: {
+          aliases?: string[]
+          code?: string
+          name?: string
+          name_gu?: string
+          name_hi?: string
+        }
+        Relationships: []
       }
       csp_violations: {
         Row: {
@@ -1922,6 +1949,7 @@ export type Database = {
           attributes: Json
           budget_max: number | null
           budget_min: number | null
+          buyer_country_code: string | null
           buyer_id: string
           category_id: string | null
           colors: string[] | null
@@ -1934,6 +1962,8 @@ export type Database = {
           id: string
           image: string | null
           images: string[] | null
+          overseas: boolean
+          overseas_vip_until: string | null
           product_id: string | null
           product_name: string | null
           quantity: number | null
@@ -1950,6 +1980,7 @@ export type Database = {
           attributes?: Json
           budget_max?: number | null
           budget_min?: number | null
+          buyer_country_code?: string | null
           buyer_id: string
           category_id?: string | null
           colors?: string[] | null
@@ -1962,6 +1993,8 @@ export type Database = {
           id?: string
           image?: string | null
           images?: string[] | null
+          overseas?: boolean
+          overseas_vip_until?: string | null
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
@@ -1978,6 +2011,7 @@ export type Database = {
           attributes?: Json
           budget_max?: number | null
           budget_min?: number | null
+          buyer_country_code?: string | null
           buyer_id?: string
           category_id?: string | null
           colors?: string[] | null
@@ -1990,6 +2024,8 @@ export type Database = {
           id?: string
           image?: string | null
           images?: string[] | null
+          overseas?: boolean
+          overseas_vip_until?: string | null
           product_id?: string | null
           product_name?: string | null
           quantity?: number | null
@@ -5109,6 +5145,7 @@ export type Database = {
         Returns: string
       }
       confirm_account_deletion: { Args: { p_code: string }; Returns: Json }
+      country_code_for: { Args: { p: string }; Returns: string }
       csp_report_ingest: { Args: { p_reports: Json }; Returns: undefined }
       discard_account_deletion_code: {
         Args: { p_request: string }
@@ -5322,6 +5359,7 @@ export type Database = {
         }[]
       }
       my_lead_alerts: { Args: { p_limit?: number }; Returns: Json }
+      my_overseas_tier: { Args: never; Returns: string }
       my_product_cap: { Args: never; Returns: Json }
       my_vendor_private: {
         Args: never
@@ -5399,6 +5437,7 @@ export type Database = {
         Args: { p_queue_depth?: number; p_reason: string; p_status: string }
         Returns: boolean
       }
+      overseas_lead_count: { Args: never; Returns: Json }
       owns_product: { Args: { pid: string }; Returns: boolean }
       owns_rfq: { Args: { rid: string }; Returns: boolean }
       pause_ad_campaign_by_admin: {
@@ -5701,6 +5740,7 @@ export type Database = {
       vendor_cap_plan: { Args: { p_vendor: string }; Returns: string }
       vendor_entitlements: { Args: { p_vendor?: string }; Returns: Json }
       vendor_keep_products: { Args: { p_ids: string[] }; Returns: Json }
+      vendor_quoted_rfq: { Args: { p_rfq: string }; Returns: boolean }
       vendor_set_live_products: { Args: { p_ids: string[] }; Returns: Json }
       vendor_type_from_labels: {
         Args: { p_business_type: string; p_labels: string[] }
