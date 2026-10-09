@@ -5578,6 +5578,11 @@ export type Database = {
       faq_translations_valid: { Args: { p: Json }; Returns: boolean }
       feature_on: { Args: { p_key: string }; Returns: boolean }
       feature_on_for: { Args: { p_key: string; p_profile: string }; Returns: boolean }
+      featured_listings: {
+        Args: { p_category: string; p_session?: string }
+        Returns: Json
+      }
+      featured_listings_on: { Args: never; Returns: boolean }
       for_you_products: {
         Args: { match_count?: number; p_buyer_id: string }
         Returns: {
@@ -5647,6 +5652,10 @@ export type Database = {
           p_vendor_id?: string
         }
         Returns: undefined
+      }
+      log_featured_impressions: {
+        Args: { p_items: Json; p_session?: string }
+        Returns: number
       }
       match_products: {
         Args: {
@@ -5722,6 +5731,7 @@ export type Database = {
           whatsapp: string
         }[]
       }
+      my_visibility: { Args: { p_days?: number }; Returns: Json }
       next_invoice_number: { Args: never; Returns: string }
       normalise_search_query: { Args: { q: string }; Returns: string }
       notification_claim: {
@@ -5939,6 +5949,10 @@ export type Database = {
       set_video_embedding: {
         Args: { p_embedding: string; p_id: string }
         Returns: boolean
+      }
+      spotlight_listings: {
+        Args: { p_category?: string; p_limit?: number; p_session?: string }
+        Returns: Json
       }
       state_code_for: { Args: { p: string }; Returns: string }
       state_name_key: { Args: { p: string }; Returns: string }
