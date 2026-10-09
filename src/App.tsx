@@ -51,6 +51,7 @@ import SupportInbox, { SupportCallbacks, SupportFeedback, SupportFraud } from "@
 import SupportTicket from "@/pages/SupportTicket";
 import SupportSettings from "@/pages/SupportSettings";
 import FeatureFlags from "@/pages/FeatureFlags";
+import MyVendors from "@/pages/MyVendors";
 import BillingEntity from "@/pages/BillingEntity";
 
 const queryClient = new QueryClient({
@@ -395,6 +396,14 @@ export default function App() {
                 element={
                   <RequireSection section="feature-flags">
                     <FeatureFlags />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/my-vendors"
+                element={
+                  <RequireSection section="my-vendors">
+                    <MyVendors />
                   </RequireSection>
                 }
               />

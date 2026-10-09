@@ -108,6 +108,138 @@ export type Database = {
           },
         ]
       }
+      account_manager_callbacks: {
+        Row: {
+          created_at: string
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          note: string | null
+          preferred_date: string
+          status: string
+          time_window: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          note?: string | null
+          preferred_date: string
+          status?: string
+          time_window: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          note?: string | null
+          preferred_date?: string
+          status?: string
+          time_window?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      account_manager_messages: {
+        Row: {
+          author_id: string | null
+          author_kind: string
+          author_label: string
+          body: string
+          created_at: string
+          id: string
+          vendor_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_kind: string
+          author_label: string
+          body: string
+          created_at?: string
+          id?: string
+          vendor_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_kind?: string
+          author_label?: string
+          body?: string
+          created_at?: string
+          id?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      account_manager_notes: {
+        Row: {
+          author_id: string | null
+          author_label: string
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          period: string | null
+          rfq_id: string | null
+          vendor_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_label: string
+          body: string
+          created_at?: string
+          id?: string
+          kind: string
+          period?: string | null
+          rfq_id?: string | null
+          vendor_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_label?: string
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          period?: string | null
+          rfq_id?: string | null
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      account_manager_threads: {
+        Row: {
+          created_at: string
+          last_message_at: string | null
+          last_staff_at: string | null
+          last_vendor_at: string | null
+          staff_read_at: string | null
+          vendor_id: string
+          vendor_read_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          last_message_at?: string | null
+          last_staff_at?: string | null
+          last_vendor_at?: string | null
+          staff_read_at?: string | null
+          vendor_id: string
+          vendor_read_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          last_message_at?: string | null
+          last_staff_at?: string | null
+          last_vendor_at?: string | null
+          staff_read_at?: string | null
+          vendor_id?: string
+          vendor_read_at?: string | null
+        }
+        Relationships: []
+      }
       ad_orders: {
         Row: {
           amount: number
@@ -4119,6 +4251,18 @@ export type Database = {
           reviewer_id: string
         }[]
       }
+      admin_am_assign: { Args: { p_manager: string | null; p_vendor: string }; Returns: undefined }
+      admin_am_callback_set: { Args: { p_id: string; p_status: string }; Returns: undefined }
+      admin_am_concierge: { Args: { p_vendor: string }; Returns: Json }
+      admin_am_managers: { Args: never; Returns: Json }
+      admin_am_mark_read: { Args: { p_vendor: string }; Returns: undefined }
+      admin_am_note: {
+        Args: { p_body: string; p_kind: string; p_period?: string | null; p_rfq?: string | null; p_vendor: string }
+        Returns: string
+      }
+      admin_am_send: { Args: { p_body: string; p_vendor: string }; Returns: string }
+      admin_am_vendor: { Args: { p_vendor: string }; Returns: Json }
+      admin_am_vendors: { Args: { p_filter?: string }; Returns: Json }
       admin_audit_log_actors: {
         Args: never
         Returns: {
@@ -5111,6 +5255,7 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_support_priorities: { Args: { p_ids: string[] }; Returns: Json }
       admin_support_reassign: {
         Args: { p_assignee_id: string; p_ticket_id: string }
         Returns: undefined
@@ -5166,6 +5311,13 @@ export type Database = {
           role: Database["public"]["Enums"]["admin_role_type"]
         }[]
       }
+      am_cancel_callback: { Args: { p_id: string }; Returns: undefined }
+      am_mark_read: { Args: never; Returns: undefined }
+      am_request_callback: {
+        Args: { p_date: string; p_note?: string | null; p_window: string }
+        Returns: string
+      }
+      am_send: { Args: { p_body: string }; Returns: string }
       anonymize_account: { Args: { p_user: string }; Returns: undefined }
       approve_ad_campaign: {
         Args: { p_ad_id: string; p_note?: string }
@@ -5537,6 +5689,7 @@ export type Database = {
           id: string
         }[]
       }
+      my_account_manager: { Args: never; Returns: Json }
       my_autopay: { Args: never; Returns: Json }
       my_contact_channels: { Args: never; Returns: Json }
       my_contact_info: {
@@ -5955,6 +6108,7 @@ export type Database = {
         | "finance_admin"
         | "support"
         | "manager"
+        | "account_manager"
       product_status: "draft" | "under_review" | "live" | "rejected" | "paused"
       quote_status: "pending" | "shortlisted" | "accepted" | "rejected"
       rfq_status: "active" | "closed"
@@ -6094,6 +6248,7 @@ export const Constants = {
         "finance_admin",
         "support",
         "manager",
+        "account_manager",
       ],
       product_status: ["draft", "under_review", "live", "rejected", "paused"],
       quote_status: ["pending", "shortlisted", "accepted", "rejected"],

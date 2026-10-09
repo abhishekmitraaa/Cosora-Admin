@@ -10,6 +10,7 @@ export const ALL_ROLES: AdminRole[] = [
   "finance_admin",
   "support",
   "manager",
+  "account_manager",
 ];
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
@@ -26,15 +27,18 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   // 2026-09-26 it also adds, changes and removes teammates in TEAM_ROLES on the
   // Admins page. It sees no moderation or commerce section.
   manager: "Manager",
+  // Subscriptions P9 (2026-10-09): looks after vendors on Silver and above, on My vendors.
+  account_manager: "Account manager",
 };
 
 /**
- * The roles a manager may give teammates (Mitra, 2026-09-26). The same five as
- * admin.is_team_role() in migration 20260925210601, which is what enforces it:
+ * The roles a manager may give teammates (Mitra, 2026-09-26; account_manager since subscriptions
+ * P9). The same six as admin.is_team_role() (migrations 20260925210601 and 20261009130100), which
+ * is what enforces it:
  * admin_set_role / admin_grant / admin_revoke refuse a manager anything else,
  * and refuse any change to a super admin, another manager, or the manager.
  */
-export const TEAM_ROLES: AdminRole[] = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support"];
+export const TEAM_ROLES: AdminRole[] = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager"];
 
 /** The roles this admin may hand out on the Admins page. */
 export function assignableRoles(role: AdminRole | null): AdminRole[] {
@@ -149,7 +153,12 @@ export type Section =
   // Cosora's legal and tax identity on the tax invoice (subscriptions P0).
   // admin_billing_entity() and admin_billing_entity_save() admit super_admin and
   // finance_admin, read and write.
-  | "billing-entity";
+  | "billing-entity"
+  // Account managers' workspace (subscriptions P9): the vendors they look after, messages,
+  // callbacks, VIP concierge and success reviews. admin_am_* admit super_admin, manager and
+  // account_manager (each checking the vendor is one the caller serves); only super admins
+  // and managers name a vendor's manager (admin_am_assign).
+  | "my-vendors";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -248,6 +257,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // Mirror admin_feature_flags() and admin_billing_entity() exactly.
   "feature-flags": ["super_admin", "manager"],
   "billing-entity": ["super_admin", "finance_admin"],
+  // Mirrors admin.am_staff(). Change the SQL gate and this line together.
+  "my-vendors": ["super_admin", "manager", "account_manager"],
 };
 
 /**
@@ -314,6 +325,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // admin_feature_flag_set(): super admins only. A manager reads.
   "feature-flags": ["super_admin"],
   "billing-entity": ["super_admin", "finance_admin"],
+  // Messages, callbacks and notes: everyone who reads it, for the vendors they serve.
+  "my-vendors": ["super_admin", "manager", "account_manager"],
 };
 
 /** `role` is nullable: an is_admin user with no role yet fails closed everywhere. */

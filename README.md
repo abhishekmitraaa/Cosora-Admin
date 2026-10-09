@@ -544,6 +544,14 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Account managers (2026-10-09; built, not live)
+
+**My vendors** is the account managers' workspace: the Silver, Gold and VIP sellers each looks after, their messages
+and call requests, and for VIP the sales concierge and the monthly review. Super admins and managers see every seller
+and name who looks after each; an account manager sees the sellers named for them and the shared team. The support
+inbox puts Gold and VIP sellers' waiting requests first and shows when the first reply is due. The switch is
+"Account managers and priority support" on **Feature switches**.
+
 ### The CRM (2026-10-09; built, not live)
 
 Silver, Gold and VIP sellers keep a CRM of the buyers they work with; Gold and VIP also get its analytics and

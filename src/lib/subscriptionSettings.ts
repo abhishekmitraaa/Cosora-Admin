@@ -33,6 +33,7 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   lead_alerts: "Lead alerts",
   overseas_leads: "Overseas requirements",
   crm: "CRM",
+  account_managers: "Account managers and priority support",
 };
 
 export function useFeatureFlags() {

@@ -37,6 +37,7 @@ import {
   Siren,
   Lightbulb,
   Clock,
+  Handshake,
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
@@ -99,6 +100,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/accounts", section: "accounts", label: "Accounts", icon: UserCog },
       { to: "/customers", section: "customers", label: "Customers", icon: Users },
       { to: "/geography", section: "geography", label: "Geography", icon: Map },
+      { to: "/my-vendors", section: "my-vendors", label: "My vendors", icon: Handshake },
     ],
   },
   {

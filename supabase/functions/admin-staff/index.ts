@@ -73,7 +73,7 @@ const REST = (key: string) => ({
 });
 
 // The roles a manager may give: admin.is_team_role() in migration 20260925210601.
-const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support"];
+const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager"];
 
 const EMAIL_RE = /^[^\s@,()<>]+@[^\s@,()<>]+\.[^\s@,()<>]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

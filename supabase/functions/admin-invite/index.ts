@@ -68,9 +68,9 @@ const REST = (key: string) => ({
   "content-type": "application/json",
 });
 
-// The roles a manager may give, the same five as admin.is_team_role() in
-// migration 20260925210601. The database re-checks every grant.
-const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support"];
+// The roles a manager may give, the same six as admin.is_team_role() (migrations
+// 20260925210601 and 20261009130100). The database re-checks every grant.
+const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager"];
 
 // Interpolated into a PostgREST filter and handed to GoTrue - reject anything
 // exotic rather than trying to escape it.

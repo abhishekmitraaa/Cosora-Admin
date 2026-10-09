@@ -33,6 +33,7 @@ import {
   STATUS_LABELS,
   useSupportCounts,
   useSupportList,
+  useSupportPriorities,
   useSupportRealtime,
   useSupportSettings,
   VIEW_LABELS,
@@ -40,6 +41,7 @@ import {
   type SupportChannel,
   type SupportFilters,
   type SupportListRow,
+  type SupportPriority,
   type SupportStatus,
   type SupportView,
 } from "@/lib/support";
@@ -108,6 +110,8 @@ export function SupportQueue({ channel, title, subtitle, footer }: QueueProps) {
   const list = useSupportList(filters);
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   const total = rows[0]?.total_count ?? 0;
+  // Gold and VIP vendors' requests (subscriptions P9): the queue already puts them first.
+  const priorities = useSupportPriorities(useMemo(() => rows.map((r) => r.id), [rows]));
   const c = counts.data;
 
   const categories = (settings.data?.categories ?? []).filter((cat) => !channel || cat.channels.includes(channel));
@@ -256,7 +260,7 @@ export function SupportQueue({ channel, title, subtitle, footer }: QueueProps) {
                 ? ["Request", "From", "Call window", "Attempts", "Status", "Assigned"]
                 : ["Request", "From", "Topic", "Status", "Waiting", "Assigned"]}>
                 {rows.map((r) => (
-                  <QueueLine key={r.id} row={r} callbacks={channel === "callback"} />
+                  <QueueLine key={r.id} row={r} callbacks={channel === "callback"} priority={priorities.data?.[r.id]} />
                 ))}
               </Table>
               <div className="mt-3 flex justify-end">
@@ -301,7 +305,7 @@ export function RolloutNotice() {
   return <Notice tone={c.open_now ? "positive" : "neutral"}>{hours}</Notice>;
 }
 
-function QueueLine({ row: r, callbacks }: { row: SupportListRow; callbacks: boolean }) {
+function QueueLine({ row: r, callbacks, priority }: { row: SupportListRow; callbacks: boolean; priority?: SupportPriority }) {
   const channel = r.channel as SupportChannel;
   const status = r.status as SupportStatus;
   return (
@@ -311,6 +315,7 @@ function QueueLine({ row: r, callbacks }: { row: SupportListRow; callbacks: bool
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-2xs text-ink-faint">{r.ticket_no}</span>
             <Badge tone={CHANNEL_TONE[channel]}>{CHANNEL_LABELS[channel]}</Badge>
+            {priority && <Badge tone={priority.tier === "vip" ? "critical" : "caution"}>{priority.tier === "vip" ? "VIP" : "Gold"}</Badge>}
             {r.is_test && <Badge>test</Badge>}
             {r.language !== "en" && <Badge tone="info">{LANGUAGE_LABELS[r.language as Lang] ?? r.language}</Badge>}
           </span>
@@ -354,7 +359,15 @@ function QueueLine({ row: r, callbacks }: { row: SupportListRow; callbacks: bool
               due in {ageFrom(new Date().toISOString(), new Date(r.waiting_since).getTime())}
             </span>
           ) : r.awaiting_staff && r.waiting_since ? (
-            <Badge tone={waitTone(r.waiting_since)}>{ageFrom(r.waiting_since)}</Badge>
+            <>
+              <Badge tone={waitTone(r.waiting_since)}>{ageFrom(r.waiting_since)}</Badge>
+              {priority?.target_at && (
+                <span className={`block text-2xs ${new Date(priority.target_at).getTime() < Date.now() ? "font-semibold text-critical-fg" : "text-ink-faint"}`}
+                  title={istTime(priority.target_at)} data-testid="support-reply-target">
+                  {`reply by ${format(new Date(priority.target_at), "HH:mm")}`}
+                </span>
+              )}
+            </>
           ) : (
             <span className="text-2xs text-ink-faint" title={istTime(r.last_message_at)}>
               last {ageFrom(r.last_message_at)} ago

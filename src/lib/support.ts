@@ -164,6 +164,8 @@ export interface SupportCounts {
   unassigned: number;
   callbacks_today: number;
   callbacks_overdue: number;
+  /** Gold and VIP vendors' requests waiting on staff (subscriptions P9). Absent before its migration. */
+  awaiting_priority?: number;
   oldest_waiting_at: string | null;
   open_now: boolean;
   rollout: "off" | "staff" | "all";
@@ -180,6 +182,33 @@ export function useSupportCounts(enabled = true) {
       const { data, error } = await supabase.rpc("admin_support_counts");
       if (error) throw new Error(error.message);
       return data as unknown as SupportCounts;
+    },
+  });
+}
+
+/** A Gold or VIP vendor's request (subscriptions P9): its tier, and when the first reply is due. */
+export interface SupportPriority {
+  tier: "vip" | "gold";
+  /** Set while the request waits on staff: 1 hour (VIP) or 4 hours (Gold) from when support is open. */
+  target_at: string | null;
+}
+
+/** Priorities of the requests shown, by id. Empty before the P9 migration. */
+export function useSupportPriorities(ids: string[]) {
+  return useQuery({
+    queryKey: ["support", "priorities", ids],
+    enabled: ids.length > 0,
+    queryFn: async (): Promise<Record<string, SupportPriority>> => {
+      const out: Record<string, SupportPriority> = {};
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data, error } = await supabase.rpc("admin_support_priorities", { p_ids: ids.slice(i, i + 200) });
+        if (error) {
+          if (error.code === "PGRST202") return {};
+          throw new Error(error.message);
+        }
+        Object.assign(out, data as unknown as Record<string, SupportPriority>);
+      }
+      return out;
     },
   });
 }
