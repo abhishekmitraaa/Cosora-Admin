@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import {
   Empty,
   ErrorNote,
   Field,
+  Input,
   Modal,
   Note,
   Page,
@@ -23,20 +24,29 @@ import {
   Stack,
   StatusBadge,
   Table,
+  Tabs,
   Textarea,
 } from "@/components/ui";
 import { RefundGuaranteePanel } from "@/components/RefundGuaranteePanel";
 import { BillingIncidentsPanel } from "@/components/BillingIncidentsPanel";
+import { SubscriptionKpis } from "@/components/SubscriptionKpis";
+import { PlanPricesPanel } from "@/components/PlanPricesPanel";
+import { GrantPlanModal } from "@/components/GrantPlanModal";
+import { useSubscriptionWorklist, type WorklistRow, type WorklistView } from "@/lib/subscriptionAdmin";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
+
+/** One subscription in the list, whichever query it came from. */
+type SubRow = WorklistRow;
 
 /** A plan change or a cancel, waiting for its reason. */
 type Pending =
   | { kind: "plan"; sub: SubRow; planId: string }
   | { kind: "cancel"; sub: SubRow };
 
-interface SubRow {
+/** The plain list's row (before the P12 worklist function is applied). */
+interface PlainSubRow {
   id: string;
   vendor_id: string;
   plan_id: string;
@@ -45,11 +55,39 @@ interface SubRow {
   current_period_start: string | null;
   current_period_end: string | null;
   auto_renew: boolean;
+  created_at: string;
   vendor: { brand_name: string | null; city: string | null } | null;
   /** A paid downgrade waiting for the period to end (2026-10-02); absent before that migration. */
   scheduled_plan_id?: string | null;
   scheduled_from?: string | null;
 }
+
+const fromPlain = (s: PlainSubRow): SubRow => ({
+  id: s.id, vendor_id: s.vendor_id, brand_name: s.vendor?.brand_name ?? null, city: s.vendor?.city ?? null,
+  plan_id: s.plan_id, billing_cycle: s.billing_cycle, status: s.status,
+  current_period_start: s.current_period_start, current_period_end: s.current_period_end, auto_renew: s.auto_renew,
+  scheduled_plan_id: s.scheduled_plan_id ?? null, scheduled_from: s.scheduled_from ?? null, created_at: s.created_at,
+  sort_at: s.created_at, grace_until: null, mandate_status: null, granted: false, last_failed_at: null,
+});
+
+/** The worklists (subscriptions P12). `days` says what "within" means where it applies. */
+const VIEWS: { id: WorklistView; label: string; days?: boolean; empty: string }[] = [
+  { id: "all", label: "All", empty: "No vendor subscriptions." },
+  { id: "expiring", label: "Ending soon", days: true, empty: "No paid plan ends in that time." },
+  { id: "grace", label: "In grace days", empty: "No plan is in its grace days." },
+  { id: "autopay_trouble", label: "Payment trouble", days: true, empty: "No halted or retrying autopay, and no failed payment in that time." },
+  { id: "granted", label: "Complimentary", empty: "No complimentary plan is running." },
+  { id: "downgrade", label: "Downgrades", empty: "No downgrade is waiting." },
+  { id: "lapsed", label: "Lapsed", days: true, empty: "No paid plan ended in that time." },
+];
+
+const MANDATE: Record<string, { label: string; tone: "positive" | "caution" | "critical" | "neutral" }> = {
+  active: { label: "autopay on", tone: "positive" },
+  authenticated: { label: "autopay set up", tone: "positive" },
+  pending: { label: "autopay retrying", tone: "caution" },
+  halted: { label: "autopay halted", tone: "critical" },
+  created: { label: "autopay not finished", tone: "neutral" },
+};
 
 interface InvoiceRow {
   id: string;
@@ -109,7 +147,7 @@ interface PlanRow {
   yearly_price: number;
 }
 
-const SUBTITLE = "Plans, invoices, refunds and billing incidents.";
+const SUBTITLE = "Plans, prices, worklists, invoices, refunds and billing incidents.";
 
 export default function Subscriptions() {
   const role = useRole();
@@ -128,13 +166,28 @@ export default function Subscriptions() {
     },
   });
 
-  // Both lists page by created_at, newest first: the next page starts strictly
+  // The worklists (subscriptions P12): one row per vendor, filtered on the server.
+  const [view, setView] = useState<WorklistView>("all");
+  const [days, setDays] = useState(7);
+  const [planFilter, setPlanFilter] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(typed), 300);
+    return () => clearTimeout(t);
+  }, [typed]);
+  const worklist = useSubscriptionWorklist(view, days, planFilter, search);
+  // null: the worklist function isn't applied yet, so the plain list is read instead.
+  const plainOnly = worklist.data?.pages[0] === null;
+
+  // The plain list pages by created_at, newest first: the next page starts strictly
   // before the last row shown. vendor_subscriptions.vendor_id FKs vendor_profiles,
   // so the embed is a real single-hop relationship (unlike products -> vendor).
   const subs = useInfiniteQuery({
     queryKey: ["subscriptions"],
+    enabled: plainOnly,
     initialPageParam: null as string | null,
-    queryFn: async ({ pageParam }): Promise<(SubRow & { created_at: string })[]> => {
+    queryFn: async ({ pageParam }): Promise<PlainSubRow[]> => {
       const base = `id, vendor_id, plan_id, billing_cycle, status, current_period_start,
            current_period_end, auto_renew, created_at, vendor:vendor_profiles(brand_name, city)`;
       const read = (columns: string) => {
@@ -146,7 +199,7 @@ export default function Subscriptions() {
       // Before the 2026-10-02 migration there are no scheduled_* columns (42703).
       if (error?.code === "42703") ({ data, error } = await read(base));
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as (SubRow & { created_at: string })[];
+      return (data ?? []) as unknown as PlainSubRow[];
     },
     getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
   });
@@ -173,6 +226,13 @@ export default function Subscriptions() {
     getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
   });
 
+  const refreshLists = () => {
+    void qc.invalidateQueries({ queryKey: ["subscription-worklist"] });
+    void qc.invalidateQueries({ queryKey: ["subscription-kpis"] });
+    void qc.invalidateQueries({ queryKey: ["subscriptions"] });
+    void qc.invalidateQueries({ queryKey: ["reports"] });
+  };
+
   /**
    * Plan changes and cancels go through admin_subscription_change_plan() /
    * admin_subscription_cancel() (admin completion, Phase 3b). They used to be
@@ -183,9 +243,11 @@ export default function Subscriptions() {
    */
   const [pending, setPending] = useState<Pending | null>(null);
   const [reason, setReason] = useState("");
+  const [granting, setGranting] = useState(false);
 
   const decide = useMutation({
     mutationFn: async ({ action, why }: { action: Pending; why: string }) => {
+      if (!action.sub.id) throw new Error("This vendor has no subscription yet.");
       const { error } =
         action.kind === "plan"
           ? await supabase.rpc("admin_subscription_change_plan", {
@@ -203,8 +265,7 @@ export default function Subscriptions() {
       toast.success(action.kind === "plan" ? "Plan changed" : "Subscription canceled");
       setPending(null);
       setReason("");
-      void qc.invalidateQueries({ queryKey: ["subscriptions"] });
-      void qc.invalidateQueries({ queryKey: ["reports"] });
+      refreshLists();
     },
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
@@ -249,7 +310,7 @@ export default function Subscriptions() {
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
 
-  if (subs.isPending || invoices.isPending) {
+  if (worklist.isPending || invoices.isPending || (plainOnly && subs.isLoading)) {
     return (
       <Page width="wide">
         <PageHeader title="Subscriptions & billing" subtitle={SUBTITLE} />
@@ -257,12 +318,17 @@ export default function Subscriptions() {
       </Page>
     );
   }
+  if (worklist.error) return <ErrorNote message={(worklist.error as Error).message} />;
   if (subs.error) return <ErrorNote message={(subs.error as Error).message} />;
   if (invoices.error) return <ErrorNote message={(invoices.error as Error).message} />;
 
-  const subRows = subs.data?.pages.flat() ?? [];
+  const subRows: SubRow[] = plainOnly
+    ? (subs.data?.pages.flat() ?? []).map(fromPlain)
+    : (worklist.data?.pages.flatMap((p) => p ?? []) ?? []);
+  const more = plainOnly ? subs : worklist;
   const invRows = invoices.data?.pages.flat() ?? [];
-  const planName = (id: string) => (plans.data ?? []).find((p) => p.id === id)?.name ?? id;
+  const planName = (id: string | null) => (id ? (plans.data ?? []).find((p) => p.id === id)?.name ?? id : "none");
+  const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
 
   return (
     <Page width="wide">
@@ -271,44 +337,94 @@ export default function Subscriptions() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "subscriptions")} />}
 
       <Stack>
+        <SubscriptionKpis />
+
         <BillingIncidentsPanel writable={writable} />
 
         <RefundGuaranteePanel writable={writable} />
 
-        <Panel title="Subscriptions">
+        <Panel
+          title="Subscriptions"
+          actions={
+            !plainOnly && (
+              <Button size="sm" variant="primary" disabled={!writable} onClick={() => setGranting(true)} data-testid="grant-open">
+                Give a complimentary plan
+              </Button>
+            )
+          }
+        >
+          {!plainOnly && (
+            <>
+              <Tabs tabs={VIEWS.map((v) => ({ id: v.id, label: v.label }))} active={view} onChange={setView} />
+              <div className="mb-3 flex flex-wrap items-end gap-3">
+                <Field label="Vendor" htmlFor="sub-search" className="w-56">
+                  <Input id="sub-search" placeholder="Part of the brand name" value={typed} onChange={(e) => setTyped(e.target.value)} />
+                </Field>
+                <Field label="Plan" htmlFor="sub-plan" className="w-40">
+                  <Select id="sub-plan" value={planFilter ?? ""} onChange={(e) => setPlanFilter(e.target.value || null)}>
+                    <option value="">Any plan</option>
+                    {(plans.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </Select>
+                </Field>
+                {current.days && (
+                  <Field label="Within" htmlFor="sub-days" className="w-36">
+                    <Select id="sub-days" value={String(days)} onChange={(e) => setDays(Number(e.target.value))}>
+                      {[7, 30, 90].map((d) => <option key={d} value={d}>{`${d} days`}</option>)}
+                    </Select>
+                  </Field>
+                )}
+              </div>
+            </>
+          )}
           {subRows.length === 0 ? (
-            <Empty>No vendor subscriptions.</Empty>
+            <Empty>{search || planFilter ? "No subscription matches." : current.empty}</Empty>
           ) : (
             <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Autopay", "Actions"]}>
               {subRows.map((s) => (
-                <tr key={s.id} className={ROW_HOVER}>
+                <tr key={s.vendor_id} className={ROW_HOVER} data-testid="sub-row">
                   <td className="px-3 py-2 font-medium text-ink">
-                    {s.vendor?.brand_name ?? "Unknown vendor"}
+                    {s.brand_name ?? "Unknown vendor"}
+                    {s.granted && (
+                      <span className="mt-0.5 block">
+                        <Badge tone="info">complimentary</Badge>
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
-                    <Select
-                      aria-label={`Plan for ${s.vendor?.brand_name ?? "this vendor"}`}
-                      value={s.plan_id}
-                      disabled={!writable || decide.isPending || s.status === "canceled" || s.status === "expired"}
-                      onChange={(e) => {
-                        setReason("");
-                        setPending({ kind: "plan", sub: s, planId: e.target.value });
-                      }}
-                    >
-                      {(plans.data ?? []).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </Select>
+                    {s.id && s.plan_id ? (
+                      <Select
+                        aria-label={`Plan for ${s.brand_name ?? "this vendor"}`}
+                        value={s.plan_id}
+                        disabled={!writable || decide.isPending || s.status === "canceled" || s.status === "expired"}
+                        onChange={(e) => {
+                          setReason("");
+                          setPending({ kind: "plan", sub: s, planId: e.target.value });
+                        }}
+                      >
+                        {(plans.data ?? []).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <span className="text-xs text-ink-ghost">no subscription yet</span>
+                    )}
                   </td>
-                  <td className="px-3 py-2 text-ink-muted">{s.billing_cycle}</td>
+                  <td className="px-3 py-2 text-ink-muted">{s.billing_cycle ?? ""}</td>
                   <td className="px-3 py-2">
-                    <StatusBadge status={s.status} />
+                    {s.status && <StatusBadge status={s.status} />}
                     {/* Active with its period over (subscriptions P4): the plan is still in force
                         for the vendor's grace days; the daily job lapses it after them. */}
                     {s.status === "active" && s.current_period_end && new Date(s.current_period_end).getTime() < Date.now() && (
-                      <span className="mt-1 block text-2xs text-ink-faint" data-testid="grace-note">period over, in its grace days</span>
+                      <span className="mt-1 block text-2xs text-ink-faint" data-testid="grace-note">
+                        {s.grace_until
+                          ? `period over, in its grace days until ${format(new Date(s.grace_until), "d MMM")}`
+                          : "period over, in its grace days"}
+                      </span>
+                    )}
+                    {s.last_failed_at && (
+                      <span className="mt-1 block text-2xs text-critical-fg">{`a payment failed ${format(new Date(s.last_failed_at), "d MMM, HH:mm")}`}</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs tabular-nums text-ink-muted">
@@ -327,12 +443,20 @@ export default function Subscriptions() {
                     )}
                   </td>
                   {/* auto_renew means autopay since subscriptions P3: a Razorpay mandate renews the plan. */}
-                  <td className="px-3 py-2 text-xs text-ink-muted">{s.auto_renew ? <Badge tone="positive">on</Badge> : "off"}</td>
+                  <td className="px-3 py-2 text-xs text-ink-muted">
+                    {s.mandate_status && MANDATE[s.mandate_status] ? (
+                      <Badge tone={MANDATE[s.mandate_status].tone}>{MANDATE[s.mandate_status].label}</Badge>
+                    ) : s.auto_renew ? (
+                      <Badge tone="positive">on</Badge>
+                    ) : (
+                      "off"
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <Button
                       variant="danger"
                       size="sm"
-                      disabled={!writable || s.status === "canceled" || s.status === "expired" || decide.isPending}
+                      disabled={!writable || !s.id || s.status === "canceled" || s.status === "expired" || decide.isPending}
                       onClick={() => {
                         setReason("");
                         setPending({ kind: "cancel", sub: s });
@@ -345,14 +469,16 @@ export default function Subscriptions() {
               ))}
             </Table>
           )}
-          {subs.hasNextPage && (
+          {more.hasNextPage && (
             <div className="mt-3 flex justify-center">
-              <Button size="sm" disabled={subs.isFetchingNextPage} onClick={() => void subs.fetchNextPage()}>
-                {subs.isFetchingNextPage ? "Loading…" : "Load more subscriptions"}
+              <Button size="sm" disabled={more.isFetchingNextPage} onClick={() => void more.fetchNextPage()}>
+                {more.isFetchingNextPage ? "Loading…" : "Load more subscriptions"}
               </Button>
             </div>
           )}
         </Panel>
+
+        <PlanPricesPanel writable={writable} />
 
         {/*
           Refund honesty: the button is only enabled where a real gateway payment
@@ -468,12 +594,23 @@ export default function Subscriptions() {
         </Panel>
       </Stack>
 
+      {granting && (
+        <GrantPlanModal
+          plans={plans.data ?? []}
+          onClose={() => setGranting(false)}
+          onDone={() => {
+            setGranting(false);
+            refreshLists();
+          }}
+        />
+      )}
+
       <Modal
         open={pending !== null}
         title={
           pending?.kind === "plan"
-            ? `Move ${pending.sub.vendor?.brand_name ?? "this vendor"} to ${planName(pending.planId)}`
-            : `Cancel ${pending?.sub.vendor?.brand_name ?? "this vendor"}'s subscription`
+            ? `Move ${pending.sub.brand_name ?? "this vendor"} to ${planName(pending.planId)}`
+            : `Cancel ${pending?.sub.brand_name ?? "this vendor"}'s subscription`
         }
         onClose={() => setPending(null)}
       >

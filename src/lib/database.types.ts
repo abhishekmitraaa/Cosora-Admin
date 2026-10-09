@@ -2585,6 +2585,42 @@ export type Database = {
           },
         ]
       }
+      subscription_grants: {
+        Row: {
+          created_at: string
+          ends_at: string
+          granted_by: string | null
+          id: string
+          plan_id: string
+          reason: string
+          starts_at: string
+          subscription_id: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          granted_by?: string | null
+          id?: string
+          plan_id: string
+          reason: string
+          starts_at: string
+          subscription_id?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          granted_by?: string | null
+          id?: string
+          plan_id?: string
+          reason?: string
+          starts_at?: string
+          subscription_id?: string | null
+          vendor_id?: string
+        }
+        Relationships: []
+      }
       subscription_invoices: {
         Row: {
           amount: number
@@ -2882,6 +2918,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plan_prices: {
+        Row: {
+          applied_at: string | null
+          canceled_at: string | null
+          canceled_by: string | null
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          monthly_price: number
+          plan_id: string
+          previous_monthly: number | null
+          previous_yearly: number | null
+          reason: string
+          status: string
+          yearly_price: number
+        }
+        Insert: {
+          applied_at?: string | null
+          canceled_at?: string | null
+          canceled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          id?: string
+          monthly_price: number
+          plan_id: string
+          previous_monthly?: number | null
+          previous_yearly?: number | null
+          reason: string
+          status?: string
+          yearly_price: number
+        }
+        Update: {
+          applied_at?: string | null
+          canceled_at?: string | null
+          canceled_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          monthly_price?: number
+          plan_id?: string
+          previous_monthly?: number | null
+          previous_yearly?: number | null
+          reason?: string
+          status?: string
+          yearly_price?: number
+        }
+        Relationships: []
       }
       subscription_plans: {
         Row: {
@@ -5040,6 +5127,17 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_plan_price_cancel: { Args: { p_id: string; p_reason: string }; Returns: undefined }
+      admin_plan_price_set: {
+        Args: {
+          p_effective?: string
+          p_monthly: number
+          p_plan: string
+          p_reason?: string
+          p_yearly: number
+        }
+        Returns: Json
+      }
       admin_profile_emails: {
         Args: { p_ids: string[] }
         Returns: {
@@ -5215,6 +5313,42 @@ export type Database = {
       admin_subscription_change_plan: {
         Args: { p_plan_id: string; p_reason: string; p_subscription_id: string }
         Returns: undefined
+      }
+      admin_subscription_grant: {
+        Args: { p_plan: string; p_reason: string; p_until: string; p_vendor: string }
+        Returns: Json
+      }
+      admin_subscription_kpis: { Args: never; Returns: Json }
+      admin_subscription_worklist: {
+        Args: {
+          p_after_at?: string
+          p_after_vendor?: string
+          p_days?: number
+          p_limit?: number
+          p_plan?: string
+          p_search?: string
+          p_view?: string
+        }
+        Returns: {
+          auto_renew: boolean
+          billing_cycle: string
+          brand_name: string
+          city: string
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          grace_until: string
+          granted: boolean
+          id: string
+          last_failed_at: string
+          mandate_status: string
+          plan_id: string
+          scheduled_from: string
+          scheduled_plan_id: string
+          sort_at: string
+          status: string
+          vendor_id: string
+        }[]
       }
       admin_support_assignees: {
         Args: never
