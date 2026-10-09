@@ -5,7 +5,7 @@ import { describeWriteError, supabase } from "@/lib/supabase";
 // Subscriptions P0 (2026-10-08): feature switches and Cosora's billing details.
 //
 // Both live in the database behind their own RPCs, which decide who may read and
-// write (textile-spark-net migration 20261008100000_subscriptions_p0_foundations):
+// write (textile-spark-net migration 20261009171435_subscriptions_p0_foundations):
 //   * admin_feature_flags()       super_admin, manager read
 //     admin_feature_flag_set()    super_admin only, with a reason (Admin Log)
 //   * admin_billing_entity()      super_admin, finance_admin

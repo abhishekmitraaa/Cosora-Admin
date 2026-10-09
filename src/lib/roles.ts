@@ -33,7 +33,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 
 /**
  * The roles a manager may give teammates (Mitra, 2026-09-26; account_manager since subscriptions
- * P9). The same six as admin.is_team_role() (migrations 20260925210601 and 20261009130100), which
+ * P9). The same six as admin.is_team_role() (migrations 20260925210601 and 20261009193949), which
  * is what enforces it:
  * admin_set_role / admin_grant / admin_revoke refuse a manager anything else,
  * and refuse any change to a super admin, another manager, or the manager.

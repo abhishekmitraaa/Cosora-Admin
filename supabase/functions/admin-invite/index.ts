@@ -69,7 +69,7 @@ const REST = (key: string) => ({
 });
 
 // The roles a manager may give, the same six as admin.is_team_role() (migrations
-// 20260925210601 and 20261009130100). The database re-checks every grant.
+// 20260925210601 and 20261009193949). The database re-checks every grant.
 const TEAM_ROLES = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager"];
 
 // Interpolated into a PostgREST filter and handed to GoTrue - reject anything

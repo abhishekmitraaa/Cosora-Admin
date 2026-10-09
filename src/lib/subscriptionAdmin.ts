@@ -3,7 +3,7 @@ import { describeWriteError, supabase } from "@/lib/supabase";
 
 // ─────────────────────────────────────────────────────────────
 // Subscriptions admin tooling (subscriptions P12, 2026-10-09; textile-spark-net's
-// 20261009160000_subscriptions_p12_admin_tooling).
+// 20261009194403_subscriptions_p12_admin_tooling).
 //
 // - KPIs: admin_subscription_kpis(), one set-based read.
 // - Worklists: admin_subscription_worklist(view, days, plan, search), one row per vendor,

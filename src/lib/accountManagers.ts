@@ -5,7 +5,7 @@ import { describeWriteError, supabase } from "@/lib/supabase";
 // Account managers (subscriptions P9, 2026-10-09): the My vendors workspace.
 //
 // Everything here is an admin_am_* function in textile-spark-net's migration
-// 20261009130100_subscriptions_p9_account_managers, and each checks the caller:
+// 20261009193949_subscriptions_p9_account_managers, and each checks the caller:
 //   * super admins and managers serve every vendor and name a vendor's manager
 //     (admin_am_assign);
 //   * an account manager serves the vendors they are named for, and the shared team (every
