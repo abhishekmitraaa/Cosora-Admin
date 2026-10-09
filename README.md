@@ -544,6 +544,20 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Lead alerts (2026-10-09; built, not live)
+
+Vendors are told when a buyer posts a requirement that suits them, by their plan's channels (textile-spark-net's
+subscriptions P6): Basic a daily email summary; Silver the bell and the summary; Gold and VIP the bell, email and
+WhatsApp as it happens, VIP first. Free vendors see the same leads, untold.
+- **Leads → Lead alerts panel:** the last 7 days. "Held" says why an alert didn't go out as it happened: the plan's
+  channel is the daily summary, the vendor's hourly limit or quiet hours, or the vendor turned instant alerts off.
+  "Not matched yet" with an error means the matching failed for a requirement; it was still posted and the daily
+  run retries.
+- **Feature switches → Lead alerts:** list test accounts first. Email also needs "Email, WhatsApp and SMS delivery"
+  to list the vendor.
+- The daily summary needs its scheduled job (`lead-alert-digest`); WhatsApp needs Meta to approve the
+  `new_lead_alert` template. Until then vendors see those channels as "Starting soon".
+
 ### Ad reach by state (2026-10-09; built, not live)
 
 A campaign reaches the states its vendor chose, as far as their plan allows (textile-spark-net's subscriptions P5):

@@ -43,6 +43,7 @@ import {
   cn,
   type Tone,
 } from "@/components/ui";
+import { LeadAlertsPanel } from "@/components/LeadAlertsPanel";
 
 /**
  * LEADS: THE RFQ PIPELINE (admin completion Phase 7).
@@ -163,6 +164,8 @@ export default function Leads() {
             </div>
           </>
         )}
+
+        <LeadAlertsPanel />
 
         <Panel
           title="Pipeline"

@@ -1185,6 +1185,44 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_alert_settings: {
+        Row: {
+          category_ids: string[] | null
+          digest: boolean
+          instant: boolean
+          quiet_end: string | null
+          quiet_start: string | null
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          category_ids?: string[] | null
+          digest?: boolean
+          instant?: boolean
+          quiet_end?: string | null
+          quiet_start?: string | null
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          category_ids?: string[] | null
+          digest?: boolean
+          instant?: boolean
+          quiet_end?: string | null
+          quiet_start?: string | null
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_alert_settings_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: true
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           body: string | null
@@ -4511,6 +4549,7 @@ export type Database = {
           id: string
         }[]
       }
+      admin_lead_alert_stats: { Args: { p_days?: number }; Returns: Json }
       admin_lead_detail: { Args: { p_rfq_id: string }; Returns: Json }
       admin_lead_remove: {
         Args: { p_reason: string; p_rfq_id: string }
@@ -5207,6 +5246,7 @@ export type Database = {
         Args: { p_since: string; p_vendor: string }
         Returns: number
       }
+      lead_digest_run: { Args: never; Returns: Json }
       log_call: {
         Args: { p_product_context?: string; p_vendor_id: string }
         Returns: Json
@@ -5281,6 +5321,7 @@ export type Database = {
           key: string
         }[]
       }
+      my_lead_alerts: { Args: { p_limit?: number }; Returns: Json }
       my_product_cap: { Args: never; Returns: Json }
       my_vendor_private: {
         Args: never
@@ -5485,6 +5526,16 @@ export type Database = {
       set_contact_consent: {
         Args: { p_channel: string; p_opted_in: boolean; p_source?: string }
         Returns: undefined
+      }
+      set_lead_alert_settings: {
+        Args: {
+          p_category_ids: string[] | null
+          p_digest: boolean
+          p_instant: boolean
+          p_quiet_end: string | null
+          p_quiet_start: string | null
+        }
+        Returns: Json
       }
       set_product_embedding: {
         Args: { p_embedding: string; p_id: string }
