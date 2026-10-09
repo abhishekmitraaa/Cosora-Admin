@@ -21,13 +21,25 @@ export async function fetchAccountStatuses(ids: string[]): Promise<Map<string, s
   const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Map();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, account_status")
-    .in("id", unique);
-  if (error) throw new Error(error.message);
+  // The ids go in the URL: a few hundred of them outgrow the gateway's limit (the Vendors
+  // page asks for every vendor), so they go 100 at a time (subscriptions sweep, 2026-10-09).
+  const parts = await Promise.all(
+    chunks(unique, IN_CHUNK).map(async (part) => {
+      const { data, error } = await supabase.from("profiles").select("id, account_status").in("id", part);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    }),
+  );
+  return new Map(parts.flat().map((p) => [p.id, p.account_status as string]));
+}
 
-  return new Map((data ?? []).map((p) => [p.id, p.account_status as string]));
+/** How many ids one `.in()` filter carries, so the URL stays well under the gateway's limit. */
+export const IN_CHUNK = 100;
+
+export function chunks<T>(list: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
 }
 
 /** Single-account form of the above. Returns null when there is no profiles row. */

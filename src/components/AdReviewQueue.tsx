@@ -155,8 +155,11 @@ export default function AdReviewQueue() {
    * Deliberately computed in the database: counting statuses client-side would
    * mean fetching every campaign row just to bucket it.
    */
+  // ad_review_metrics is for super_admin and ads_moderator; support reads the queue but not the
+  // figures, so it doesn't ask (it was a 403 on every visit; subscriptions sweep, 2026-10-09).
   const metrics = useQuery({
     queryKey: ["ad-review", "metrics"],
+    enabled: role === "super_admin" || role === "ads_moderator",
     queryFn: async () => {
       const { data, error } = await supabase.rpc("ad_review_metrics", { p_days: 30 });
       if (error) throw new Error(error.message);

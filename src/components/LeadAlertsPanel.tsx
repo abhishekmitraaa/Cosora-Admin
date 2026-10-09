@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { useRole } from "@/hooks/useAdminSession";
 import { Badge, Note, Panel } from "@/components/ui";
 
 interface Stats {
@@ -35,8 +36,12 @@ const HELD_LABEL: Record<keyof Stats["held"], string> = {
  * Shows nothing before the P6 migration is applied, or to a role the figures aren't for.
  */
 export function LeadAlertsPanel() {
+  // admin_lead_alert_stats is for super_admin, manager and support; the other roles that open
+  // Leads don't ask (it was a 403; subscriptions sweep, 2026-10-09).
+  const role = useRole();
   const stats = useQuery({
     queryKey: ["lead-alert-stats"],
+    enabled: role === "super_admin" || role === "manager" || role === "support",
     queryFn: async (): Promise<Stats | null> => {
       const { data, error } = await supabase.rpc("admin_lead_alert_stats", { p_days: 7 });
       if (error) {

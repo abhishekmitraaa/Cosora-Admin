@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { fetchAccountStatuses } from "./accounts";
+import { IN_CHUNK, chunks, fetchAccountStatuses } from "./accounts";
 
 /**
  * Vendor identity as shown next to moderated content.
@@ -30,11 +30,14 @@ export async function fetchVendorsByIds(ids: string[]): Promise<Map<string, Vend
   const unique = [...new Set(ids)].filter(Boolean);
   if (unique.length === 0) return new Map();
 
-  const [{ data, error }, statuses] = await Promise.all([
-    supabase.from("vendor_profiles").select("id, brand_name, city, is_verified").in("id", unique),
+  const [parts, statuses] = await Promise.all([
+    Promise.all(chunks(unique, IN_CHUNK).map((part) =>
+      supabase.from("vendor_profiles").select("id, brand_name, city, is_verified").in("id", part))),
     fetchAccountStatuses(unique),
   ]);
-  if (error) throw new Error(error.message);
+  const failed = parts.find((p) => p.error);
+  if (failed?.error) throw new Error(failed.error.message);
+  const data = parts.flatMap((p) => p.data ?? []);
 
   return new Map(
     (data ?? []).map((v) => [
