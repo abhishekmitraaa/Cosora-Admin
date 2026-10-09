@@ -1547,6 +1547,42 @@ export type Database = {
           },
         ]
       }
+      product_import_batches: {
+        Row: {
+          as_draft: boolean
+          created: number
+          created_at: string
+          errors: Json
+          failed: number
+          file_name: string | null
+          id: string
+          total: number
+          vendor_id: string
+        }
+        Insert: {
+          as_draft?: boolean
+          created?: number
+          created_at?: string
+          errors?: Json
+          failed?: number
+          file_name?: string | null
+          id?: string
+          total: number
+          vendor_id: string
+        }
+        Update: {
+          as_draft?: boolean
+          created?: number
+          created_at?: string
+          errors?: Json
+          failed?: number
+          file_name?: string | null
+          id?: string
+          total?: number
+          vendor_id?: string
+        }
+        Relationships: []
+      }
       product_reviews: {
         Row: {
           body: string | null
@@ -5429,6 +5465,7 @@ export type Database = {
         }[]
       }
       cancel_account_deletion: { Args: never; Returns: Json }
+      category_for_import: { Args: { p_name: string }; Returns: string }
       certificate_apply: {
         Args: {
           p_courier?: string
@@ -5613,6 +5650,10 @@ export type Database = {
       immutable_array_to_string: {
         Args: { arr: string[]; sep: string }
         Returns: string
+      }
+      import_products: {
+        Args: { p_as_draft?: boolean; p_file_name?: string; p_rows: Json }
+        Returns: Json
       }
       increment_product_enquiry: { Args: { p: string }; Returns: undefined }
       increment_product_view: { Args: { p: string }; Returns: undefined }

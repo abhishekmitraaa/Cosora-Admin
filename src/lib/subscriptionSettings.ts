@@ -35,6 +35,7 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   crm: "CRM",
   account_managers: "Account managers and priority support",
   featured_listings: "Featured listings, spotlight and seal tiers",
+  bulk_import: "Bulk catalogue import",
 };
 
 export function useFeatureFlags() {
