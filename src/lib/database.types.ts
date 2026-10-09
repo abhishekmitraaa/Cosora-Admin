@@ -3474,6 +3474,181 @@ export type Database = {
           },
         ]
       }
+      vendor_lead_followups: {
+        Row: {
+          created_at: string
+          done_at: string | null
+          due_at: string
+          id: string
+          note: string | null
+          notified_at: string | null
+          pipeline_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          done_at?: string | null
+          due_at: string
+          id?: string
+          note?: string | null
+          notified_at?: string | null
+          pipeline_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          done_at?: string | null
+          due_at?: string
+          id?: string
+          note?: string | null
+          notified_at?: string | null
+          pipeline_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_lead_followups_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_lead_pipeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_lead_followups_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_lead_notes: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          meta: Json
+          pipeline_id: string
+          vendor_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          meta?: Json
+          pipeline_id: string
+          vendor_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          meta?: Json
+          pipeline_id?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_lead_notes_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_lead_pipeline"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_lead_notes_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendor_lead_pipeline: {
+        Row: {
+          buyer_id: string | null
+          buyer_name: string | null
+          closed_at: string | null
+          created_at: string
+          id: string
+          lost_reason: string | null
+          next_follow_up_at: string | null
+          rfq_id: string | null
+          source: string
+          stage: string
+          stage_changed_at: string
+          tags: string[]
+          title: string
+          updated_at: string
+          value_inr: number | null
+          vendor_id: string
+        }
+        Insert: {
+          buyer_id?: string | null
+          buyer_name?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          rfq_id?: string | null
+          source?: string
+          stage?: string
+          stage_changed_at?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          value_inr?: number | null
+          vendor_id: string
+        }
+        Update: {
+          buyer_id?: string | null
+          buyer_name?: string | null
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          lost_reason?: string | null
+          next_follow_up_at?: string | null
+          rfq_id?: string | null
+          source?: string
+          stage?: string
+          stage_changed_at?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          value_inr?: number | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_lead_pipeline_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_lead_pipeline_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_lead_pipeline_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_profiles: {
         Row: {
           about: string | null
@@ -5146,6 +5321,26 @@ export type Database = {
       }
       confirm_account_deletion: { Args: { p_code: string }; Returns: Json }
       country_code_for: { Args: { p: string }; Returns: string }
+      crm_add_follow_up: {
+        Args: { p_due: string; p_id: string; p_note?: string | null }
+        Returns: string
+      }
+      crm_add_lead: {
+        Args: { p_buyer_name?: string | null; p_tags?: string[]; p_title: string; p_value?: number | null }
+        Returns: string
+      }
+      crm_add_note: { Args: { p_body: string; p_id: string }; Returns: string }
+      crm_analytics: { Args: { p_days?: number }; Returns: Json }
+      crm_delete_follow_up: { Args: { p_follow_up: string }; Returns: undefined }
+      crm_delete_lead: { Args: { p_id: string }; Returns: undefined }
+      crm_stage_rank: { Args: { p_stage: string }; Returns: number }
+      crm_tags_ok: { Args: { p: string[] }; Returns: boolean }
+      crm_track: { Args: { p_rfq: string }; Returns: string }
+      crm_update_follow_up: {
+        Args: { p_done?: boolean | null; p_due?: string | null; p_follow_up: string }
+        Returns: undefined
+      }
+      crm_update_lead: { Args: { p_id: string; p_patch: Json }; Returns: undefined }
       csp_report_ingest: { Args: { p_reports: Json }; Returns: undefined }
       discard_account_deletion_code: {
         Args: { p_request: string }

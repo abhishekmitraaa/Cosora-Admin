@@ -32,6 +32,7 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   ad_state_targeting: "Ad reach by state",
   lead_alerts: "Lead alerts",
   overseas_leads: "Overseas requirements",
+  crm: "CRM",
 };
 
 export function useFeatureFlags() {

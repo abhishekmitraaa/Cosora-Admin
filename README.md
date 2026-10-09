@@ -544,6 +544,12 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### The CRM (2026-10-09; built, not live)
+
+Silver, Gold and VIP sellers keep a CRM of the buyers they work with; Gold and VIP also get its analytics and
+WhatsApp follow-up reminders. It is the seller's own: staff can't read it here. The switch is "CRM" on **Feature
+switches**.
+
 ### Overseas requirements (2026-10-09; built, not live)
 
 A requirement from a buyer outside India is visible only to Gold and VIP sellers; VIP sees it first for 24 hours
