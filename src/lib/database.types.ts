@@ -166,6 +166,8 @@ export type Database = {
           status: string
           target_categories: Json | null
           target_cities: Json | null
+          target_countries: string[]
+          target_states: string[]
           title: string
           vendor_id: string
         }
@@ -187,6 +189,8 @@ export type Database = {
           status?: string
           target_categories?: Json | null
           target_cities?: Json | null
+          target_countries?: string[]
+          target_states?: string[]
           title: string
           vendor_id: string
         }
@@ -208,6 +212,8 @@ export type Database = {
           status?: string
           target_categories?: Json | null
           target_cities?: Json | null
+          target_countries?: string[]
+          target_states?: string[]
           title?: string
           vendor_id?: string
         }
@@ -3793,6 +3799,20 @@ export type Database = {
       }
       ad_moderator: { Args: never; Returns: boolean }
       ad_owner: { Args: { p_ad_id: string }; Returns: boolean }
+      ad_reach_check: {
+        Args: { p_cities: Json; p_countries: string[]; p_states: string[]; p_vendor: string }
+        Returns: Json
+      }
+      ad_reach_resolve: {
+        Args: {
+          p_cities: Json
+          p_countries: string[]
+          p_states: string[]
+          p_strict?: boolean
+          p_vendor: string
+        }
+        Returns: Json
+      }
       ad_review_metrics: { Args: { p_days?: number }; Returns: Json }
       ad_seal_sources: { Args: { p_placement: string }; Returns: string[] }
       ad_target_live_status: { Args: { p_ad_id: string }; Returns: string }
@@ -3805,6 +3825,10 @@ export type Database = {
         Returns: boolean
       }
       ad_viewer_city: { Args: never; Returns: string }
+      ad_viewer_location: {
+        Args: never
+        Returns: { city: string; country_code: string; state_code: string }[]
+      }
       admin_account_suspension_list: {
         Args: { p_active?: boolean; p_profile_ids?: string[] }
         Returns: {

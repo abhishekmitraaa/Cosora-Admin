@@ -544,6 +544,18 @@ buyer app's `/subscription`; the request appears in a panel on `/subscriptions`
   (`subscription_credit_notes`). **PDF** opens the stored PDF (`invoice-render` draws it once into the private
   `invoices` bucket; the link is signed for 5 minutes with your own session).
 
+### Ad reach by state (2026-10-09; built, not live)
+
+A campaign reaches the states its vendor chose, as far as their plan allows (textile-spark-net's subscriptions P5):
+one state on Basic, four on Silver, any on Gold and VIP, and on VIP also countries outside India.
+- **Ads → review queue → "Show creative, targeting and history":** "Target states" lists the state codes, or says
+  "All of India" when none were chosen; "Countries outside India" lists any. Older campaigns still show "Target
+  cities".
+- **Who sees it:** a buyer known to be in another state doesn't; a buyer whose state Cosora doesn't know does. The
+  plan's limit was applied when the campaign was made, so a reviewer doesn't need to count states.
+- **Feature switches → Ad reach by state:** list test accounts first. Off, a vendor's new campaigns keep the older
+  city targeting.
+
 ### Reminders, grace days and paused listings (2026-10-08; built, not live)
 
 A plan now ends in three steps for vendors the `subscription_lifecycle` switch allows (textile-spark-net's

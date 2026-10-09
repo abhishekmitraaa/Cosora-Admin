@@ -62,6 +62,9 @@ interface QueueAd {
   image_url: string | null;
   target_categories: unknown;
   target_cities: unknown;
+  // Subscriptions P5: the states an ad reaches (india_states codes) and, on VIP, countries.
+  target_states: string[] | null;
+  target_countries: string[] | null;
   moderation_reason: string | null;
   moderated_at: string | null;
 }
@@ -131,6 +134,7 @@ export default function AdReviewQueue() {
         .select(
           `id, title, placement, status, daily_budget, impressions, clicks, starts_at, ends_at,
            created_at, vendor_id, product_id, image_url, target_categories, target_cities,
+           target_states, target_countries,
            moderation_reason, moderated_at`,
         )
         .eq("status", tab)
@@ -381,6 +385,8 @@ function ReviewCard({
   const startsFuture = a.starts_at ? new Date(a.starts_at).getTime() > Date.now() : false;
   const alreadyEnded = a.ends_at ? new Date(a.ends_at).getTime() <= Date.now() : false;
   const cities = jsonList(a.target_cities);
+  const states = jsonList(a.target_states);
+  const countries = jsonList(a.target_countries);
 
   return (
     <Card className="transition-shadow hover:shadow-card-hover">
@@ -438,8 +444,16 @@ function ReviewCard({
                 <Attr label="Promoted product" value={a.product_id ? "Linked" : "None"} />
                 <Attr label="Starts" value={a.starts_at ? format(new Date(a.starts_at), "d MMM yyyy") : null} />
                 <Attr label="Ends" value={a.ends_at ? format(new Date(a.ends_at), "d MMM yyyy") : null} />
+                <Attr label="Target states" value={states ?? (cities ? null : "All of India")} />
+                <Attr label="Countries outside India" value={countries} />
                 <Attr label="Target cities" value={cities} />
               </AttrGrid>
+              {states && (
+                <p className="text-2xs text-ink-faint">
+                  Buyers known to be in another state don't see this campaign; buyers whose state Cosora doesn't
+                  know still can. The vendor's plan decided how many states it may reach.
+                </p>
+              )}
               {cities && (
                 <p className="text-2xs text-ink-faint">
                   City targeting is enforced and fails closed: a buyer whose city Cosora does not know
