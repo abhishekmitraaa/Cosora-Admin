@@ -7,6 +7,8 @@ interface Stats {
   since: string;
   requirements_matched: number;
   match_errors: number;
+  /** Requirements that told nobody because their buyer had raised too many alerts that day. */
+  skipped_buyer_cap?: number;
   alerts: number;
   vendors_told: number;
   as_it_happened: number;
@@ -26,8 +28,9 @@ const HELD_LABEL: Record<keyof Stats["held"], string> = {
  * Lead alerts (subscriptions P6, 2026-10-09): whether vendors are being told about buyer
  * requirements that suit them. Counts for the last 7 days from admin_lead_alert_stats():
  * requirements matched, alerts raised, how many went out as they happened and why the rest
- * were held, what is waiting for the next daily summary, and the last matching error (a
- * failed match never stops the requirement being posted; the daily run retries it).
+ * were held, what is waiting for the next daily summary, how many requirements told nobody
+ * because their buyer had already raised the day's limit of alerts, and the last matching
+ * error (a failed match never stops the requirement being posted; the daily run retries it).
  *
  * Shows nothing before the P6 migration is applied, or to a role the figures aren't for.
  */
@@ -59,6 +62,7 @@ export function LeadAlertsPanel() {
         <Badge tone="positive">{`${s.as_it_happened} as they happened`}</Badge>
         {s.waiting_for_digest > 0 && <Badge tone="caution">{`${s.waiting_for_digest} waiting for the daily summary`}</Badge>}
         {s.match_errors > 0 && <Badge tone="critical">{`${s.match_errors} not matched yet`}</Badge>}
+        {(s.skipped_buyer_cap ?? 0) > 0 && <Badge tone="caution">{`${s.skipped_buyer_cap} told nobody: the buyer's daily limit`}</Badge>}
       </div>
       {held.length > 0 && (
         <p className="mt-2 text-xs text-ink-faint">
