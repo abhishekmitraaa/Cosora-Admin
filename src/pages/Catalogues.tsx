@@ -51,6 +51,21 @@ const TABS: { id: Status; label: string }[] = [
   { id: "rejected", label: "Rejected (audit)" },
 ];
 
+/**
+ * The address when it is a web address, else null. A catalogue's file and cover addresses are the seller's to write;
+ * the database accepts only http(s) (catalogues_web_urls), and this keeps a `javascript:` link out of a staff session
+ * even if a row ever got past that.
+ */
+function webUrl(u: string | null): string | null {
+  if (!u) return null;
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
 const UPLOADED = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
 
 /**
@@ -211,11 +226,13 @@ function CatalogueCard({
   onApprove: () => void;
   onReject: () => void;
 }) {
+  const cover = webUrl(c.cover_url);
+  const file = webUrl(c.file_url);
   return (
     <Card className="transition-shadow hover:shadow-card-hover">
       <div className="flex flex-wrap gap-4">
-        {c.cover_url ? (
-          <img src={c.cover_url} alt="" className="h-28 w-20 rounded-lg border border-line object-cover sm:h-32 sm:w-24" />
+        {cover ? (
+          <img src={cover} alt="" className="h-28 w-20 rounded-lg border border-line object-cover sm:h-32 sm:w-24" />
         ) : (
           <div className="flex h-28 w-20 items-center justify-center rounded-lg border border-dashed border-line-strong text-ink-faint sm:h-32 sm:w-24">
             <FileText className="h-7 w-7" aria-hidden />
@@ -237,8 +254,8 @@ function CatalogueCard({
             <Attr
               label="File"
               value={
-                c.file_url ? (
-                  <a href={c.file_url} target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline-offset-2 hover:underline">
+                file ? (
+                  <a href={file} target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline-offset-2 hover:underline">
                     Open PDF
                   </a>
                 ) : null
