@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { setOwnPassword } from "@/lib/staff";
-import { AuthLayout, Button, Card, ErrorNote, Field, Input } from "@/components/ui";
+import { AuthLayout, Button, Card, ErrorNote, Field, Input, Note } from "@/components/ui";
+import { ACTIVITY_NOTICE } from "@/lib/activityNotice";
 
 /**
  * First sign-in for a registered staff member (admin-staff edge function). Their
@@ -89,6 +90,7 @@ export default function ChangeTemporaryPassword() {
             Sign out
           </button>
         </form>
+        <Note className="mt-5">{ACTIVITY_NOTICE}</Note>
       </Card>
     </AuthLayout>
   );

@@ -242,6 +242,9 @@ changed fields before → after. Filters: admin, area, action, date range.
     (`useAdminSession`);
   - `admin-invite` and `admin-refund-payment` call `admin_audit_record()`.
 - Append-only: no client can write it, and a trigger refuses UPDATE and DELETE for everyone.
+- **Staff are told it exists** (2026-10-11): the sign-in page and "Choose your password" (a new staff member's
+  first screen) show `ACTIVITY_NOTICE` from `src/lib/activityNotice.ts`, which says exactly what is recorded.
+  Pages visited and records opened are not recorded yet; when that ships, the wording changes in the same release.
 - **A new page that writes a new table** needs `trg_admin_audit` on that table, or its
   changes won't appear. Counters and derived columns are excluded on purpose.
 - **Manager** (`manager`, textile-spark-net migration `20260925173658`) is granted on the
