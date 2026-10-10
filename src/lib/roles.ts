@@ -55,7 +55,7 @@ export type Section =
   // deliberately not a sub-tab of it: it is a different table with its own RLS.
   | "videos"
   // Seller catalogues (PDFs). The same two roles as products and videos, enforced the same way:
-  // catalogues_moderation_guard (buyer repo, 20261010160000_catalogue_review).
+  // catalogues_moderation_guard (buyer repo, 20261010133347_catalogue_review).
   | "catalogues"
   | "vendors"
   | "ads"

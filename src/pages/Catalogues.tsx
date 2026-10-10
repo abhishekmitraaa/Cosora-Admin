@@ -75,7 +75,7 @@ const UPLOADED = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", da
  * `catalogues` UPDATE of `status` (plus the reason), which RLS and
  * `catalogues_moderation_guard` refuse unless the caller is super_admin or
  * product_moderator, a rejection carries a reason, and a moderator changes nothing but
- * the status and the reason (buyer repo, 20261010160000_catalogue_review). Approving
+ * the status and the reason (buyer repo, 20261010133347_catalogue_review). Approving
  * clears the reason in the database. A catalogue its seller changed after a decision
  * carries an open edit record, shown on its card as for listings and videos.
  *
