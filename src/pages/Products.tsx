@@ -6,6 +6,8 @@ import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import FlagLog from "@/components/FlagLog";
+import { EditedBadge, ListingEditNotice } from "@/components/ListingEditNotice";
+import { fetchListingEdits, type ListingEdit } from "@/lib/listingEdits";
 import {
   Attr,
   AttrGrid,
@@ -80,8 +82,12 @@ export default function Products() {
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as ProductRow[];
-      const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, vendors };
+      // A listing its seller changed after a decision carries an open edit record: shown on its card.
+      const [vendors, edits] = await Promise.all([
+        fetchVendorsByIds(rows.map((r) => r.vendor_id)),
+        fetchListingEdits("product", rows.map((r) => r.id)),
+      ]);
+      return { rows, vendors, edits };
     },
   });
 
@@ -146,7 +152,7 @@ export default function Products() {
   }
   if (products.error) return <ErrorNote message={(products.error as Error).message} />;
 
-  const { rows, vendors } = products.data!;
+  const { rows, vendors, edits } = products.data!;
 
   return (
     <Page>
@@ -173,6 +179,7 @@ export default function Products() {
               key={p.id}
               product={p}
               vendor={vendors.get(p.vendor_id)}
+              edit={edits.get(p.id)}
               writable={writable}
               busy={moderate.isPending}
               onApprove={() => approve(p)}
@@ -214,6 +221,7 @@ export default function Products() {
 function ProductCard({
   product: p,
   vendor,
+  edit,
   writable,
   busy,
   onApprove,
@@ -221,6 +229,7 @@ function ProductCard({
 }: {
   product: ProductRow;
   vendor: VendorSummary | undefined;
+  edit: ListingEdit | undefined;
   writable: boolean;
   busy: boolean;
   onApprove: () => void;
@@ -253,6 +262,7 @@ function ProductCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-section font-bold text-ink">{p.name}</h3>
             <StatusBadge status={p.status} />
+            <EditedBadge edit={edit} />
           </div>
 
           <div className="mt-1 text-sm tabular-nums text-ink-muted">
@@ -274,6 +284,8 @@ function ProductCard({
             {vendor?.is_verified ? <Badge tone="info">verified</Badge> : <Badge>unverified</Badge>}
             {vendor?.account_status === "suspended" && <Badge tone="critical">suspended</Badge>}
           </div>
+
+          <ListingEditNotice entity="product" edit={edit} />
 
           {p.status === "rejected" && p.rejection_reason && (
             <Notice tone="critical" className="mt-2.5 text-xs">

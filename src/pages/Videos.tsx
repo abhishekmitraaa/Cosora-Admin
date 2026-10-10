@@ -7,6 +7,8 @@ import { supabase, assertWrote, describeWriteError } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
+import { EditedBadge, ListingEditNotice } from "@/components/ListingEditNotice";
+import { fetchListingEdits, type ListingEdit } from "@/lib/listingEdits";
 import {
   Attr,
   AttrGrid,
@@ -110,8 +112,12 @@ export default function Videos() {
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as VideoRow[];
-      const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, vendors };
+      // A video its seller changed after a decision carries an open edit record: shown on its card.
+      const [vendors, edits] = await Promise.all([
+        fetchVendorsByIds(rows.map((r) => r.vendor_id)),
+        fetchListingEdits("product_video", rows.map((r) => r.id)),
+      ]);
+      return { rows, vendors, edits };
     },
   });
 
@@ -202,7 +208,7 @@ export default function Videos() {
   }
   if (videos.error) return <ErrorNote message={(videos.error as Error).message} />;
 
-  const { rows, vendors } = videos.data!;
+  const { rows, vendors, edits } = videos.data!;
 
   return (
     <Page>
@@ -227,6 +233,7 @@ export default function Videos() {
               key={v.id}
               video={v}
               vendor={vendors.get(v.vendor_id)}
+              edit={edits.get(v.id)}
               writable={writable}
               busy={moderate.isPending || bulkApprove.isPending}
               onPlay={() => setPlaying(v)}
@@ -357,6 +364,7 @@ export default function Videos() {
 function VideoCard({
   video: v,
   vendor,
+  edit,
   writable,
   busy,
   onPlay,
@@ -366,6 +374,7 @@ function VideoCard({
 }: {
   video: VideoRow;
   vendor: VendorSummary | undefined;
+  edit: ListingEdit | undefined;
   writable: boolean;
   busy: boolean;
   onPlay: () => void;
@@ -417,6 +426,7 @@ function VideoCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-section font-bold text-ink">{v.brand_line}</h3>
             <StatusBadge status={v.status} />
+            <EditedBadge edit={edit} />
             {overCap && <Badge tone="critical">over the {MAX_VIDEO_SECONDS}s cap</Badge>}
           </div>
 
@@ -455,6 +465,8 @@ function VideoCard({
                 " Reject it rather than approving a row buyers would meet as a broken player."}
             </Notice>
           )}
+
+          <ListingEditNotice entity="product_video" edit={edit} />
 
           {v.status === "rejected" && v.rejection_reason && (
             <Notice tone="critical" className="mt-2.5 text-xs">

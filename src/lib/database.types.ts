@@ -5070,6 +5070,17 @@ export type Database = {
         }[]
       }
       admin_leads_summary: { Args: { p_days?: number }; Returns: Json }
+      admin_listing_edits: {
+        Args: { p_entity: string; p_ids: string[] }
+        Returns: {
+          changes: Json
+          edited_at: string
+          edits: number
+          entity_id: string
+          last_edited_at: string
+          was_status: string
+        }[]
+      }
       admin_list_admins: {
         Args: never
         Returns: {
