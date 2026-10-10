@@ -2,7 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
-import { AuthLayout, Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
+import { AuthLayout, Button, Card, ErrorNote, Input, Note, Spinner } from "@/components/ui";
+import { ACTIVITY_NOTICE } from "@/lib/activityNotice";
 
 export default function Login() {
   const { session, loading } = useAdminSession();
@@ -60,6 +61,7 @@ export default function Login() {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+        <Note className="mt-5">{ACTIVITY_NOTICE}</Note>
       </Card>
     </AuthLayout>
   );
