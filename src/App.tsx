@@ -13,6 +13,7 @@ import Login from "@/pages/Login";
 import ResetPassword from "@/pages/ResetPassword";
 import Products from "@/pages/Products";
 import Videos from "@/pages/Videos";
+import Catalogues from "@/pages/Catalogues";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
 import Ads from "@/pages/Ads";
@@ -73,6 +74,7 @@ function Landing() {
         // the established ones for the same reason.
         "products",
         "videos",
+        "catalogues",
         "vendors",
         "ads",
         "subscriptions",
@@ -130,6 +132,14 @@ export default function App() {
                 element={
                   <RequireSection section="videos">
                     <Videos />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/catalogues"
+                element={
+                  <RequireSection section="catalogues">
+                    <Catalogues />
                   </RequireSection>
                 }
               />

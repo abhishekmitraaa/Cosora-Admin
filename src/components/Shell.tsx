@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleHelp,
   Clapperboard,
+  BookOpen,
   CreditCard,
   Award,
   HeartPulse,
@@ -88,6 +89,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: "/products", section: "products", label: "Products", icon: Boxes },
       { to: "/videos", section: "videos", label: "Video Closeups", icon: Clapperboard },
+      { to: "/catalogues", section: "catalogues", label: "Catalogues", icon: BookOpen },
       { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
       { to: "/chat-review", section: "chat-review", label: "Review queue", icon: ShieldAlert },
       { to: "/chats", section: "chats", label: "Chats", icon: MessagesSquare },

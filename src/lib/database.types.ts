@@ -745,6 +745,7 @@ export type Database = {
           file_url: string | null
           id: string
           page_count: number | null
+          rejection_reason: string | null
           status: Database["public"]["Enums"]["product_status"]
           title: string
           vendor_id: string
@@ -756,6 +757,7 @@ export type Database = {
           file_url?: string | null
           id?: string
           page_count?: number | null
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           title: string
           vendor_id: string
@@ -767,6 +769,7 @@ export type Database = {
           file_url?: string | null
           id?: string
           page_count?: number | null
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["product_status"]
           title?: string
           vendor_id?: string
