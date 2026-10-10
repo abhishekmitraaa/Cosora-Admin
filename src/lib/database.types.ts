@@ -3012,44 +3012,6 @@ export type Database = {
         }
         Relationships: []
       }
-      subscription_usage: {
-        Row: {
-          id: string
-          leads_used: number
-          period_end: string
-          period_start: string
-          products_used: number
-          updated_at: string
-          vendor_id: string
-        }
-        Insert: {
-          id?: string
-          leads_used?: number
-          period_end: string
-          period_start: string
-          products_used?: number
-          updated_at?: string
-          vendor_id: string
-        }
-        Update: {
-          id?: string
-          leads_used?: number
-          period_end?: string
-          period_start?: string
-          products_used?: number
-          updated_at?: string
-          vendor_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_usage_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       support_attachments: {
         Row: {
           bytes: number
