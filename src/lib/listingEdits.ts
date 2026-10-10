@@ -3,7 +3,7 @@ import type { Json } from "@/lib/database.types";
 
 /**
  * Listings, videos and catalogues their seller changed after Cosora approved or rejected them
- * (buyer repo migration 20261010150000_listing_edit_rereview). The database sends an edited
+ * (buyer repo migration 20261010124955_listing_edit_rereview). The database sends an edited
  * live item back to review and keeps one open record per item: each changed field's value
  * before the first edit and now, and how many pictures were added, removed or reordered. The
  * record closes when a moderator approves or rejects the item.
