@@ -202,7 +202,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let refund: { id?: string; status?: string; amount?: number };
   try {
     const resp = await fetch(
-      `https://api.razorpay.com/v1/payments/${encodeURIComponent(invoice.razorpay_payment_id)}/refund`,
+      // RAZORPAY_API_URL names a local or staging mock; unset (production), it is Razorpay itself.
+      `${Deno.env.get("RAZORPAY_API_URL") || "https://api.razorpay.com"}/v1/payments/${encodeURIComponent(invoice.razorpay_payment_id)}/refund`,
       {
         method: "POST",
         headers: {
