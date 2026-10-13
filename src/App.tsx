@@ -14,6 +14,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import Products from "@/pages/Products";
 import Videos from "@/pages/Videos";
 import Catalogues from "@/pages/Catalogues";
+import ReviewReports from "@/pages/ReviewReports";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
 import Ads from "@/pages/Ads";
@@ -81,6 +82,7 @@ function Landing() {
         "accounts",
         "chats",
         "chat-review",
+        "review-reports",
         "chat-keywords",
         "chat-patterns",
         "chat-reasons",
@@ -196,6 +198,14 @@ export default function App() {
                 element={
                   <RequireSection section="chats">
                     <ChatThread />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/review-reports"
+                element={
+                  <RequireSection section="review-reports">
+                    <ReviewReports />
                   </RequireSection>
                 }
               />

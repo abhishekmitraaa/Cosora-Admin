@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useRecordView } from "@/lib/activity";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -57,6 +58,7 @@ interface VendorDetailRow {
 
 export default function VendorDetail() {
   const { id } = useParams<{ id: string }>();
+  useRecordView("public.vendor_profiles", id);
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "vendors");

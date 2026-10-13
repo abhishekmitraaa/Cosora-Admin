@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useRecordView } from "@/lib/activity";
 import { format } from "date-fns";
 import { ArrowLeft, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -59,6 +60,7 @@ const MESSAGE_LIMIT = 500;
  */
 export default function ChatThread() {
   const { id } = useParams<{ id: string }>();
+  useRecordView("public.conversations", id);
 
   const thread = useQuery({
     queryKey: ["chat-thread", id],

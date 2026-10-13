@@ -225,6 +225,12 @@ panel's first real content editor; Site content followed on 2026-09-29.
 
 ### Admin Log (2026-09-25)
 
+Since 2026-10-13 the Admin Log also has an **Activity** tab: the pages and records each admin opened
+(`admin.activity_views`, written by `admin_activity_record()` from `src/lib/activity.ts`), for super admins and
+managers. Page visits are deleted after 180 days by the daily `admin-activity-prune` job; the log of changes is
+untouched and stays append-only. `/review-reports` (super admin, support) is the queue of reviews that buyers or
+sellers reported. The **Delivery team** role sees Certificates only.
+
 `/admin-log` lists every change an admin makes in the panel, every sign-in and sign-out, and
 the invite and refund edge functions' actions, newest first, with IST date and time and the
 changed fields before → after. Filters: admin, area, action, date range.

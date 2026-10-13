@@ -18,8 +18,10 @@ import {
   Select,
   SkeletonList,
   Table,
+  Tabs,
   type Tone,
 } from "@/components/ui";
+import AdminActivity from "@/components/AdminActivity";
 
 /**
  * The Admin Log (MPF-26, 2026-09-25): every change an admin makes and every
@@ -95,6 +97,8 @@ const AREAS: Record<string, string> = {
   // registrar as the actor. "Created" is a registration; "Changed" a new temporary
   // password. The password itself is never logged.
   "admin.staff_members": "Staff directory",
+  // 2026-10-13: a reported review, and the decision on it (dismissed, or the review removed).
+  "admin.review_reports": "Review report",
 };
 
 const ACTIONS: Record<string, { label: string; tone: Tone }> = {
@@ -183,6 +187,7 @@ function Details({ row }: { row: LogRow }) {
 }
 
 export default function AdminLog() {
+  const [tab, setTab] = useState<"changes" | "activity">("changes");
   const [actor, setActor] = useState("");
   const [area, setArea] = useState("");
   const [action, setAction] = useState("");
@@ -229,8 +234,22 @@ export default function AdminLog() {
     <Page width="wide">
       <PageHeader
         title="Admin Log"
-        subtitle="Every change an admin makes in this panel, and every sign-in and sign-out, with date and time."
+        subtitle="Every change an admin makes in this panel, every sign-in and sign-out, and what each admin opens, with date and time."
       />
+
+      <Tabs
+        tabs={[
+          { id: "changes", label: "Changes and sign-ins" },
+          { id: "activity", label: "Activity" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {tab === "activity" ? (
+        <AdminActivity />
+      ) : (
+      <>
 
       <Note className="mb-4">
         Written by the database, not by this page: each table the panel changes records the admin
@@ -326,6 +345,8 @@ export default function AdminLog() {
             </div>
           )}
         </Card>
+      )}
+      </>
       )}
     </Page>
   );
