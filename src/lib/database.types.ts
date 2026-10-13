@@ -4351,6 +4351,62 @@ export type Database = {
       admin_am_send: { Args: { p_body: string; p_vendor: string }; Returns: string }
       admin_am_vendor: { Args: { p_vendor: string }; Returns: Json }
       admin_am_vendors: { Args: { p_filter?: string }; Returns: Json }
+      admin_activity_list: {
+        Args: { p_actor?: string; p_before?: string; p_kind?: string; p_limit?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          actor_role: string
+          at: string
+          id: number
+          kind: string
+          label: string
+          path: string
+          target_id: string
+          target_table: string
+        }[]
+      }
+      admin_activity_record: {
+        Args: { p_kind: string; p_label?: string; p_path: string; p_target_id?: string; p_target_table?: string }
+        Returns: boolean
+      }
+      admin_activity_summary: {
+        Args: { p_days?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          actor_role: string
+          changes: number
+          last_seen: string
+          pages: number
+          records: number
+          sign_ins: number
+        }[]
+      }
+      admin_review_report_decide: {
+        Args: { p_action: string; p_kind: string; p_note?: string; p_review_id: string }
+        Returns: number
+      }
+      admin_review_reports_list: {
+        Args: { p_status?: string }
+        Returns: {
+          created_at: string
+          decided_at: string
+          decided_by_name: string
+          decision_note: string
+          id: string
+          note: string
+          reason_code: string
+          reason_label: string
+          reporter_id: string
+          reporter_name: string
+          review_exists: boolean
+          review_id: string
+          review_kind: string
+          review_snapshot: Json
+          status: string
+        }[]
+      }
       admin_audit_log_actors: {
         Args: never
         Returns: {
@@ -6274,6 +6330,7 @@ export type Database = {
         | "support"
         | "manager"
         | "account_manager"
+        | "delivery_team"
       product_status: "draft" | "under_review" | "live" | "rejected" | "paused"
       quote_status: "pending" | "shortlisted" | "accepted" | "rejected"
       rfq_status: "active" | "closed"
@@ -6414,6 +6471,7 @@ export const Constants = {
         "support",
         "manager",
         "account_manager",
+        "delivery_team",
       ],
       product_status: ["draft", "under_review", "live", "rejected", "paused"],
       quote_status: ["pending", "shortlisted", "accepted", "rejected"],

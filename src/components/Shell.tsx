@@ -14,6 +14,7 @@ import {
   Award,
   HeartPulse,
   History,
+  Flag,
   LogOut,
   Map,
   Megaphone,
@@ -43,6 +44,7 @@ import {
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
 import { useSupportCounts } from "@/lib/support";
+import { useRecordPageViews } from "@/lib/activity";
 import { cn, Logo, ThemeToggle } from "./ui";
 
 interface NavItem {
@@ -92,6 +94,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/catalogues", section: "catalogues", label: "Catalogues", icon: BookOpen },
       { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
       { to: "/chat-review", section: "chat-review", label: "Review queue", icon: ShieldAlert },
+      { to: "/review-reports", section: "review-reports", label: "Reported reviews", icon: Flag },
       { to: "/chats", section: "chats", label: "Chats", icon: MessagesSquare },
     ],
   },
@@ -165,6 +168,8 @@ export default function Shell() {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
   const role = identity?.role ?? null;
+  // Every page an admin opens is recorded (lib/activity.ts); the staff notice says so.
+  useRecordPageViews(role !== null);
   const supportCounts = useSupportCounts(canSee(role, "support"));
   const waiting = supportCounts.data?.awaiting ?? 0;
 

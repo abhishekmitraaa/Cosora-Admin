@@ -11,6 +11,7 @@ export const ALL_ROLES: AdminRole[] = [
   "support",
   "manager",
   "account_manager",
+  "delivery_team",
 ];
 
 export const ROLE_LABELS: Record<AdminRole, string> = {
@@ -29,16 +30,19 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   manager: "Manager",
   // Subscriptions P9 (2026-10-09): looks after vendors on Silver and above, on My vendors.
   account_manager: "Account manager",
+  // 2026-10-13: prints and dispatches Verified Certificates, on the Certificates page only.
+  delivery_team: "Delivery team",
 };
 
 /**
  * The roles a manager may give teammates (Mitra, 2026-09-26; account_manager since subscriptions
- * P9). The same six as admin.is_team_role() (migrations 20260925210601 and 20261009193949), which
+ * P9; delivery_team since 2026-10-13). The same seven as admin.is_team_role() (migrations
+ * 20260925210601, 20261009193949 and 20261013100400), which
  * is what enforces it:
  * admin_set_role / admin_grant / admin_revoke refuse a manager anything else,
  * and refuse any change to a super admin, another manager, or the manager.
  */
-export const TEAM_ROLES: AdminRole[] = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager"];
+export const TEAM_ROLES: AdminRole[] = ["product_moderator", "vendor_ops", "ads_moderator", "finance_admin", "support", "account_manager", "delivery_team"];
 
 /** The roles this admin may hand out on the Admins page. */
 export function assignableRoles(role: AdminRole | null): AdminRole[] {
@@ -67,6 +71,9 @@ export type Section =
   // writes here that it has nowhere else.
   | "chats"
   | "chat-review"
+  // Reviews that buyers or sellers reported (2026-10-13). Mirrors admin.review_moderator():
+  // admin_review_reports_list() and admin_review_report_decide() admit super_admin and support.
+  | "review-reports"
   | "chat-keywords"
   | "chat-patterns"
   | "chat-reasons"
@@ -197,6 +204,7 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   admins: ["super_admin", "manager"],
   chats: ["super_admin", "support"],
   "chat-review": ["super_admin", "support"],
+  "review-reports": ["super_admin", "support"],
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   // Support READS this list — it has to, the reason picker is populated from it.
@@ -234,17 +242,11 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // land" is a support question. Mirrors the subscriptions split.
   payments: ["super_admin", "finance_admin", "support"],
   // NO LONGER DEV-SEED (2026-09-13). certificate_orders exists, and this gate
-  // now MIRRORS A REAL SQL PREDICATE: certificate_fulfiller() in migration
-  // 20260913130000 admits super_admin and finance_admin. If these ever drift,
-  // the database wins and the admin sees a 42501.
-  //
-  // STILL OUTSTANDING: the intended list is
-  //   ["super_admin", "finance_admin", "delivery_team"]
-  // and `delivery_team` does NOT exist in the admin_role_type enum, so naming
-  // it here would imply a role nobody can hold. Add it here, in SECTION_WRITE,
-  // and in certificate_fulfiller() in the same change that creates the enum
-  // value.
-  certificates: ["super_admin", "finance_admin"],
+  // now MIRRORS A REAL SQL PREDICATE: certificate_fulfiller() and the
+  // certificate_orders_read policy admit super_admin, finance_admin and, since
+  // 2026-10-13 (buyer repo 20261013100400_delivery_team_access), delivery_team.
+  // If these ever drift, the database wins and the admin sees a 42501.
+  certificates: ["super_admin", "finance_admin", "delivery_team"],
   discounts: ["super_admin", "finance_admin"],
   customers: ["super_admin", "support", "finance_admin"],
   leads: ["super_admin", "vendor_ops", "product_moderator", "support"],
@@ -284,6 +286,7 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // The chats overview is oversight only — every action lives in the queue.
   chats: [],
   "chat-review": ["super_admin", "support"],
+  "review-reports": ["super_admin", "support"],
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
@@ -308,9 +311,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   content: ["super_admin"],
   blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
-  // Mirrors certificate_fulfiller() exactly. Add "delivery_team" here at the
-  // same time as in SECTION_READ and in the SQL, once the enum value exists.
-  certificates: ["super_admin", "finance_admin"],
+  // Mirrors certificate_fulfiller() exactly.
+  certificates: ["super_admin", "finance_admin", "delivery_team"],
   discounts: ["super_admin", "finance_admin"],
   // Tags only (admin completion Phase 6): admin_customer_tag_* refuse every
   // other role in the database. Nothing on the screen edits an account.

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useRecordView } from "@/lib/activity";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ArrowLeft, Download, FileText, Lock, Paperclip, Phone, X } from "lucide-react";
@@ -78,6 +79,7 @@ const BOARD: Record<SupportChannel, { to: string; label: string }> = {
 
 export default function SupportTicket() {
   const { ticketNo } = useParams<{ ticketNo: string }>();
+  useRecordView("public.support_tickets", ticketNo, ticketNo);
   useSupportRealtime();
   const ticket = useSupportTicket(ticketNo);
 
