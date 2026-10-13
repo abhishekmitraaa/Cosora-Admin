@@ -9,6 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-13 (RELEASE): the Reported reviews queue, the Admin Log's Activity tab and the Delivery team role are live. textile-spark-net's six migrations were applied to production first (its changelog has the detail); `admin-invite` and `admin-staff` were deployed from this branch; the branch is merged to `main`.
 - 2026-10-13 (Four ToDo items; branch `build/todo-batch-2026-10-13`, with the same branch in textile-spark-net, which holds the five migrations; built and checked on the local stack, **not released**): **A Reported reviews queue, an Activity tab on the Admin Log, and the Delivery team role.**
   - **Reported reviews** (`/review-reports`, section `review-reports`, super admin and support; `src/pages/ReviewReports.tsx`): one card per reported review with every report on it, and Open, Removed and Dismissed tabs. Dismiss leaves the review up; Remove needs a reason, deletes the review and tells its author. Who reported is shown to Cosora's team only. Backed by `admin_review_reports_list()` and `admin_review_report_decide()`.
   - **Activity** (`src/lib/activity.ts`, `src/components/AdminActivity.tsx`): the Shell records every page an admin opens, and VendorDetail, SupportTicket and ChatThread record the record opened, through `admin_activity_record()`. The Admin Log has two tabs now: "Changes and sign-ins" (as before) and "Activity" (a summary per admin, then the views). Super admins and managers only. A failed recording is logged to the console and never blocks the page.
