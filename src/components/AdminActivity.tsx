@@ -59,6 +59,20 @@ const IST = new Intl.DateTimeFormat("en-IN", {
   hour12: false,
 });
 
+/**
+ * A recorded path is shown as a link only when it can't leave the panel: one leading slash and
+ * no second slash or backslash after it ("//host" and "/\host" are other sites to a browser).
+ * The database refuses anything else too; this is the page not trusting what it is handed.
+ */
+function isPanelPath(p: string): boolean {
+  if (p.length === 0 || p[0] !== "/" || p[1] === "/") return false;
+  for (let i = 0; i < p.length; i++) {
+    const c = p.charCodeAt(i);
+    if (c < 32 || c === 92) return false; // a control character or a backslash
+  }
+  return true;
+}
+
 const when = (at: string | null) => (at ? `${IST.format(new Date(at))} IST` : "Never");
 const roleLabel = (r: string | null) => (r && r in ROLE_LABELS ? ROLE_LABELS[r as AdminRole] : r ?? "");
 
@@ -196,9 +210,13 @@ export default function AdminActivity() {
                   )}
                 </td>
                 <td className="px-3 py-2 align-top">
-                  <Link to={r.path} className="break-all font-mono text-2xs text-ink underline-offset-2 hover:underline">
-                    {r.path}
-                  </Link>
+                  {isPanelPath(r.path) ? (
+                    <Link to={r.path} className="break-all font-mono text-2xs text-ink underline-offset-2 hover:underline">
+                      {r.path}
+                    </Link>
+                  ) : (
+                    <span className="break-all font-mono text-2xs text-ink-muted">{r.path}</span>
+                  )}
                 </td>
               </tr>
             ))}
