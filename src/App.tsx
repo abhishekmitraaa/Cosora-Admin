@@ -41,6 +41,7 @@ import Faqs from "@/pages/Faqs";
 // imported because they are small and admins move between them constantly.
 const Geography = lazy(() => import("@/pages/Geography"));
 import Content from "@/pages/Content";
+import CategoryImages from "@/pages/CategoryImages";
 import Blogs from "@/pages/Blogs";
 import Payments from "@/pages/Payments";
 import Certificates from "@/pages/Certificates";
@@ -93,6 +94,7 @@ function Landing() {
         "customers",
         "geography",
         "content",
+        "category-images",
         "reports",
         "traction",
         "admins",
@@ -272,6 +274,14 @@ export default function App() {
                 element={
                   <RequireSection section="content">
                     <Content />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/category-pictures"
+                element={
+                  <RequireSection section="category-images">
+                    <CategoryImages />
                   </RequireSection>
                 }
               />

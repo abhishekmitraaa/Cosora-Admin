@@ -21,6 +21,7 @@ import {
   Menu,
   MessagesSquare,
   Palette,
+  Images,
   Receipt,
   Regex,
   ScrollText,
@@ -131,6 +132,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Settings",
     items: [
       { to: "/content", section: "content", label: "Site content", icon: Palette },
+      { to: "/category-pictures", section: "category-images", label: "Category pictures", icon: Images },
       { to: "/blogs", section: "blogs", label: "Blog", icon: Newspaper },
       { to: "/chat-keywords", section: "chat-keywords", label: "Keyword blocklist", icon: Ban },
       { to: "/chat-patterns", section: "chat-patterns", label: "Flag patterns", icon: Regex },

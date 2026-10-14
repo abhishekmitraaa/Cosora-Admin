@@ -121,6 +121,11 @@ export type Section =
   // Vendor-dashboard banners and the site theme (admin completion Phase 9).
   // admin_site_* admit super_admin only.
   | "content"
+  // The pictures of the buyer site's categories: New Arrivals' "Shop by category" tiles and the
+  // Categories page's banners and tiles (2026-10-14, Mitra named the manager). Its own section,
+  // not part of "content": admin_category_images() / admin_category_image_set() admit
+  // super_admin and manager (admin.require_category_image_admin), and "content" is super admins only.
+  | "category-images"
   // The public Cosora Journal at www.cosora.in/blogs: articles, categories and
   // the landing hero. Same gate as "content" because the admin_blog_* RPCs all
   // call admin.require_content_admin().
@@ -235,6 +240,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // mirroring admin.require_content_admin() in the admin_site_* RPCs (admin
   // completion Phase 9). Widen both together if a marketing role is ever added.
   content: ["super_admin"],
+  // Mirrors admin.require_category_image_admin(). Change the SQL gate and this line together.
+  "category-images": ["super_admin", "manager"],
   // Mirrors admin.require_content_admin() in every admin_blog_* RPC. Widen the
   // SQL gate and this line together; either alone is wrong.
   blogs: ["super_admin"],
@@ -309,6 +316,7 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // The log tables are service_role-only with RLS on and no policies.
   "system-health": ["super_admin"],
   content: ["super_admin"],
+  "category-images": ["super_admin", "manager"],
   blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
   // Mirrors certificate_fulfiller() exactly.

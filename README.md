@@ -494,6 +494,14 @@ and the `admin_site_*` RPCs (textile-spark-net migration `20260928195051`, admin
 
 Both reach the site in about a minute (the `site-config` snapshot). Both tables are in the Admin Log.
 
+### Category pictures (2026-10-14)
+
+`/category-pictures` (section `category-images`, super_admin and manager) sets the picture of each of New Arrivals'
+"Shop by category" tiles and of each Categories-page banner and sub-category tile, through `lib/categoryImages.ts`
+and `admin_category_images()` / `admin_category_image_set()` (textile-spark-net migration `20261014090000`). A slot
+with no picture shows the buyer app's default; "Use default" puts it back. Pictures are resized in the browser and
+stored in `site-content/categories/`. Changes reach the site in about a minute and are in the Admin Log.
+
 ### Discounts (2026-09-29)
 
 `/discounts` (section `discounts`, super_admin and finance_admin) manages codes through `lib/discounts.ts`

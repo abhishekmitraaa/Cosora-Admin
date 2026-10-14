@@ -4383,6 +4383,11 @@ export type Database = {
           sign_ins: number
         }[]
       }
+      admin_category_image_set: {
+        Args: { p_image_path?: string | null; p_slot: string }
+        Returns: string | null
+      }
+      admin_category_images: { Args: never; Returns: Json }
       admin_review_report_decide: {
         Args: { p_action: string; p_kind: string; p_note?: string; p_review_id: string }
         Returns: number
