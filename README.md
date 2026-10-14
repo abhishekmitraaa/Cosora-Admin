@@ -502,6 +502,15 @@ and `admin_category_images()` / `admin_category_image_set()` (textile-spark-net 
 with no picture shows the buyer app's default; "Use default" puts it back. Pictures are resized in the browser and
 stored in `site-content/categories/`. Changes reach the site in about a minute and are in the Admin Log.
 
+### New Arrivals carousel (2026-10-14)
+
+`/new-arrivals-carousel` (section `hero-slides`, super_admin and manager) picks the live listings in the carousel at
+the top of the buyer's New Arrivals page, through `lib/heroSlides.ts` and `admin_hero_slides()` /
+`admin_hero_slides_save()` (textile-spark-net migration `20261014150000`). Up to 12, in order, each with an optional
+start and end; the list is saved whole. Search is `feed_products` (live listings only, by listing or seller name). A
+pick that stops being live stays in the list, marked, and the site skips it; with nothing picked the site shows the
+most popular live listings. Changes reach the site in about a minute and are in the Admin Log.
+
 ### Discounts (2026-09-29)
 
 `/discounts` (section `discounts`, super_admin and finance_admin) manages codes through `lib/discounts.ts`

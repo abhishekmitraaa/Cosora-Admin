@@ -42,6 +42,7 @@ import Faqs from "@/pages/Faqs";
 const Geography = lazy(() => import("@/pages/Geography"));
 import Content from "@/pages/Content";
 import CategoryImages from "@/pages/CategoryImages";
+import HeroSlides from "@/pages/HeroSlides";
 import Blogs from "@/pages/Blogs";
 import Payments from "@/pages/Payments";
 import Certificates from "@/pages/Certificates";
@@ -95,6 +96,7 @@ function Landing() {
         "geography",
         "content",
         "category-images",
+        "hero-slides",
         "reports",
         "traction",
         "admins",
@@ -282,6 +284,14 @@ export default function App() {
                 element={
                   <RequireSection section="category-images">
                     <CategoryImages />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/new-arrivals-carousel"
+                element={
+                  <RequireSection section="hero-slides">
+                    <HeroSlides />
                   </RequireSection>
                 }
               />
