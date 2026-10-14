@@ -6,7 +6,6 @@ The deferred-items list is maintained in one place, in the primary repo:
 
 Items on it that land in THIS repo when they are picked up:
 
-- ~~`delivery_team` admin role~~: built 2026-10-13 on branch `build/todo-batch-2026-10-13`; released 2026-10-13.
 - **GST / invoicing for ad purchases** (High, blocked on real Razorpay) — the
   admin-side refund and finance surfaces would need to understand ad invoices,
   which do not exist yet.
