@@ -284,6 +284,8 @@ export interface SupportTicketDetail {
     is_staff: boolean;
     email: string | null;
     phone_masked: string | null;
+    /** Signed up through the test sign-in code, which accepts any 6 digits: the number was never verified (2026-10-16). */
+    phone_unverified?: boolean;
   } | null;
   callback: {
     date: string;

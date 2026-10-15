@@ -815,6 +815,12 @@ function RequesterPanel({ detail: d }: { detail: SupportTicketDetail }) {
         <RevealPhone ticketId={d.ticket.id} field="requester_phone" masked={r.phone_masked} label="Phone" />
       </dl>
       {r.is_staff && <Notice tone="info" className="mt-3">This request comes from a Cosora admin account.</Notice>}
+      {r.phone_unverified && (
+        <Notice tone="caution" className="mt-3" title="Phone number not verified">
+          This account signed in with the test sign-in code, which accepts any 6 digits, so whoever sent this may not own
+          this number. Don't treat the requester's name or number as proven; check with them before acting on it.
+        </Notice>
+      )}
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
         {canSee(role, "accounts") && (
           <Link to={`/accounts?q=${encodeURIComponent(r.id)}`} className="text-ink-muted underline hover:text-ink">Open in Accounts</Link>
