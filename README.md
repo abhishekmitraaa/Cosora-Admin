@@ -270,8 +270,10 @@ Answers what buyers and vendors send from Help: chats, callback requests, fraud 
 and app feedback. The plan and its decisions are in textile-spark-net
 `documentation/help-feature-plan.md`. The data is `public.support_*`, read and written
 only through `admin_support_*` functions (textile-spark-net migrations `20260930212818`,
-`20260930213143` and `20260930213451`, applied 2026-10-01). Rollout starts Off, so the
-inbox stays empty until a super admin opens it in Support settings.
+`20260930213143` and `20260930213451`, applied 2026-10-01). Chats and callbacks follow the
+rollout (Off until a super admin opens it in Support settings). Fraud reports and app feedback
+don't: since 2026-10-16 every signed-in buyer and seller can send them, so the Fraud and Feedback
+boards receive them whatever the rollout (textile-spark-net migration `20261016100000`).
 
 | Route | Page | What it does |
 |---|---|---|
@@ -296,6 +298,10 @@ inbox stays empty until a super admin opens it in Support settings.
   RLS guarantees it, not this app.
 - **Phone numbers are masked.** Reveal calls `admin_support_reveal_contact()`, which writes a
   `reveal_contact` row to the Admin Log before returning the number.
+- **"Phone number not verified"** (2026-10-16) shows in the Requester panel when the account was
+  created through the test sign-in code, which accepts any 6 digits: the person may not own that
+  number. `admin_support_get()` returns it as `requester.phone_unverified` (textile-spark-net
+  migration `20261016120000`). It stops mattering once real SMS sign-in replaces the test code.
 - **Files:** `lib/support.ts` `uploadStaffFile()` reserves a path, uploads to the private
   `support-attachments` bucket, then calls the `support-attachment-verify` edge function,
   which checks the file's first bytes and the type storage serves it as. It returns only
