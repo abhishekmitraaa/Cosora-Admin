@@ -444,11 +444,13 @@ export async function markFeedbackReviewed(ticketId: string, note?: string): Pro
 
 // ── Files ──────────────────────────────────────────────────────────────────────
 export const SUPPORT_BUCKET = "support-attachments";
-export const ACCEPTED_FILES = "image/jpeg,image/png,image/webp,application/pdf,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/aac,audio/x-m4a,audio/wav";
+// Staff pictures are JPEG only (2026-10-16, lib/jpeg.ts; admin_support_prepare_upload() agrees). Requesters' PNG
+// and WebP screenshots still arrive and open as before.
+export const ACCEPTED_FILES = "image/jpeg,.jpg,.jpeg,application/pdf,audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/aac,audio/x-m4a,audio/wav";
 const MB = 1024 * 1024;
 
 function kindOf(mime: string): "image" | "pdf" | "audio" | null {
-  if (["image/jpeg", "image/png", "image/webp"].includes(mime)) return "image";
+  if (mime === "image/jpeg") return "image";
   if (mime === "application/pdf") return "pdf";
   if (["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/aac", "audio/x-m4a", "audio/wav"].includes(mime)) return "audio";
   return null;
@@ -457,7 +459,11 @@ function kindOf(mime: string): "image" | "pdf" | "audio" | null {
 /** The limits admin.support_reserve_upload() enforces, checked early for a clear message. */
 export function checkFile(file: File): string | null {
   const kind = kindOf(file.type);
-  if (!kind) return `${file.name}: send a photo (JPG, PNG, WebP), a PDF or an audio file.`;
+  if (!kind) {
+    return file.type.startsWith("image/")
+      ? `${file.name}: pictures must be JPEG (.jpg).`
+      : `${file.name}: send a JPEG photo (.jpg), a PDF or an audio file.`;
+  }
   const cap = kind === "pdf" ? 10 * MB : 5 * MB;
   if (file.size > cap) return `${file.name} is larger than ${cap / MB} MB.`;
   return null;

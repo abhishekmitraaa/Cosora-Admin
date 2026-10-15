@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { ExternalLink, ImageOff, RotateCcw, Upload } from "lucide-react";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
-import { IMAGE_TYPES } from "@/lib/siteContent";
+import { JPEG_ACCEPT } from "@/lib/jpeg";
 import {
   SURFACE_HINT,
   categoryImageUrl,
@@ -74,7 +74,7 @@ export default function CategoryImages() {
 
       <Note className="mb-4">
         Upload a picture to replace Cosora's default, or put the default back. A change reaches the site in about a
-        minute and is in the Admin Log. Pictures are resized before upload (JPEG, PNG or WebP, up to 2 MB after resizing).
+        minute and is in the Admin Log. Pictures are JPEG (.jpg) only, and are resized before upload (up to 2 MB after resizing).
       </Note>
 
       <Tabs
@@ -214,7 +214,7 @@ function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable:
             <input
               ref={input}
               type="file"
-              accept={Object.keys(IMAGE_TYPES).join(",")}
+              accept={JPEG_ACCEPT}
               className="hidden"
               aria-label={`Picture for ${slot.label}`}
               onChange={(e) => {

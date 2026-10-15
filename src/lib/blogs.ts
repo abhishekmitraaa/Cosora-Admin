@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, assertWrote } from "./supabase";
+import { assertJpeg } from "./jpeg";
 
 /**
  * Data layer for the public Cosora Journal at www.cosora.in/blogs.
@@ -11,12 +12,7 @@ import { supabase, assertWrote } from "./supabase";
  */
 
 export const BLOG_BUCKET = "site-content";
-export const IMAGE_TYPES: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-/** The bucket itself caps at 2 MB. WebP is the way to stay inside it for a hero. */
+/** The bucket itself caps at 2 MB. */
 export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 export type BlogStatus = "draft" | "published" | "scheduled";
@@ -126,10 +122,9 @@ export function blogImageUrl(path: string | null | undefined): string | null {
  * upload outside blog/<uuid>.<ext> is refused by the database, not just here.
  */
 export async function uploadBlogImage(file: File): Promise<string> {
-  const ext = IMAGE_TYPES[file.type];
-  if (!ext) throw new Error("Use a JPEG, PNG or WebP image.");
+  await assertJpeg(file);
   if (file.size > IMAGE_MAX_BYTES) throw new Error("The image must be 2 MB or smaller.");
-  const path = `blog/${crypto.randomUUID()}.${ext}`;
+  const path = `blog/${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage
     .from(BLOG_BUCKET)
     .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: false });

@@ -431,7 +431,7 @@ function Composer({ detail: d }: { detail: SupportTicketDetail }) {
           {busy ?? (internal ? "Save note" : "Send reply")}
         </Button>
       </div>
-      <p className="mt-2 text-2xs text-ink-faint">Photos (JPG, PNG, WebP) and audio up to 5 MB, PDFs up to 10 MB. Every file is checked before anyone can open it.</p>
+      <p className="mt-2 text-2xs text-ink-faint">JPEG photos (.jpg) and audio up to 5 MB, PDFs up to 10 MB. Every file is checked before anyone can open it.</p>
     </Panel>
   );
 }

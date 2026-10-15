@@ -485,8 +485,8 @@ all) reads `admin_leads_list()`, `admin_leads_summary()` and `admin_lead_detail(
 `/content` (section `content`, super_admin only) edits two things through `lib/siteContent.ts`
 and the `admin_site_*` RPCs (textile-spark-net migration `20260928195051`, admin completion Phase 9).
 - **Vendor dashboard banners** (Mitra: none on the buyer side): add, edit, reorder, turn on and off,
-  schedule and delete. The destination must be a path on cosora.in. An image (JPEG, PNG or WebP, up
-  to 2 MB) is uploaded to `site-content/banners/` only when the banner is saved; a refused save
+  schedule and delete. The destination must be a path on cosora.in. An image (JPEG only since
+  2026-10-16, up to 2 MB) is uploaded to `site-content/banners/` only when the banner is saved; a refused save
   removes it, and a replaced or deleted banner's image is deleted after the row.
 - **Theme:** the buyer site's five brand colours and two fonts. The page shows the WCAG contrast of
   text on white and of white on each accent, and blocks a save below 4.5:1 and 3:1, as the database
@@ -494,13 +494,21 @@ and the `admin_site_*` RPCs (textile-spark-net migration `20260928195051`, admin
 
 Both reach the site in about a minute (the `site-config` snapshot). Both tables are in the Admin Log.
 
+### Pictures are JPEG only (2026-10-16)
+
+Every picture input (banners, category pictures, blog images, support replies) takes JPEG only, through
+`lib/jpeg.ts` (`JPEG_ACCEPT` for the picker, `assertJpeg()` checks the type and the file's first bytes). The database
+agrees: the `site-content` bucket accepts `image/jpeg` only and its upload policies want a .jpg/.jpeg name, and
+`admin_support_prepare_upload()` refuses another picture type (textile-spark-net migration `20261016100000`).
+Pictures stored before as PNG or WebP still show and can be removed.
+
 ### Category pictures (2026-10-14)
 
 `/category-pictures` (section `category-images`, super_admin and manager) sets the picture of each of New Arrivals'
 "Shop by category" tiles and of each Categories-page banner and sub-category tile, through `lib/categoryImages.ts`
 and `admin_category_images()` / `admin_category_image_set()` (textile-spark-net migration `20261014090000`). A slot
-with no picture shows the buyer app's default; "Use default" puts it back. Pictures are resized in the browser and
-stored in `site-content/categories/`. Changes reach the site in about a minute and are in the Admin Log.
+with no picture shows the buyer app's default; "Use default" puts it back. Pictures are JPEG, resized and
+re-encoded as JPEG in the browser, and stored in `site-content/categories/`. Changes reach the site in about a minute and are in the Admin Log.
 
 ### New Arrivals carousel (2026-10-14)
 

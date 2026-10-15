@@ -8,7 +8,6 @@ import {
   BANNER_LIMITS,
   COLOUR_LABELS,
   IMAGE_MAX_BYTES,
-  IMAGE_TYPES,
   bannerImageUrl,
   contrast,
   isHex,
@@ -24,6 +23,7 @@ import {
   type SiteTheme,
   type ThemeColour,
 } from "@/lib/siteContent";
+import { JPEG_ACCEPT, JPEG_ONLY, isJpegType } from "@/lib/jpeg";
 import {
   Badge,
   Button,
@@ -304,7 +304,7 @@ function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: 
   function pick(file: File | undefined) {
     setFileError(null);
     if (!file) return;
-    if (!IMAGE_TYPES[file.type]) return setFileError("Use a JPEG, PNG or WebP image.");
+    if (!isJpegType(file)) return setFileError(JPEG_ONLY);
     if (file.size > IMAGE_MAX_BYTES) return setFileError("The image must be 2 MB or smaller.");
     set({ file });
   }
@@ -363,7 +363,7 @@ function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: 
           </Field>
         </div>
 
-        <Field label="Image" htmlFor="banner-image" hint="Optional. JPEG, PNG or WebP, up to 2 MB, about 3:2." error={fileError}>
+        <Field label="Image" htmlFor="banner-image" hint="Optional. JPEG (.jpg) only, up to 2 MB, about 3:2." error={fileError}>
           <div className="flex flex-wrap items-center gap-3">
             {preview ? (
               <img src={preview} alt="" className="h-20 w-32 rounded-lg border border-line object-cover" />
@@ -376,7 +376,7 @@ function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: 
               <input
                 id="banner-image"
                 type="file"
-                accept={Object.keys(IMAGE_TYPES).join(",")}
+                accept={JPEG_ACCEPT}
                 onChange={(e) => pick(e.target.files?.[0])}
                 className="text-xs text-ink-muted file:mr-2 file:rounded-md file:border file:border-line file:bg-surface-2 file:px-2 file:py-1 file:text-xs file:text-ink"
               />

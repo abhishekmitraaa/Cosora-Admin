@@ -1005,7 +1005,7 @@ function LandingTab({ writable }: { writable: boolean }) {
 
         <BlogImageField
           label="Banner image"
-          hint="Wide crop, around 3:1. JPEG, PNG or WebP up to 2 MB."
+          hint="Wide crop, around 3:1. JPEG (.jpg) only, up to 2 MB."
           path={draft.hero_image}
           disabled={!writable}
           onChange={(p) => set({ hero_image: p })}

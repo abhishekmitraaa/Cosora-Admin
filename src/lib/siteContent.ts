@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { assertJpeg } from "@/lib/jpeg";
 
 /**
  * SITE CONTENT (admin completion Phase 9, migration 20260928195051 in textile-spark-net).
@@ -48,7 +49,6 @@ export interface ThemeState {
 
 export const BANNER_LIMITS = { title: 80, subtitle: 160, cta: 30, path: 200 } as const;
 export const SITE_CONTENT_BUCKET = "site-content";
-export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 /** The colours, named by their job, not their hue. */
@@ -108,10 +108,9 @@ export function useSiteTheme() {
 
 /** Checks the type and size the bucket enforces, then uploads under a new name. Returns the path. */
 export async function uploadBannerImage(file: File): Promise<string> {
-  const ext = IMAGE_TYPES[file.type];
-  if (!ext) throw new Error("Use a JPEG, PNG or WebP image.");
+  await assertJpeg(file);
   if (file.size > IMAGE_MAX_BYTES) throw new Error("The image must be 2 MB or smaller.");
-  const path = `banners/${crypto.randomUUID()}.${ext}`;
+  const path = `banners/${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage
     .from(SITE_CONTENT_BUCKET)
     .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: false });

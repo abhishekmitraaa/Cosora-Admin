@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { SITE_CONTENT_BUCKET, IMAGE_TYPES, IMAGE_MAX_BYTES } from "@/lib/siteContent";
+import { SITE_CONTENT_BUCKET, IMAGE_MAX_BYTES } from "@/lib/siteContent";
+import { assertJpeg, JPEG_MIME } from "@/lib/jpeg";
 
 /**
  * CATEGORY PICTURES (2026-10-14; migration 20261014090000_category_images in textile-spark-net).
@@ -40,7 +41,7 @@ export const MAX_SIDE: Record<SlotSurface, { w: number; h: number }> = {
 };
 
 export const SURFACE_HINT: Record<SlotSurface, string> = {
-  new_arrivals: "Square. A product on a plain or transparent background reads best; it's shown whole, not cropped.",
+  new_arrivals: "Square. A product on a plain white background reads best (JPEG has no transparency); it's shown whole, not cropped.",
   categories_tile: "Square. It's cropped to fill the tile.",
   categories_banner: "Wide, about 16:7. It's cropped to fill the banner, with the category's name over the bottom.",
 };
@@ -61,13 +62,12 @@ export function useCategoryImageSlots() {
 }
 
 /**
- * Shrinks a picture to the size it's shown at and re-encodes it (WebP where the browser can, which
- * keeps a PNG's transparency; JPEG otherwise). A phone photo of several megabytes becomes a few
- * hundred kilobytes, which is what every visitor downloads. A picture already small enough is
- * re-encoded only if that makes it smaller.
+ * Shrinks a JPEG to the size it's shown at and re-encodes it as JPEG (JPEG only since 2026-10-16,
+ * lib/jpeg.ts). A phone photo of several megabytes becomes a few hundred kilobytes, which is what
+ * every visitor downloads. A picture already small enough is re-encoded only if that makes it smaller.
  */
 export async function preparePicture(file: File, surface: SlotSurface): Promise<{ blob: Blob; ext: string }> {
-  if (!IMAGE_TYPES[file.type]) throw new Error("Use a JPEG, PNG or WebP picture.");
+  await assertJpeg(file);
   const bitmap = await createImageBitmap(file).catch(() => {
     throw new Error("That file couldn't be read as a picture.");
   });
@@ -85,15 +85,14 @@ export async function preparePicture(file: File, surface: SlotSurface): Promise<
 
   const encode = (type: string, quality?: number) =>
     new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
-  let blob = await encode("image/webp", 0.86);
-  if (!blob || blob.type !== "image/webp") blob = await encode("image/jpeg", 0.88);
-  if (!blob) throw new Error("This browser can't prepare the picture.");
+  const blob = await encode(JPEG_MIME, 0.86);
+  if (!blob || blob.type !== JPEG_MIME) throw new Error("This browser can't prepare the picture.");
 
   // Not made bigger by re-encoding: keep the original when it was already the right size and smaller.
   const keepOriginal = scale === 1 && file.size <= blob.size;
   const out = keepOriginal ? file : blob;
   if (out.size > IMAGE_MAX_BYTES) throw new Error("The picture must be 2 MB or smaller.");
-  return { blob: out, ext: IMAGE_TYPES[out.type] ?? "webp" };
+  return { blob: out, ext: "jpg" };
 }
 
 async function uploadPicture(file: File, surface: SlotSurface): Promise<string> {
