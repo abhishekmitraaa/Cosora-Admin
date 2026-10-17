@@ -508,10 +508,22 @@ agrees: the `site-content` bucket accepts `image/jpeg` only and its upload polic
 `admin_support_prepare_upload()` refuses another picture type (textile-spark-net migration `20261016100000`).
 Pictures stored before as PNG or WebP still show and can be removed.
 
+### Requirement review (2026-10-17; built, not live)
+
+A buyer's open requirement (Post Your Requirement, Quick Quote) waits for review before any seller sees it.
+`/requirement-review` (section `rfq-review`: super_admin, product_moderator, manager) lists them oldest first with
+how long each has waited (buyers are told it usually takes 3–5 minutes) and refreshes every 30 seconds; the
+navigation shows the count. **Approve** puts it live for sellers (and runs their alerts); **Not approve** needs one
+of the reasons, whose message the buyer reads, plus an optional note. The buyer is notified either way.
+`/requirement-reasons` (written by managers and super admins): no delete, a retired reason is made inactive.
+RPCs `admin_rfq_submissions`, `admin_rfq_pending_count`, `admin_rfq_review`, `admin_rfq_review_reasons`,
+`admin_rfq_review_reason_save` (textile-spark-net migration `20261017140000`); `lib/rfqReview.ts`.
+
 ### Category pictures (2026-10-14)
 
-`/category-pictures` (section `category-images`, super_admin and manager) sets the picture of each of New Arrivals'
-"Shop by category" tiles and of each Categories-page banner and sub-category tile, through `lib/categoryImages.ts`
+`/category-pictures` (section `category-images`, super_admin and manager) sets the picture of each Categories-page
+banner and sub-category tile; since 2026-10-17 a tile is that category's picture on every page (New Arrivals' tiles,
+sellers' stores, Trends), and New Arrivals has no slots of its own, through `lib/categoryImages.ts`
 and `admin_category_images()` / `admin_category_image_set()` (textile-spark-net migration `20261014090000`). A slot
 with no picture shows the buyer app's default; "Use default" puts it back. Pictures are JPEG, resized and
 re-encoded as JPEG in the browser, and stored in `site-content/categories/`. Changes reach the site in about a minute and are in the Admin Log.

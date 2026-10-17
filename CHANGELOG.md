@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-17 (branch `fix/batch-2026-10-17`, with textile-spark-net's branch of the same name, which holds migrations `20261017100000`–`20261017140000`; built and tested on the local stack; NOT pushed): Mitra's ten bugs, the admin side.
+  - **Requirement review** (`/requirement-review`, section `rfq-review`: super_admin, product_moderator, manager): buyers' open requirements wait here before sellers see them; Approve, or Not approve with a reason; the navigation shows how many wait. **Requirement reasons** (`/requirement-reasons`): managers and super admins write what the buyer reads. `lib/rfqReview.ts`.
+  - **Products › Review details**: everything the vendor entered (all columns, every other answer, every picture, the listing's videos and PDFs), with Approve / Reject. Vendor-written links are shown only when http(s) (`safeHttpUrl`; a `javascript:` picture URL was found by the commit security review before release).
+  - **Category pictures**: New Arrivals has no pictures of its own any more; a tile is its category's picture on every page.
+  - **Videos**: the tagged listing shows its status, with a note when buyers can't open it.
+
 - 2026-10-16 (branch `fix/report-verified-2026-10-16`, with textile-spark-net's branch of the same name, which holds migration `20261016120000_support_requester_unverified.sql`; **RELEASED 2026-10-16** after that migration was applied): **A request from an unverified number says so.** While the test sign-in code accepts any 6 digits, the account behind a fraud report may not own its number. `admin_support_get()` now returns `requester.phone_unverified` (the account was created by `otp-dev-verify`), and the request page's Requester panel shows "Phone number not verified" for it. Files: `src/lib/support.ts`, `src/pages/SupportTicket.tsx`. Tested in textile-spark-net's `tests/local/cat-pics-reports-jpeg.spec.ts` (2c). `tsc` 0.
 
 - 2026-10-16 (branch `fix/jpeg-reports-2026-10-16`, with textile-spark-net's `fix/cat-pics-reports-2026-10-16`, which holds migration `20261016100000_reports_in_app_admin_jpeg.sql`; built and tested on the local stack; **RELEASED 2026-10-16** after that migration was applied to production): **Pictures are JPEG only; reports arrive.** Mitra: "all the input pictures from the admin should only accept Jpeg format for the performance optimisation and fast rendering speed"; "the report option should get all the reports in the admin panel and not via email".
