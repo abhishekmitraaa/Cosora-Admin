@@ -20,7 +20,7 @@ import { assertJpeg, JPEG_MIME } from "@/lib/jpeg";
  * the site-config snapshot.
  */
 
-export type SlotSurface = "new_arrivals" | "categories_banner" | "categories_tile";
+export type SlotSurface = "categories_banner" | "categories_tile";
 
 export interface CategoryImageSlot {
   slot: string;
@@ -35,14 +35,12 @@ export interface CategoryImageSlot {
 
 /** The longest side a picture is stored at, by where it shows. Banners are wide; tiles are small squares. */
 export const MAX_SIDE: Record<SlotSurface, { w: number; h: number }> = {
-  new_arrivals: { w: 800, h: 800 },
   categories_tile: { w: 800, h: 800 },
   categories_banner: { w: 1600, h: 900 },
 };
 
 export const SURFACE_HINT: Record<SlotSurface, string> = {
-  new_arrivals: "Square. A product on a plain white background reads best (JPEG has no transparency); it's shown whole, not cropped.",
-  categories_tile: "Square. It's cropped to fill the tile.",
+  categories_tile: "Square. It's cropped to fill the tile. It is this category's picture everywhere on the site: the Categories page, New Arrivals' tiles, sellers' stores and Trends.",
   categories_banner: "Wide, about 16:7. It's cropped to fill the banner, with the category's name over the bottom.",
 };
 

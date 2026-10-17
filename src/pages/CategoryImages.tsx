@@ -24,7 +24,6 @@ import {
   ReadOnlyBanner,
   Select,
   SkeletonList,
-  Tabs,
   cn,
 } from "@/components/ui";
 
@@ -32,8 +31,11 @@ import {
  * CATEGORY PICTURES (2026-10-14). Real data: lib/categoryImages.ts and the admin_category_image*
  * RPCs in textile-spark-net migration 20261014090000.
  *
- *   New Arrivals      the 12 tiles of "Shop by category" on the buyer home page
  *   Categories page   each category's banner and its sub-category tiles on /categories
+ *
+ * Since 2026-10-17 a sub-category's tile is that category's picture on every page of the buyer site (New
+ * Arrivals' "Shop by category", sellers' stores, Trends); New Arrivals no longer has pictures of its own
+ * (migration 20261017100000 removed those slots).
  *
  * roles.ts section "category-images": super_admin and manager read and write; the RPCs and the
  * storage policies refuse everyone else. A slot with no picture shows the buyer app's default.
@@ -41,33 +43,26 @@ import {
 
 const BUYER_SITE = "https://www.cosora.in";
 
-type Tab = "new_arrivals" | "categories";
-
 export default function CategoryImages() {
   const role = useRole();
   const writable = canWrite(role, "category-images");
   const slots = useCategoryImageSlots();
-  const [tab, setTab] = useState<Tab>("new_arrivals");
-
   const rows = slots.data ?? [];
-  const tiles = rows.filter((r) => r.surface === "new_arrivals");
   const groups = useMemo(() => {
     const map = new Map<string, CategoryImageSlot[]>();
     for (const r of rows) {
-      if (r.surface === "new_arrivals") continue;
       const g = r.group_label ?? r.label;
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(r);
     }
     return [...map.entries()];
   }, [rows]);
-  const custom = (list: CategoryImageSlot[]) => list.filter((r) => r.image_path).length;
 
   return (
     <Page>
       <PageHeader
         title="Category pictures"
-        subtitle="The pictures buyers see for each category: New Arrivals' tiles, and the banners and tiles on the Categories page."
+        subtitle="The picture buyers see for each category, everywhere on the site: the Categories page's banners and tiles, New Arrivals' tiles, sellers' stores and Trends."
       />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "category-images")} />}
@@ -77,27 +72,10 @@ export default function CategoryImages() {
         minute and is in the Admin Log. Pictures are JPEG (.jpg) only, and are resized before upload (up to 2 MB after resizing).
       </Note>
 
-      <Tabs
-        tabs={[
-          { id: "new_arrivals", label: "New Arrivals", count: custom(tiles) || undefined },
-          { id: "categories", label: "Categories page", count: custom(groups.flatMap(([, g]) => g)) || undefined },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
-
       {slots.isLoading ? (
         <SkeletonList rows={3} height="h-40" />
       ) : slots.error ? (
         <ErrorNote message={(slots.error as Error).message} />
-      ) : tab === "new_arrivals" ? (
-        <Panel
-          title="Shop by category"
-          description="The 12 tiles on the buyer home page, in order. Each is shown whole on a white tile."
-          actions={<SiteLink path="/home/new-arrivals" />}
-        >
-          <SlotGrid slots={tiles} writable={writable} />
-        </Panel>
       ) : (
         <CategoriesTab groups={groups} writable={writable} />
       )}
@@ -186,7 +164,7 @@ function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable:
           <img
             src={categoryImageUrl(slot.image_path)}
             alt={slot.label}
-            className={cn("absolute inset-0 h-full w-full", slot.surface === "new_arrivals" ? "object-contain bg-white p-2" : "object-cover")}
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-center text-ink-faint">

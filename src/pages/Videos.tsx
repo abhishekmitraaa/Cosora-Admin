@@ -50,8 +50,15 @@ interface VideoRow {
   vendor_id: string;
   created_at: string;
   /** The tagged product, via product_videos.product_id. Nullable — a video need not tag one. */
-  product: { name: string } | null;
+  product: { name: string; status: string } | null;
 }
+
+const PRODUCT_STATUS_WORD: Record<string, string> = {
+  under_review: "in review",
+  rejected: "rejected",
+  draft: "draft",
+  paused: "paused",
+};
 
 const SUBTITLE =
   "Moderate vendor-submitted product videos. Approving publishes to the buyer feed; rejecting requires a reason the vendor will read.";
@@ -105,7 +112,7 @@ export default function Videos() {
           `id, brand_line, category, price, moq, thumbnail_url, video_url,
            duration_seconds, video_width, video_height, status, rejection_reason,
            vendor_id, created_at,
-           product:products(name)`,
+           product:products(name, status)`,
         )
         .eq("status", tab)
         .order("created_at", { ascending: false });
@@ -436,7 +443,10 @@ function VideoCard({
 
           <AttrGrid cols={3}>
             <Attr label="Category" value={v.category} />
-            <Attr label="Product" value={v.product?.name} />
+            <Attr
+              label="Product"
+              value={v.product ? `${v.product.name}${v.product.status === "live" ? "" : ` (${PRODUCT_STATUS_WORD[v.product.status] ?? v.product.status})`}` : null}
+            />
             <Attr
               label="Length"
               value={v.duration_seconds != null ? `${v.duration_seconds}s` : null}
@@ -448,6 +458,13 @@ function VideoCard({
             <Attr label="Price" value={v.price} />
             <Attr label="MOQ" value={v.moq} />
           </AttrGrid>
+          {/* Buyers can only open a live listing: a video tagged to any other shows them "This listing isn't
+              available right now" (2026-10-17: production's one live video was tagged to a rejected listing). */}
+          {v.product && v.product.status !== "live" && (
+            <p className="mt-2 text-xs text-caution-fg">
+              The tagged listing isn't live, so buyers can't open it from this video.
+            </p>
+          )}
 
           {/* Vendor context: who submitted this, and are they already trusted. */}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-line pt-2.5 text-xs text-ink-muted">
