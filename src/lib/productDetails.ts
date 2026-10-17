@@ -57,6 +57,20 @@ export function fieldLabel(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * A link a vendor wrote is shown only if it is plain http(s). product_images.url and product_videos.video_url
+ * are vendor-written text: a "javascript:" URL in an <a href> here would run in an admin's session.
+ */
+export function safeHttpUrl(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const url = new URL(u);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function show(v: unknown): string | null {
   if (v === null || v === undefined || v === "") return null;
   if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : null;
@@ -136,12 +150,12 @@ export async function fetchProductDetails(id: string): Promise<ProductDetails> {
     parentCategory,
     fields,
     answers,
-    images: (imgs.data ?? []).map((i) => i.url),
+    images: (imgs.data ?? []).map((i) => safeHttpUrl(i.url)).filter((u): u is string => u !== null),
     videos: (vids.data ?? []).map((v) => ({
       id: v.id,
       status: v.status as string,
-      url: v.video_url,
-      poster: v.thumbnail_url,
+      url: safeHttpUrl(v.video_url),
+      poster: safeHttpUrl(v.thumbnail_url),
       durationSeconds: v.duration_seconds,
     })),
     documents: (docs.data ?? []).map((d) => ({
