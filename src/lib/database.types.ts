@@ -1518,6 +1518,44 @@ export type Database = {
           },
         ]
       }
+      product_documents: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          path: string
+          position: number
+          product_id: string
+          size_bytes: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          path: string
+          position?: number
+          product_id: string
+          size_bytes?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          path?: string
+          position?: number
+          product_id?: string
+          size_bytes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_documents_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           created_at: string

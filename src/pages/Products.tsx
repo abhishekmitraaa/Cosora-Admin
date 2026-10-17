@@ -6,6 +6,7 @@ import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import FlagLog from "@/components/FlagLog";
+import ProductDetailsModal from "@/components/ProductDetailsModal";
 import { EditedBadge, ListingEditNotice } from "@/components/ListingEditNotice";
 import { fetchListingEdits, type ListingEdit } from "@/lib/listingEdits";
 import {
@@ -64,6 +65,8 @@ export default function Products() {
   const writable = canWrite(role, "products");
   const [tab, setTab] = useState<Status>("under_review");
   const [rejecting, setRejecting] = useState<ProductRow | null>(null);
+  // "Review details": everything the vendor entered (2026-10-17).
+  const [viewing, setViewing] = useState<ProductRow | null>(null);
   const [reason, setReason] = useState("");
 
   const products = useQuery({
@@ -187,10 +190,35 @@ export default function Products() {
                 setRejecting(p);
                 setReason("");
               }}
+              onDetails={() => setViewing(p)}
             />
           ))}
         </div>
       )}
+
+      <ProductDetailsModal
+        productId={viewing?.id ?? null}
+        title={viewing?.name ?? ""}
+        onClose={() => setViewing(null)}
+        actions={
+          viewing && (
+            <>
+              {viewing.status !== "rejected" && (
+                <Button variant="danger" disabled={!writable || moderate.isPending}
+                  onClick={() => { setRejecting(viewing); setReason(""); setViewing(null); }}>
+                  {viewing.status === "live" ? "Pull down" : "Reject"}
+                </Button>
+              )}
+              {viewing.status !== "live" && viewing.status !== "paused" && (
+                <Button variant="primary" disabled={!writable || moderate.isPending}
+                  onClick={() => { approve(viewing); setViewing(null); }}>
+                  Approve
+                </Button>
+              )}
+            </>
+          )
+        }
+      />
 
       <Modal
         open={rejecting !== null}
@@ -226,6 +254,7 @@ function ProductCard({
   busy,
   onApprove,
   onReject,
+  onDetails,
 }: {
   product: ProductRow;
   vendor: VendorSummary | undefined;
@@ -234,6 +263,7 @@ function ProductCard({
   busy: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onDetails: () => void;
 }) {
   const [showLog, setShowLog] = useState(false);
   const images = [...(p.images ?? [])].sort((a, b) => a.position - b.position);
@@ -255,6 +285,11 @@ function ProductCard({
                 className="h-20 w-20 rounded-lg border border-line object-cover sm:h-24 sm:w-24"
               />
             ))
+          )}
+          {images.length > 3 && (
+            <span className="flex h-20 w-12 items-center justify-center rounded-lg border border-line text-xs text-ink-muted sm:h-24">
+              +{images.length - 3}
+            </span>
           )}
         </div>
 
@@ -312,6 +347,7 @@ function ProductCard({
               {p.status === "live" ? "Pull down" : "Reject"}
             </Button>
           )}
+          <Button onClick={onDetails}>Review details</Button>
           <Button variant="ghost" onClick={() => setShowLog((s) => !s)}>
             {showLog ? "Hide log" : "Flag / log"}
           </Button>
