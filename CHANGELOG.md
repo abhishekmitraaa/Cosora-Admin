@@ -9,7 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
-- 2026-10-17 (branch `fix/batch-2026-10-17`, with textile-spark-net's branch of the same name, which holds migrations `20261017100000`–`20261017140000`; built and tested on the local stack; NOT pushed): Mitra's ten bugs, the admin side.
+- 2026-10-17 (branch `fix/batch-2026-10-17`, with textile-spark-net's branch of the same name, which holds migrations `20261017100000`–`20261017140000`; **RELEASED 2026-10-17**, admin main `d9aa30e..ae65db7`, after those migrations were applied): Mitra's ten bugs, the admin side.
   - **Requirement review** (`/requirement-review`, section `rfq-review`: super_admin, product_moderator, manager): buyers' open requirements wait here before sellers see them; Approve, or Not approve with a reason; the navigation shows how many wait. **Requirement reasons** (`/requirement-reasons`): managers and super admins write what the buyer reads. `lib/rfqReview.ts`.
   - **Products › Review details**: everything the vendor entered (all columns, every other answer, every picture, the listing's videos and PDFs), with Approve / Reject. Vendor-written links are shown only when http(s) (`safeHttpUrl`; a `javascript:` picture URL was found by the commit security review before release).
   - **Category pictures**: New Arrivals has no pictures of its own any more; a tile is its category's picture on every page.

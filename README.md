@@ -508,7 +508,7 @@ agrees: the `site-content` bucket accepts `image/jpeg` only and its upload polic
 `admin_support_prepare_upload()` refuses another picture type (textile-spark-net migration `20261016100000`).
 Pictures stored before as PNG or WebP still show and can be removed.
 
-### Requirement review (2026-10-17; built, not live)
+### Requirement review (2026-10-17; live 2026-10-17)
 
 A buyer's open requirement (Post Your Requirement, Quick Quote) waits for review before any seller sees it.
 `/requirement-review` (section `rfq-review`: super_admin, product_moderator, manager) lists them oldest first with
