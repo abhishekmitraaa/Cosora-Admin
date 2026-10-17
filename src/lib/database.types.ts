@@ -5095,6 +5095,52 @@ export type Database = {
       }
       admin_lead_alert_stats: { Args: { p_days?: number }; Returns: Json }
       admin_lead_detail: { Args: { p_rfq_id: string }; Returns: Json }
+      admin_rfq_pending_count: { Args: never; Returns: number }
+      admin_rfq_review: {
+        Args: { p_decision: string; p_id: string; p_note?: string; p_reason_id?: string }
+        Returns: string
+      }
+      admin_rfq_review_reason_save: {
+        Args: { p_active?: boolean; p_buyer_message: string; p_id: string | null; p_label: string; p_sort?: number }
+        Returns: string
+      }
+      admin_rfq_review_reasons: {
+        Args: never
+        Returns: {
+          active: boolean
+          buyer_message: string
+          id: string
+          label: string
+          sort: number
+          updated_at: string
+        }[]
+      }
+      admin_rfq_submissions: {
+        Args: { p_limit?: number; p_state?: string }
+        Returns: {
+          attributes: Json
+          budget_max: number | null
+          budget_min: number | null
+          buyer_id: string
+          buyer_message: string | null
+          buyer_name: string | null
+          buyer_phone_unverified: boolean
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          images: string[] | null
+          product_name: string | null
+          quantity: number | null
+          reason_label: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewer_name: string | null
+          rfq_id: string | null
+          state: string
+          title: string
+        }[]
+      }
       admin_lead_remove: {
         Args: { p_reason: string; p_rfq_id: string }
         Returns: {

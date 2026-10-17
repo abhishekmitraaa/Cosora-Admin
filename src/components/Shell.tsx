@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useRfqPendingCount } from "@/lib/rfqReview";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Newspaper,
@@ -41,7 +42,7 @@ import {
   Siren,
   Lightbulb,
   Clock,
-  Handshake,
+  Handshake, ClipboardCheck, ListChecks
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
@@ -56,8 +57,8 @@ interface NavItem {
   icon: typeof Boxes;
   /** Active only on this exact path, so /support is not lit on /support/callbacks. */
   end?: boolean;
-  /** Shows the number of support requests waiting on staff. */
-  badge?: "support";
+  /** Shows the number waiting on staff: support requests, or requirements to review. */
+  badge?: "support" | "rfq";
 }
 
 /**
@@ -91,6 +92,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Moderation",
     items: [
+      { to: "/requirement-review", section: "rfq-review", label: "Requirements", icon: ClipboardCheck, badge: "rfq" },
       { to: "/products", section: "products", label: "Products", icon: Boxes },
       { to: "/videos", section: "videos", label: "Video Closeups", icon: Clapperboard },
       { to: "/catalogues", section: "catalogues", label: "Catalogues", icon: BookOpen },
@@ -139,6 +141,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/chat-keywords", section: "chat-keywords", label: "Keyword blocklist", icon: Ban },
       { to: "/chat-patterns", section: "chat-patterns", label: "Flag patterns", icon: Regex },
       { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
+      { to: "/requirement-reasons", section: "rfq-reasons", label: "Requirement reasons", icon: ListChecks },
       { to: "/faqs", section: "faqs", label: "FAQs", icon: CircleHelp },
       { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
       { to: "/admin-log", section: "admin-log", label: "Admin Log", icon: History },
@@ -176,6 +179,7 @@ export default function Shell() {
   useRecordPageViews(role !== null);
   const supportCounts = useSupportCounts(canSee(role, "support"));
   const waiting = supportCounts.data?.awaiting ?? 0;
+  const rfqWaiting = useRfqPendingCount(canSee(role, "rfq-review")).data ?? 0;
 
   const groups = useMemo(
     () =>
@@ -310,12 +314,12 @@ export default function Shell() {
                             />
                             <Icon size={16} className="shrink-0" />
                             {label}
-                            {badge === "support" && waiting > 0 && (
+                            {badge && (badge === "support" ? waiting : rfqWaiting) > 0 && (
                               <span
                                 className="ml-auto rounded-md bg-white/[0.12] px-1.5 py-0.5 text-2xs tabular-nums text-rail-fg"
-                                aria-label={`${waiting} waiting`}
+                                aria-label={`${badge === "support" ? waiting : rfqWaiting} waiting`}
                               >
-                                {waiting > 99 ? "99+" : waiting}
+                                {(badge === "support" ? waiting : rfqWaiting) > 99 ? "99+" : badge === "support" ? waiting : rfqWaiting}
                               </span>
                             )}
                           </>

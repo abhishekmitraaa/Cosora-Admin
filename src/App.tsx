@@ -30,6 +30,8 @@ import ChatReview from "@/pages/ChatReview";
 import ChatKeywords from "@/pages/ChatKeywords";
 import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
+import RfqReview from "@/pages/RfqReview";
+import RfqReasons from "@/pages/RfqReasons";
 import Faqs from "@/pages/Faqs";
 // Phase-4 sections. All of them read the database now: the development-only
 // seed they started on (src/lib/devSeed/) was removed in admin completion
@@ -75,6 +77,7 @@ function Landing() {
         // so a role lands somewhere useful rather than on the first section
         // that happens to be alphabetically early. Phase-4 sections sit after
         // the established ones for the same reason.
+        "rfq-review",
         "products",
         "videos",
         "catalogues",
@@ -242,6 +245,22 @@ export default function App() {
                 element={
                   <RequireSection section="chat-reasons">
                     <ChatReasons />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/requirement-review"
+                element={
+                  <RequireSection section="rfq-review">
+                    <RfqReview />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/requirement-reasons"
+                element={
+                  <RequireSection section="rfq-reasons">
+                    <RfqReasons />
                   </RequireSection>
                 }
               />

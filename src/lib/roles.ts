@@ -77,6 +77,11 @@ export type Section =
   | "chat-keywords"
   | "chat-patterns"
   | "chat-reasons"
+  // Buyers' requirements wait for review before sellers see them (2026-10-17). Mirrors admin.require_rfq_reviewer()
+  // (super_admin, product_moderator, manager); the reasons are written by managers and super admins
+  // (admin_rfq_review_reason_save).
+  | "rfq-review"
+  | "rfq-reasons"
   // Buyer Help / seller registration / subscription FAQs (2026-09-23). REAL
   // DATA: public.faqs, written only through admin_faq_* RPCs. The first
   // admin-editable content that was never dev-seed.
@@ -224,6 +229,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // `admin_role() in ('support','super_admin')`, so that was simply wrong, and
   // it hid the page from the role that uses its vocabulary daily.
   "chat-reasons": ["super_admin", "support"],
+  "rfq-review": ["super_admin", "product_moderator", "manager"],
+  "rfq-reasons": ["super_admin", "product_moderator", "manager"],
   // admin_faq_list() admits support + super_admin, the same audience as block
   // reasons. Support answers the questions buyers ask, so it reads what the FAQ says.
   faqs: ["super_admin", "support"],
@@ -303,6 +310,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   "chat-keywords": ["super_admin", "support"],
   "chat-patterns": ["super_admin", "support"],
   "chat-reasons": ["super_admin"],
+  "rfq-review": ["super_admin", "product_moderator", "manager"],
+  "rfq-reasons": ["super_admin", "manager"],
   // admin_faq_add / update / delete / reorder admit support + super_admin, the
   // same predicate as admin_faq_list (migration 20260924170736; Mitra's answer to
   // the 2026-09-23 open question). Support answers buyers' questions, so it keeps
