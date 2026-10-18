@@ -681,6 +681,20 @@ holding them. "Messages have been due for over 5 minutes" means the `notificatio
 **Send a test** (super_admin, `admin_notification_test()`) queues a message to your own address on that channel, five
 an hour; it goes out on the dispatcher's next run.
 
+### Trending searches (2026-10-18; built, not live)
+
+Insight › Trending searches (`/trending-searches`) shows what the buyer's /search lists under "Trending": the terms
+and categories computed every night at 00:10 India time from searches on Cosora (textile-spark-net migration
+`20261018120000_search_trends`). The buyer site gets words only; this page shows the visitors and visitor-days
+behind each. A typed term is listed only once 3 different visitors searched it in the window (yesterday, widening to
+7 then 30 days when fewer than 5 terms qualify); staff searches don't count; phone numbers, emails and links never
+appear.
+
+- `admin_search_trends()`: super admins, support and managers. `admin_search_trend_hide(term, reason)` /
+  `admin_search_trend_unhide(term, reason)`: super admins and support. A hide covers the term in any case or spacing,
+  and a category of the same name; it recomputes the list at once and reaches the site in about a minute.
+- Who sees the list is the `search_trending` switch (Feature switches): off, listed accounts, or everyone.
+
 ### Live Activity (2026-09-28)
 
 `/traction` (section `traction`: every role, read-only) reads `admin_live_activity(minutes)`
