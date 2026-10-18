@@ -5325,6 +5325,15 @@ export type Database = {
           id: string
         }[]
       }
+      admin_search_trend_hide: {
+        Args: { p_reason: string; p_term: string }
+        Returns: number
+      }
+      admin_search_trend_unhide: {
+        Args: { p_reason: string; p_term: string }
+        Returns: number
+      }
+      admin_search_trends: { Args: never; Returns: Json }
       admin_set_role: {
         Args: {
           p_role: Database["public"]["Enums"]["admin_role_type"]

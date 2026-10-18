@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Newspaper,
   Activity,
+  TrendingUp,
   Ban,
   BarChart3,
   Boxes,
@@ -128,6 +129,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/leads", section: "leads", label: "Leads", icon: Inbox },
       { to: "/reports", section: "reports", label: "Reports", icon: BarChart3 },
       { to: "/traction", section: "traction", label: "Live Activity", icon: Activity },
+      { to: "/trending-searches", section: "search-trends", label: "Trending searches", icon: TrendingUp },
       { to: "/system-health", section: "system-health", label: "System Health", icon: HeartPulse },
     ],
   },

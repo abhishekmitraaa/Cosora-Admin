@@ -135,6 +135,11 @@ export type Section =
   // as the category pictures: admin_hero_slides() / admin_hero_slides_save() admit super_admin and
   // manager (admin.require_hero_slides_admin).
   | "hero-slides"
+  // /search's trending list (2026-10-18; migration 20261018120000_search_trends in textile-spark-net):
+  // what is published, with its counts, and the hidden terms. admin_search_trends() admits super_admin,
+  // support and manager; admin_search_trend_hide/_unhide super_admin and support
+  // (admin.require_search_trends).
+  | "search-trends"
   // The public Cosora Journal at www.cosora.in/blogs: articles, categories and
   // the landing hero. Same gate as "content" because the admin_blog_* RPCs all
   // call admin.require_content_admin().
@@ -255,6 +260,8 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   "category-images": ["super_admin", "manager"],
   // Mirrors admin.require_hero_slides_admin(). Change the SQL gate and this line together.
   "hero-slides": ["super_admin", "manager"],
+  // Mirrors admin.require_search_trends(false). Change the SQL gate and this line together.
+  "search-trends": ["super_admin", "support", "manager"],
   // Mirrors admin.require_content_admin() in every admin_blog_* RPC. Widen the
   // SQL gate and this line together; either alone is wrong.
   blogs: ["super_admin"],
@@ -333,6 +340,9 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   content: ["super_admin"],
   "category-images": ["super_admin", "manager"],
   "hero-slides": ["super_admin", "manager"],
+  // Support and super admins already moderate what users write (chats, FAQs). Mirrors
+  // admin.require_search_trends(true).
+  "search-trends": ["super_admin", "support"],
   blogs: ["super_admin"],
   payments: ["super_admin", "finance_admin"],
   // Mirrors certificate_fulfiller() exactly.

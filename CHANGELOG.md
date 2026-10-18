@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-18 (branch `search/trending-searches`, with textile-spark-net's branch of the same name, which holds migrations `20261018120000_search_trends` and `20261018120100_search_trends_job`; **built and tested on the local stack, NOT released**). Trending searches: a new page, Insight › Trending searches (`/trending-searches`, section `search-trends`).
+  - Why: the buyer's /search now lists "Trending yesterday / this week / this month" and the most searched categories, measured nightly from Cosora's own searches; a typed term appears only once 3 different visitors searched it. People type anything, so staff need to see what is published and take a term down.
+  - The page (`src/pages/TrendingSearches.tsx`, `src/lib/searchTrends.ts`): the list in force with visitors and visitor-days, the switch's state, hide (from the list or typed, with a reason, in the Admin Log), hidden terms with "Let back", recent computations. Super admins, support and managers read; super admins and support hide (`admin.require_search_trends`).
+  - `roles.ts`, `Shell.tsx` (nav), `App.tsx` (route), `database.types.ts` (three RPCs, by hand until regenerated).
+  - Tested: typecheck (an injected error is caught), build; the buyer repo's browser spec opens this page as a manager (counts, no Hide) and as support (hide with a reason; gone from the buyer's page).
+
 - 2026-10-17 (branch `fix/batch-2026-10-17`, with textile-spark-net's branch of the same name, which holds migrations `20261017100000`–`20261017140000`; **RELEASED 2026-10-17**, admin main `d9aa30e..ae65db7`, after those migrations were applied): Mitra's ten bugs, the admin side.
   - **Requirement review** (`/requirement-review`, section `rfq-review`: super_admin, product_moderator, manager): buyers' open requirements wait here before sellers see them; Approve, or Not approve with a reason; the navigation shows how many wait. **Requirement reasons** (`/requirement-reasons`): managers and super admins write what the buyer reads. `lib/rfqReview.ts`.
   - **Products › Review details**: everything the vendor entered (all columns, every other answer, every picture, the listing's videos and PDFs), with Approve / Reject. Vendor-written links are shown only when http(s) (`safeHttpUrl`; a `javascript:` picture URL was found by the commit security review before release).

@@ -51,6 +51,7 @@ import Certificates from "@/pages/Certificates";
 import Discounts from "@/pages/Discounts";
 import Customers from "@/pages/Customers";
 import LiveActivity from "@/pages/LiveActivity";
+import TrendingSearches from "@/pages/TrendingSearches";
 import SystemHealth from "@/pages/SystemHealth";
 // Help & Support (2026-09-30): the inbox and its boards, one request, and settings.
 import SupportInbox, { SupportCallbacks, SupportFeedback, SupportFraud } from "@/pages/Support";
@@ -367,6 +368,14 @@ export default function App() {
                 element={
                   <RequireSection section="traction">
                     <LiveActivity />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/trending-searches"
+                element={
+                  <RequireSection section="search-trends">
+                    <TrendingSearches />
                   </RequireSection>
                 }
               />
