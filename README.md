@@ -693,7 +693,9 @@ appear.
 - `admin_search_trends()`: super admins, support and managers. `admin_search_trend_hide(term, reason)` /
   `admin_search_trend_unhide(term, reason)`: super admins and support. A hide covers the term in any case or spacing,
   and a category of the same name; it recomputes the list at once and reaches the site in about a minute.
-- Who sees the list is the `search_trending` switch (Feature switches): off, listed accounts, or everyone.
+- Who sees the list is the `search_trending` switch (Feature switches): off, listed accounts, or everyone. Typed
+  terms also need `search_trending_terms`, which is off for now (Mitra, 2026-10-18: categories only): buyers see the
+  categories, and the page says the terms aren't public.
 
 ### Live Activity (2026-09-28)
 

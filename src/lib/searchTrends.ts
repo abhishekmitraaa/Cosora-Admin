@@ -53,6 +53,9 @@ export interface RecentRun extends TrendRun {
 
 export interface SearchTrendsAdmin {
   switch: { enabled: boolean; listed: number } | null;
+  /** search_trending_terms (2026-10-18): typed terms reach the site only where this is on. Off: categories only.
+   *  Missing before textile-spark-net migration 20261018150000. */
+  terms_switch?: { enabled: boolean; listed: number } | null;
   run: TrendRun | null;
   terms: TrendItem[];
   categories: TrendItem[];

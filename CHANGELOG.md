@@ -9,6 +9,8 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-18 (with textile-spark-net migration `20261018150000_search_trends_categories_only`; **RELEASED 2026-10-18**). Trending searches: categories only, for now (Mitra). The page shows the new `search_trending_terms` switch: while it is off, a notice says typed terms aren't shown on the site and why (a script can pose as 3 visitors), and the terms table is there to watch. `lib/searchTrends.ts` reads `terms_switch`.
+
 - 2026-10-18 (branch `search/trending-searches`, with textile-spark-net's branch of the same name, which holds migrations `20261018120000_search_trends` and `20261018120100_search_trends_job`; **built and tested on the local stack, NOT released**). Trending searches: a new page, Insight › Trending searches (`/trending-searches`, section `search-trends`).
   - Why: the buyer's /search now lists "Trending yesterday / this week / this month" and the most searched categories, measured nightly from Cosora's own searches; a typed term appears only once 3 different visitors searched it. People type anything, so staff need to see what is published and take a term down.
   - The page (`src/pages/TrendingSearches.tsx`, `src/lib/searchTrends.ts`): the list in force with visitors and visitor-days, the switch's state, hide (from the list or typed, with a reason, in the Admin Log), hidden terms with "Let back", recent computations. Super admins, support and managers read; super admins and support hide (`admin.require_search_trends`).

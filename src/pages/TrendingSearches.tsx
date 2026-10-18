@@ -23,6 +23,7 @@ import {
   Input,
   Modal,
   Note,
+  Notice,
   Page,
   PageHeader,
   Panel,
@@ -61,6 +62,9 @@ export default function TrendingSearches() {
   const data = trends.data;
   const run = data?.run ?? null;
   const sw = data?.switch ?? null;
+  // Typed terms have their own switch (2026-10-18: categories only for now). Unknown (older database) counts as off.
+  const termsSw = data?.terms_switch ?? null;
+  const termsPublic = Boolean(termsSw?.enabled);
   const busy = hide.isPending || unhide.isPending;
 
   const open = (action: "hide" | "unhide", term: string) => {
@@ -130,10 +134,21 @@ export default function TrendingSearches() {
       <Note className="mb-4">
         The list is computed every night at 00:10 India time. It covers yesterday; when fewer than 5 terms qualify,
         the last 7 days, then the last 30, and the site's heading says which. A typed term is listed only once at
-        least 3 different visitors searched it. Staff searches don't count, and terms with a phone number, an email or
-        a link never appear. Categories count everyone who searched for one or clicked a search result in it. The site
-        shows the words only, never these numbers. Who sees it is the <Link to="/feature-flags" className="underline">search_trending switch</Link>.
+        least 3 different visitors searched it. Staff searches don't count, and terms with more than 4 digits, a dot, an
+        "@", "http" or "www" never appear. Categories count everyone who searched for one or clicked a search result in
+        it. The site shows the words only, never these numbers. Who sees it is the{" "}
+        <Link to="/feature-flags" className="underline">search_trending switch</Link>; typed terms also need{" "}
+        <Link to="/feature-flags" className="underline">search_trending_terms</Link>.
       </Note>
+
+      {!termsPublic && (
+        <Notice tone="info" className="mb-4" marker="terms-not-public">
+          Typed terms are not shown on the site: buyers see only the most searched categories.
+          {termsSw && termsSw.listed > 0 ? ` (${termsSw.listed} listed account${termsSw.listed === 1 ? "" : "s"} see the terms.)` : ""}{" "}
+          Anyone with a script can pose as 3 visitors, so terms stay off until staff approve them or only signed-in
+          searches count. The terms below are here to watch.
+        </Notice>
+      )}
 
       {trends.isLoading ? (
         <SkeletonList rows={3} height="h-24" />
@@ -143,7 +158,7 @@ export default function TrendingSearches() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <div className="space-y-4">
             <Panel
-              title={run ? WINDOW_LABEL[run.window] : "Nothing computed yet"}
+              title={run ? `${WINDOW_LABEL[run.window]}${termsPublic ? "" : " (terms not public)"}` : "Nothing computed yet"}
               description={
                 run
                   ? `${run.window === "day" ? day(run.ist_day) : `${day(run.window_start ?? run.ist_day)} to ${day(run.ist_day)}`}. Computed ${format(new Date(run.computed_at), "d MMM yyyy, HH:mm")} (${RUN_SOURCE_LABEL[run.source].toLowerCase()}).`
@@ -161,7 +176,7 @@ export default function TrendingSearches() {
               }
             >
               {(data?.terms ?? []).length === 0 ? (
-                <Empty>No term reached 3 visitors in this window. The site shows no trending terms.</Empty>
+                <Empty>No term reached 3 visitors in this window.</Empty>
               ) : (
                 itemTable(data!.terms, "term")
               )}
