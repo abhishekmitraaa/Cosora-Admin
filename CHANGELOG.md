@@ -9,6 +9,12 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-18 (branch `fix/chat-files-review-2026-10-18`, with textile-spark-net branch `fix/first-fixes-2026-10-18`, which holds migrations `20261018160000`–`20261018160200`; built and tested locally, **NOT released**). Chats: the whole conversation, files included.
+  - Why: Mitra, 2026-10-18: "The admin panel should be able to read the entire chat and not just the screenshot." The buyer app now sends real photos, PDFs, voice notes and contact cards, and the thread showed only their labels ("📷 Photo"), and only the first 500 messages.
+  - `src/pages/ChatThread.tsx`: messages are read in pages of 1,000 until the end; photos, PDFs and voice notes show inline through signed links to the private `chat-attachments` bucket (support and super admins may read it); a contact card has "Show number" (`admin_chat_contact_number`, an Admin Log `reveal_contact` row each time); a panel lists who blocked whom (and whether it was lifted) and each person's star / archive / delete-for-me (`admin_conversation_state`); a divider marks where a person deleted the chat for themselves (staff still see every message); a "blocked" badge in the header.
+  - `src/lib/database.types.ts`: the five `messages.attachment_*` columns and the two RPCs, by hand until regenerated.
+  - Tested: typecheck, build; the buyer repo's `tests/local/block-everywhere.spec.ts` opens a 1,009-message chat as support (all loaded, photo, PDF, number reveal with its Admin Log row, block and delete-for-me shown).
+
 - 2026-10-18 (with textile-spark-net migration `20261018150000_search_trends_categories_only`; **RELEASED 2026-10-18**). Trending searches: categories only, for now (Mitra). The page shows the new `search_trending_terms` switch: while it is off, a notice says typed terms aren't shown on the site and why (a script can pose as 3 visitors), and the terms table is there to watch. `lib/searchTrends.ts` reads `terms_switch`.
 
 - 2026-10-18 (branch `search/trending-searches`, with textile-spark-net's branch of the same name, which holds migrations `20261018120000_search_trends` and `20261018120100_search_trends_job`; **built and tested on the local stack, NOT released**). Trending searches: a new page, Insight › Trending searches (`/trending-searches`, section `search-trends`).

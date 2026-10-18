@@ -1387,6 +1387,11 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachment_bytes: number | null
+          attachment_mime: string | null
+          attachment_name: string | null
+          attachment_path: string | null
+          attachment_seconds: number | null
           body: string | null
           conversation_id: string
           created_at: string
@@ -1397,6 +1402,11 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_bytes?: number | null
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_seconds?: number | null
           body?: string | null
           conversation_id: string
           created_at?: string
@@ -1407,6 +1417,11 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_bytes?: number | null
+          attachment_mime?: string | null
+          attachment_name?: string | null
+          attachment_path?: string | null
+          attachment_seconds?: number | null
           body?: string | null
           conversation_id?: string
           created_at?: string
@@ -4708,6 +4723,8 @@ export type Database = {
         Args: { p_note?: string; p_outcome: string; p_ticket_id: string }
         Returns: Json
       }
+      admin_chat_contact_number: { Args: { p_message_id: string }; Returns: string | null }
+      admin_conversation_state: { Args: { p_conversation_id: string }; Returns: Json }
       admin_conversation_review_list: {
         Args: { p_conversation_id?: string; p_status?: string }
         Returns: {
