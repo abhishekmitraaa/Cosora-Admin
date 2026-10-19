@@ -101,13 +101,27 @@ function Landing() {
         "content",
         "category-images",
         "hero-slides",
+        // An account manager's day is their own vendors. Before "reports", which every
+        // role can read, or they would land on Reports.
+        "my-vendors",
         "reports",
         "traction",
         "admins",
       ] as const
     ).find((s) => canSee(role, s)) ?? "reports";
-  return <Navigate to={`/${first}`} replace />;
+  return <Navigate to={SECTION_PATH[first] ?? `/${first}`} replace />;
 }
+
+/**
+ * Sections whose route is not "/" + the section name. Without these, Landing sent
+ * super_admin, manager and product_moderator to /rfq-review, which no route matches:
+ * the "*" route sent them back to "/" and the two redirected forever (2026-10-20).
+ */
+const SECTION_PATH: Partial<Record<string, string>> = {
+  "rfq-review": "/requirement-review",
+  "category-images": "/category-pictures",
+  "hero-slides": "/new-arrivals-carousel",
+};
 
 export default function App() {
   return (

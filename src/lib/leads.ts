@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assertWrote, supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/database.types";
+import { safeHttpUrl } from "@/lib/productDetails";
 
 /**
  * LEADS: THE RFQ PIPELINE (admin completion Phase 7, migration 20260928071643 in
@@ -173,7 +174,13 @@ export function useLeadDetail(id: string | null) {
     queryFn: async (): Promise<LeadDetail> => {
       const { data, error } = await supabase.rpc("admin_lead_detail", { p_rfq_id: id! });
       if (error) throw new Error(error.message);
-      return data as unknown as LeadDetail;
+      const detail = data as unknown as LeadDetail;
+      // rfqs.images is buyer-written text and Leads puts each one in an <a href>: a
+      // "javascript:" entry would run in the admin's session. Plain http(s) only.
+      return {
+        ...detail,
+        images: (detail.images ?? []).map(safeHttpUrl).filter((u): u is string => u !== null),
+      };
     },
   });
 }

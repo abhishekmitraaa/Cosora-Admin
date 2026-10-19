@@ -9,6 +9,13 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-20 (branch `fix/serious-2026-10-20`, with textile-spark-net branch `fix/serious-2026-10-20`, which holds migration `20261020120000_serious_fixes.sql`; built and tested locally, **NOT released**)
+  - Why: the 2026-10-20 admin audit; Mitra: "tackle all the serious issues".
+  - Landing: each role is sent to a real route. The list named sections, and three sections' routes differ from their names (`rfq-review` → /requirement-review, `category-images` → /category-pictures, `hero-slides` → /new-arrivals-carousel), so super_admin, manager and product_moderator went to /rfq-review, the `*` route sent them back to "/", and the two redirected for ever after every sign-in. Account managers now land on My vendors instead of Reports.
+  - Leads: a requirement's photo links are http(s) only (`useLeadDetail` filters with `safeHttpUrl`). `rfqs.images` is buyer-written text; a `javascript:` entry in the `<a href>` ran in the admin's session. The database refuses such addresses too (the migration above).
+  - Database, same migration: requirements with 4-5 photos can be approved (rfqs allowed 3); `admin_profile_search` answers super_admin, support and manager, `admin_profile_emails` those and vendor_ops (any staff role could list account emails).
+  - Tests: textile-spark-net `tests/local/serious-fixes.spec.ts` 7/7; SQL harness 25/25 (8/25 before).
+
 - 2026-10-18 (branch `fix/chat-files-review-2026-10-18`, with textile-spark-net branch `fix/first-fixes-2026-10-18`, which holds migrations `20261018160000`–`20261018160200`; built and tested locally, **NOT released**). Chats: the whole conversation, files included.
   - Why: Mitra, 2026-10-18: "The admin panel should be able to read the entire chat and not just the screenshot." The buyer app now sends real photos, PDFs, voice notes and contact cards, and the thread showed only their labels ("📷 Photo"), and only the first 500 messages.
   - `src/pages/ChatThread.tsx`: messages are read in pages of 1,000 until the end; photos, PDFs and voice notes show inline through signed links to the private `chat-attachments` bucket (support and super admins may read it); a contact card has "Show number" (`admin_chat_contact_number`, an Admin Log `reveal_contact` row each time); a panel lists who blocked whom (and whether it was lifted) and each person's star / archive / delete-for-me (`admin_conversation_state`); a divider marks where a person deleted the chat for themselves (staff still see every message); a "blocked" badge in the header.
