@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { readAllPages } from "@/lib/readAllPages";
 
 /**
  * Physical verification-certificate fulfilment — REAL DATA.
@@ -103,14 +104,20 @@ function mapOrder(r: RawCertificateOrder): CertificateOrder {
   };
 }
 
-/** Oldest first: the parcel that has been waiting longest is the one to action. */
+/**
+ * Oldest first: the parcel that has been waiting longest is the one to action. Every order, in pages: a
+ * single read stopped at 1,000 rows, which cut off the newest orders, the ones still to print.
+ */
 export async function fetchCertificateOrders(): Promise<CertificateOrder[]> {
-  const { data, error } = await supabase
-    .from("certificate_orders")
-    .select("*")
-    .order("purchased_at", { ascending: true });
-  if (error) throw error;
-  return ((data ?? []) as unknown as RawCertificateOrder[]).map(mapOrder);
+  const rows = await readAllPages((from, to) =>
+    supabase
+      .from("certificate_orders")
+      .select("*")
+      .order("purchased_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  return (rows as unknown as RawCertificateOrder[]).map(mapOrder);
 }
 
 /**

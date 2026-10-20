@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, ImageOff, Plus, Trash2 } from "lucide-react";
 import { canWrite, readOnlyReason } from "@/lib/roles";
@@ -93,17 +92,20 @@ export default function Content() {
  * Banners
  * ══════════════════════════════════════════════════════════════════ */
 
-// <input type="date"> works in local days. A start is that day's first moment; an end is
-// the first moment of the next day, so "ends on 5 Oct" runs through the 5th.
-const dayStart = (v: string) => (v ? new Date(`${v}T00:00:00`).toISOString() : null);
-const dayAfter = (v: string) => {
-  if (!v) return null;
-  const d = new Date(`${v}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString();
-};
-const startInput = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd") : "");
-const endInput = (iso: string | null) => (iso ? format(new Date(Date.parse(iso) - 1), "yyyy-MM-dd") : "");
+// Banner days are India's days, whatever the admin's browser is set to (it used the browser's zone, so an
+// admin abroad scheduled banners hours off; Discounts, subscriptions and Admin Log already pin IST;
+// 2026-10-20 audit). A start is that day's first moment in IST; an end is the first moment of the next
+// IST day, so "ends after 5 Oct" runs through the 5th. IST has no daylight saving: a day is 24 hours.
+const DAY_MS = 86_400_000;
+const istMidnight = (v: string) => Date.parse(`${v}T00:00:00+05:30`);
+const dayStart = (v: string) => (v ? new Date(istMidnight(v)).toISOString() : null);
+const dayAfter = (v: string) => (v ? new Date(istMidnight(v) + DAY_MS).toISOString() : null);
+/** "2026-10-05" for the IST day a moment falls on (en-CA writes dates as yyyy-mm-dd). */
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+/** "5 Oct 2026" in IST, for the banner list. */
+const IST_LABEL = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
+const startInput = (iso: string | null) => (iso ? IST_DAY.format(new Date(iso)) : "");
+const endInput = (iso: string | null) => (iso ? IST_DAY.format(new Date(Date.parse(iso) - 1)) : "");
 
 function draftFrom(b: SiteBanner | null): BannerDraft {
   return {
@@ -218,8 +220,8 @@ function BannersTab({ writable }: { writable: boolean }) {
                     </p>
                     {(b.starts_at || b.ends_at) && (
                       <p className="mt-1 text-2xs tabular-nums text-ink-faint">
-                        {b.starts_at ? format(new Date(b.starts_at), "d MMM yyyy") : "now"} to{" "}
-                        {b.ends_at ? format(new Date(Date.parse(b.ends_at) - 1), "d MMM yyyy") : "no end"}
+                        {b.starts_at ? IST_LABEL.format(new Date(b.starts_at)) : "now"} to{" "}
+                        {b.ends_at ? IST_LABEL.format(new Date(Date.parse(b.ends_at) - 1)) : "no end"}
                       </p>
                     )}
                   </div>
@@ -390,10 +392,10 @@ function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: 
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Starts on" htmlFor="banner-start" hint="Blank: straight away.">
+          <Field label="Starts on (IST)" htmlFor="banner-start" hint="Blank: straight away.">
             <Input id="banner-start" type="date" value={startInput(draft.starts_at)} onChange={(e) => set({ starts_at: dayStart(e.target.value) })} />
           </Field>
-          <Field label="Ends after" htmlFor="banner-end" hint="Blank: until turned off." error={errors.ends_at}>
+          <Field label="Ends after (IST)" htmlFor="banner-end" hint="Blank: until turned off." error={errors.ends_at}>
             <Input id="banner-end" type="date" value={endInput(draft.ends_at)} onChange={(e) => set({ ends_at: dayAfter(e.target.value) })} />
           </Field>
         </div>

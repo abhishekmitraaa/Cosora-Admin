@@ -9,6 +9,15 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-20 (branch `fix/low-2026-10-20`, with textile-spark-net branch `fix/low-2026-10-20`, which holds migration `20261020140000_account_search_by_phone.sql`; built and tested locally, **NOT released**)
+  - Why: the 2026-10-20 admin audit's low list; Mitra: "go on with the low list".
+  - Accounts: search by name, email or phone (the migration matches a number's digits; it never returns the number).
+  - Certificates and Vendors read every row in pages (`lib/readAllPages.ts`): one read stopped at 1,000 rows with no error, which hid the newest certificate orders and the vendors late in the alphabet.
+  - Site content: banner start and end days are IST days whatever the browser's zone is, and the list shows them in IST (an admin abroad scheduled banners hours off).
+  - Chats: a search's matching ids go 100 at a time (`chunks` / `IN_CHUNK`), merged to the newest 200: up to 500 ids made a URL the gateway refused.
+  - Chat thread: file links are re-signed 5 minutes before the hour they last, and on returning to the tab once stale.
+  - Tests: textile-spark-net `tests/local/low-fixes.spec.ts` 6/6 (all six failed on production's code) and `tests/local/admin-pages.spec.ts` 10/10 (every page, every role).
+
 - 2026-10-20 (branch `fix/medium-2026-10-20`, with textile-spark-net branch `fix/medium-2026-10-20`, which holds migration `20261020130000_admin_audit_medium_fixes.sql`; **RELEASED 2026-10-20**: main 750256e, admin-staff v6 and admin-refund-payment v10 deployed, migration applied)
   - Why: the 2026-10-20 admin audit; Mitra: "tackle leaked-password protection, the staff temporary-password gaps, and also the medium list".
   - admin-staff: temporary passwords expire after 72 hours (`temp_password_issued_at` in app_metadata, set on register and reset); `set_password` refuses a password in Have I Been Pwned's breached list (k-anonymity; allowed if the service is down); a manager can't reset a deactivated super admin's or manager's password. The database now refuses an account on its temporary password (the migration above).

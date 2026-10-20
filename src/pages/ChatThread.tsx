@@ -88,7 +88,12 @@ function useFileLinks(conversationId: string | undefined, paths: string[]) {
   return useQuery({
     queryKey: ["chat-thread-files", conversationId, paths.length, paths[paths.length - 1] ?? ""],
     enabled: paths.length > 0,
+    // Links last an hour. Re-sign 5 minutes before they lapse while the page is open, and on
+    // coming back to the tab once they are stale (the global default leaves focus refetch off):
+    // a thread left open past the hour showed dead photos, voice notes and PDFs (2026-10-20 audit).
     staleTime: (SIGNED_URL_SECONDS - 300) * 1000,
+    refetchInterval: (SIGNED_URL_SECONDS - 300) * 1000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const links: Record<string, string> = {};
       for (let i = 0; i < paths.length; i += 100) {

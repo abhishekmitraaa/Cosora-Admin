@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { fetchAccountStatuses } from "@/lib/accounts";
+import { readAllPages } from "@/lib/readAllPages";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { sealSources } from "@/lib/trustSeal";
@@ -51,14 +52,18 @@ export default function Vendors() {
   const vendors = useQuery({
     queryKey: ["vendors"],
     queryFn: async (): Promise<VendorListRow[]> => {
-      const { data, error } = await supabase
-        .from("vendor_profiles")
-        .select(
-          "id, brand_name, city, business_type, onboarding_complete, is_verified, plan_id, plan_expires_at, ad_verified_until",
-        )
-        .order("brand_name", { ascending: true });
-      if (error) throw new Error(error.message);
-      const vendors = data ?? [];
+      // Every vendor, in pages: one read stopped at 1,000 rows, so brands late in the
+      // alphabet were missing with no error (2026-10-20 audit).
+      const vendors = await readAllPages((from, to) =>
+        supabase
+          .from("vendor_profiles")
+          .select(
+            "id, brand_name, city, business_type, onboarding_complete, is_verified, plan_id, plan_expires_at, ad_verified_until",
+          )
+          .order("brand_name", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
 
       // Suspension lives on `profiles`, keyed by the same uuid
       // (vendor_profiles.id FKs profiles.id). Two FKs from vendor_profiles to

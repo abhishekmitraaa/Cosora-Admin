@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { fetchParticipants, participantLabel, resolveSides, type Participant } from "@/lib/chat";
+import { chunks, IN_CHUNK } from "@/lib/accounts";
 import {
   Badge,
   Empty,
@@ -78,22 +79,35 @@ export default function Chats() {
         if (matchedIds.length === 0) return { rows: [] as ConversationRow[], people: new Map<string, Participant>() };
       }
 
-      let query = supabase
-        .from("conversations")
-        .select("id, status, last_message, last_message_at, user_a, user_b")
-        .order("last_message_at", { ascending: false })
-        .limit(PAGE_LIMIT);
+      const page = async (ids: string[] | null): Promise<ConversationRow[]> => {
+        let query = supabase
+          .from("conversations")
+          .select("id, status, last_message, last_message_at, user_a, user_b")
+          .order("last_message_at", { ascending: false })
+          .limit(PAGE_LIMIT);
+        if (tab !== "all") query = query.eq("status", tab);
+        if (ids) {
+          const list = ids.join(",");
+          query = query.or(`user_a.in.(${list}),user_b.in.(${list})`);
+        }
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return (data ?? []) as ConversationRow[];
+      };
 
-      if (tab !== "all") query = query.eq("status", tab);
-      if (matchedIds) {
-        const list = matchedIds.join(",");
-        query = query.or(`user_a.in.(${list}),user_b.in.(${list})`);
+      // The ids go in the URL, twice. Up to 500 of them made a ~37 KB address that the gateway
+      // refused, so a broad search failed exactly when it matched many people (2026-10-20 audit).
+      // 100 at a time, each part's newest PAGE_LIMIT, merged: the newest PAGE_LIMIT overall.
+      let rows: ConversationRow[];
+      if (!matchedIds) {
+        rows = await page(null);
+      } else {
+        const parts = await Promise.all(chunks(matchedIds, IN_CHUNK).map(page));
+        const byId = new Map(parts.flat().map((c) => [c.id, c]));
+        rows = [...byId.values()]
+          .sort((a, b) => Date.parse(b.last_message_at) - Date.parse(a.last_message_at))
+          .slice(0, PAGE_LIMIT);
       }
-
-      const { data, error } = await query;
-      if (error) throw new Error(error.message);
-
-      const rows = (data ?? []) as ConversationRow[];
       const people = await fetchParticipants(rows.flatMap((c) => [c.user_a, c.user_b]));
       return { rows, people };
     },

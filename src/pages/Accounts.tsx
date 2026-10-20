@@ -74,7 +74,8 @@ export default function Accounts() {
     enabled: trimmed.length >= MIN_QUERY,
     queryFn: async (): Promise<AccountRow[]> => {
       // admin_profile_search(): name or email contains the term (two ilikes, no
-      // text-search index: the table is small), or the id equals it; newest
+      // text-search index: the table is small), the digits of a phone number match
+      // the sign-in or profile number (6+ digits; never returned), or the id equals it; newest
       // first. An RPC because profiles.email is not client-selectable (MPF-3,
       // migration 20260923171821); the function is admin-gated instead.
       const { data, error } = await supabase.rpc("admin_profile_search", { p_term: trimmed, p_limit: LIMIT });
@@ -133,7 +134,7 @@ export default function Accounts() {
 
       <Card className="mb-4">
         <Field
-          label="Search by name or email"
+          label="Search by name, email or phone"
           htmlFor="account-search"
           hint={`At least ${MIN_QUERY} characters. Shows the ${LIMIT} most recent matches, so narrow the term if what you want is not here rather than paging.`}
         >
@@ -147,7 +148,7 @@ export default function Accounts() {
               className="pl-8"
               value={term}
               autoFocus
-              placeholder="anaya, or buyer@example.com"
+              placeholder="anaya, buyer@example.com or 98765 43210"
               onChange={(e) => {
                 setTerm(e.target.value);
                 setSelected(null);
