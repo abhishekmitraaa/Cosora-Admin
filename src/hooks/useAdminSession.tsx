@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { AdminRole } from "@/lib/roles";
@@ -40,7 +40,9 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<AdminIdentity | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadIdentity(current: Session | null) {
+  const userIdRef = useRef<string | null>(null);
+
+  async function loadIdentity(current: Session | null, { quiet = false }: { quiet?: boolean } = {}) {
     if (!current?.user) {
       setIdentity(null);
       setError(null);
@@ -52,6 +54,12 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     // no active admin_users row); no row at all when there is no profile.
     const data = rows?.[0] ?? null;
 
+    if (dbError && quiet) {
+      // A background re-read (token refresh) that failed, e.g. a dropped network:
+      // keep the identity already shown rather than replace the page with an error.
+      console.warn("admin_whoami re-read failed; keeping the current identity", dbError.message);
+      return;
+    }
     if (dbError) {
       setError(dbError.message);
       setIdentity(null);
@@ -84,16 +92,26 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setSession(data.session);
+      userIdRef.current = data.session?.user?.id ?? null;
       void loadIdentity(data.session);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!active) return;
       setSession(next);
-      setLoading(true);
       // Re-read the profile on every auth transition: a role changed in another
       // tab (or by another super_admin) must not survive on stale state.
-      void loadIdentity(next);
+      //
+      // Only a different person (sign-in, sign-out, another account) shows the
+      // "Checking admin access" spinner. The same person's events, above all the
+      // hourly TOKEN_REFRESHED, re-read quietly: the spinner replaces the whole
+      // app, which threw away an unsaved blog draft or an open form every hour
+      // (2026-10-20 audit).
+      const nextUserId = next?.user?.id ?? null;
+      const sameUser = nextUserId !== null && nextUserId === userIdRef.current;
+      userIdRef.current = nextUserId;
+      if (!sameUser) setLoading(true);
+      void loadIdentity(next, { quiet: sameUser });
     });
 
     return () => {

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { describeWriteError, supabase } from "@/lib/supabase";
 import { Badge, Button, Empty, Modal, Note, Panel, SkeletonList, Table, Textarea } from "@/components/ui";
+import { announceRefund, canRefund, refundSettledOrUnderway, refundState, type RefundResult } from "@/lib/refunds";
 
 interface GuaranteeInvoice {
   id: string;
@@ -76,10 +77,10 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
         throw new Error(detail);
       }
       if (data?.error) throw new Error(data.detail || data.error);
-      return data as { refundId: string; refundStatus: string };
+      return data as RefundResult;
     },
     onSuccess: (d) => {
-      toast.success(`Refund ${d.refundStatus === "processed" ? "processed" : `accepted (${d.refundStatus})`} by Razorpay (${d.refundId})`);
+      announceRefund(d);
       void qc.invalidateQueries({ queryKey: ["refund-guarantee-requests"] });
       void qc.invalidateQueries({ queryKey: ["invoices"] });
     },
@@ -116,7 +117,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
       ) : (
         <div className="space-y-4">
           {rows.map((r) => {
-            const allRefunded = r.invoices.every((i) => Boolean(i.razorpay_refund_id));
+            const allRefunded = r.invoices.every(refundSettledOrUnderway);
             return (
               <div key={r.id} className="rounded-xl border border-line bg-surface-2 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -144,9 +145,9 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
                       <td className="px-3 py-2 text-ink-muted">{i.plan_id ?? "—"}</td>
                       <td className="px-3 py-2 tabular-nums text-ink">{inr(i.total_rupees)}</td>
                       <td className="px-3 py-2">
-                        {i.razorpay_refund_id ? (
-                          <Badge tone={i.refund_status === "processed" ? "positive" : "caution"}>{i.refund_status ?? "pending"}</Badge>
-                        ) : i.refund_status === "failed" ? (
+                        {refundSettledOrUnderway(i) ? (
+                          <Badge tone={refundState(i) === "processed" ? "positive" : "caution"}>{refundState(i)}</Badge>
+                        ) : refundState(i) === "failed" ? (
                           <Badge tone="critical">failed</Badge>
                         ) : (
                           <span className="text-2xs text-ink-ghost">not yet</span>
@@ -155,7 +156,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
                       <td className="px-3 py-2 text-right">
                         <Button
                           size="sm"
-                          disabled={!writable || Boolean(i.razorpay_refund_id) || refund.isPending}
+                          disabled={!writable || !canRefund(i) || refund.isPending}
                           onClick={() => {
                             if (!confirm(`Refund ${inr(i.total_rupees)} to ${r.vendor_name ?? "this vendor"} via Razorpay?`)) return;
                             refund.mutate(i.id);

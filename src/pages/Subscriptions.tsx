@@ -33,6 +33,7 @@ import { SubscriptionKpis } from "@/components/SubscriptionKpis";
 import { PlanPricesPanel } from "@/components/PlanPricesPanel";
 import { GrantPlanModal } from "@/components/GrantPlanModal";
 import { useSubscriptionWorklist, type WorklistRow, type WorklistView } from "@/lib/subscriptionAdmin";
+import { announceRefund, canRefund, refundState, type RefundResult } from "@/lib/refunds";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -297,14 +298,10 @@ export default function Subscriptions() {
         throw new Error(detail);
       }
       if (data?.error) throw new Error(data.detail || data.error);
-      return data as { refundId: string; refundStatus: string };
+      return data as RefundResult;
     },
     onSuccess: (d) => {
-      toast.success(
-        d.refundStatus === "processed"
-          ? `Refund processed by Razorpay (${d.refundId})`
-          : `Refund accepted by Razorpay, status: ${d.refundStatus} (${d.refundId})`,
-      );
+      announceRefund(d);
       void qc.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
@@ -501,7 +498,7 @@ export default function Subscriptions() {
             <Table head={["Invoice", "Vendor", "Plan", "Amount", "Period", "Status", "Refund", ""]}>
               {invRows.map((inv) => {
                 const total = inv.total_paise != null ? inv.total_paise / 100 : inv.amount + (inv.gst_amount ?? 0);
-                const refundable = Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !inv.razorpay_refund_id;
+                const refundable = canRefund(inv);
                 const doc = inv.document_type ? DOCUMENT[inv.document_type] : null;
                 return (
                   <tr key={inv.id} className={ROW_HOVER}>
@@ -536,17 +533,21 @@ export default function Subscriptions() {
                       <StatusBadge status={inv.status} />
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {inv.razorpay_refund_id ? (
+                      {refundState(inv) !== "none" ? (
                         <span>
-                          <Badge tone={inv.refund_status === "processed" ? "positive" : "caution"}>
-                            {inv.refund_status}
+                          <Badge
+                            tone={
+                              refundState(inv) === "processed" ? "positive" : refundState(inv) === "failed" ? "critical" : "caution"
+                            }
+                          >
+                            {refundState(inv)}
                           </Badge>
-                          <span className="mt-0.5 block font-mono text-2xs text-ink-faint">
-                            {inv.razorpay_refund_id}
-                          </span>
+                          {inv.razorpay_refund_id && (
+                            <span className="mt-0.5 block font-mono text-2xs text-ink-faint">
+                              {inv.razorpay_refund_id}
+                            </span>
+                          )}
                         </span>
-                      ) : inv.refund_status === "failed" ? (
-                        <Badge tone="critical">failed</Badge>
                       ) : (
                         <span className="text-ink-ghost">none</span>
                       )}

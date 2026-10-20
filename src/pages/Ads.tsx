@@ -64,7 +64,9 @@ const TABS: { id: AdStatus; label: string }[] = [
  * One tab can cover several stored statuses. "Paused" covers both pauses and
  * the legacy single 'paused' value — an admin looking for paused campaigns
  * means all of them, even though only they can lift `paused_by_admin`.
- * "Finished" covers 'expired' and the legacy 'ended'.
+ * "Finished" covers 'expired' and the legacy 'ended'. A 'scheduled' campaign (approved,
+ * waiting for its start date) is handled on the Review view's Scheduled tab, which can
+ * reject or suspend it before it serves.
  */
 const TAB_STATUSES: Record<AdStatus, string[]> = {
   active: ["active"],
@@ -280,7 +282,7 @@ export default function Ads() {
       >
         <p className="mb-3 text-sm text-ink-muted">
           {action?.next === "paused"
-            ? "Pausing stops serving now. The vendor can resume this campaign themselves."
+            ? "Pausing stops serving now. Only Cosora can resume it: the vendor sees “Paused by Cosora” and is asked to contact support."
             : "Rejecting stops serving now. The vendor cannot reactivate it."}{" "}
           The reason is recorded on the campaign and in its decision history.
         </p>

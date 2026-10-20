@@ -1,7 +1,8 @@
+import { ListingChangedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { supabase, assertWrote } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
@@ -103,28 +104,31 @@ export default function Products() {
   const moderate = useMutation({
     mutationFn: async ({
       id,
+      from,
       status,
       rejection_reason,
     }: {
       id: string;
+      /** The status the moderator was shown; the update applies only if it still holds. */
+      from: string;
       status: Status;
       rejection_reason: string | null;
     }) => {
-      assertWrote(
-        await supabase.from("products").update({ status, rejection_reason }).eq("id", id).select("id"),
-        `set product to ${status}`,
-      );
+      await moderateFrom("products", id, from, { status, rejection_reason }, `set product to ${status}`);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      if (e instanceof ListingChangedError) void qc.invalidateQueries({ queryKey: ["products"] });
+    },
   });
 
   function approve(p: ProductRow) {
     moderate.mutate(
-      { id: p.id, status: "live", rejection_reason: null },
+      { id: p.id, from: p.status, status: "live", rejection_reason: null },
       { onSuccess: () => toast.success(`"${p.name}" is now live`) },
     );
   }
@@ -132,7 +136,7 @@ export default function Products() {
   function submitRejection() {
     if (!rejecting || !reason.trim()) return;
     moderate.mutate(
-      { id: rejecting.id, status: "rejected", rejection_reason: reason.trim() },
+      { id: rejecting.id, from: rejecting.status, status: "rejected", rejection_reason: reason.trim() },
       {
         onSuccess: () => {
           toast.success(`"${rejecting.name}" rejected`);

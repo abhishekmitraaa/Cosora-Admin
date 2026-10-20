@@ -1,8 +1,9 @@
+import { ListingChangedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
-import { supabase, assertWrote } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
@@ -110,21 +111,27 @@ export default function Catalogues() {
   });
 
   const moderate = useMutation({
-    mutationFn: async ({ id, status, rejection_reason }: { id: string; status: Status; rejection_reason: string | null }) => {
-      assertWrote(
-        await supabase.from("catalogues").update({ status, rejection_reason }).eq("id", id).select("id"),
-        `set catalogue to ${status}`,
-      );
+    mutationFn: async ({
+      id,
+      from,
+      status,
+      rejection_reason,
+    }: { id: string; from: string; status: Status; rejection_reason: string | null }) => {
+      // `from`: the status the moderator was shown; the update applies only if it still holds.
+      await moderateFrom("catalogues", id, from, { status, rejection_reason }, `set catalogue to ${status}`);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["catalogues"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      if (e instanceof ListingChangedError) void qc.invalidateQueries({ queryKey: ["catalogues"] });
+    },
   });
 
   function approve(c: CatalogueRow) {
     moderate.mutate(
-      { id: c.id, status: "live", rejection_reason: null },
+      { id: c.id, from: c.status, status: "live", rejection_reason: null },
       { onSuccess: () => toast.success(`"${c.title}" is now live`) },
     );
   }
@@ -132,7 +139,7 @@ export default function Catalogues() {
   function submitRejection() {
     if (!rejecting || !reason.trim()) return;
     moderate.mutate(
-      { id: rejecting.id, status: "rejected", rejection_reason: reason.trim() },
+      { id: rejecting.id, from: rejecting.status, status: "rejected", rejection_reason: reason.trim() },
       {
         onSuccess: () => {
           toast.success(`"${rejecting.title}" rejected`);

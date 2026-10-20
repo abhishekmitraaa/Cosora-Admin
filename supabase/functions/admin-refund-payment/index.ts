@@ -136,8 +136,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const invoice: InvoiceRow | null = Array.isArray(invRows) && invRows.length ? invRows[0] : null;
   if (!invoice) return json({ error: "invoice_not_found" }, 404);
 
-  if (invoice.refund_status === "processed" || invoice.razorpay_refund_id) {
+  // From refund_status, not razorpay_refund_id: a refund Razorpay marked failed keeps its id (here and in
+  // subscription_refund_event), and checking the id refused every retry of a failed refund (2026-10-20 audit).
+  if (invoice.refund_status === "processed") {
     return json({ error: "already_refunded", refundId: invoice.razorpay_refund_id }, 409);
+  }
+  if (invoice.refund_status === "pending") {
+    return json({ error: "refund_in_progress", detail: "A refund for this invoice is already with Razorpay." }, 409);
   }
   if (invoice.status !== "paid") {
     return json({ error: "not_refundable", detail: `Invoice status is '${invoice.status}', expected 'paid'` }, 409);
@@ -159,7 +164,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // The gateway captured (base + GST). Invoices since 2026-10-08 store that total in
   // paise; older ones store base and GST separately, in rupees. Refunding amount alone
   // would silently short the vendor the GST.
-  const amountPaise = invoice.total_paise ?? (invoice.amount + (invoice.gst_amount ?? 0)) * 100;
+  // Rounded: rupees with paise (999 + 179.82) times 100 is 117881.99999999999 in floating point, and
+  // Razorpay refuses an amount that isn't a whole number of paise.
+  const amountPaise = invoice.total_paise ?? Math.round((invoice.amount + (invoice.gst_amount ?? 0)) * 100);
   if (amountPaise <= 0) return json({ error: "zero_amount" }, 400);
 
   // ── Claim it, so a double-click can't double-refund ───────────────────────
@@ -168,7 +175,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     {
       method: "PATCH",
       headers: { ...REST(serviceKey), prefer: "return=representation" },
-      body: JSON.stringify({ refund_status: "pending" }),
+      // A retry after a failed refund drops the failed refund's id (the Admin Log has it), so Razorpay's event
+      // for the new refund can still complete the invoice if the write below doesn't.
+      body: JSON.stringify({ refund_status: "pending", razorpay_refund_id: null }),
     },
   );
   const claimed = claim.ok ? await claim.json() : [];
@@ -269,15 +278,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
   };
   if (gatewayStatus === "processed") patch.status = "refunded";
 
-  await fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
-    method: "PATCH",
-    headers: { ...REST(serviceKey), prefer: "return=minimal" },
-    body: JSON.stringify(patch),
+  // The money has moved whatever happens here, so a failed write still answers ok, but says so. The claim
+  // left the invoice 'pending' with no refund id, which Razorpay's refund.processed event (subscription_refund_event
+  // matches on the payment id when no refund id is stored) completes later; the Admin Log keeps the refund id.
+  let recorded = false;
+  let recordError: string | null = null;
+  try {
+    const saved = await fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
+      method: "PATCH",
+      headers: { ...REST(serviceKey), prefer: "return=minimal" },
+      body: JSON.stringify(patch),
+    });
+    recorded = saved.ok;
+    if (!saved.ok) recordError = `${saved.status} ${(await saved.text()).slice(0, 200)}`;
+  } catch (e) {
+    recordError = String(e).slice(0, 200);
+  }
+  if (!recorded) console.error("admin-refund-payment: refund issued but not recorded on the invoice", invoiceId, refund.id, recordError);
+  await recordRefund({
+    refund_status: gatewayStatus, razorpay_refund_id: refund.id, refunded_amount: patch.refunded_amount,
+    ...(recorded ? {} : { invoice_not_updated: recordError ?? "unknown" }),
   });
-  await recordRefund({ refund_status: gatewayStatus, razorpay_refund_id: refund.id, refunded_amount: patch.refunded_amount });
 
   return json({
     ok: true,
+    recorded,
     refundId: refund.id,
     refundStatus: gatewayStatus,
     amountPaise: refund.amount ?? amountPaise,

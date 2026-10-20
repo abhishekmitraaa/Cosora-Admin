@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { AuthLayout, Button, Card, ErrorNote, Input, Spinner } from "@/components/ui";
+import { isBreachedPassword, passwordRuleProblem } from "@/lib/pwnedPassword";
 
 /**
  * The route a Supabase invite / recovery link lands on. This is the piece that
@@ -101,8 +102,9 @@ export default function ResetPassword() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) {
-      setError("Use at least 8 characters.");
+    const problem = passwordRuleProblem(password);
+    if (problem) {
+      setError(problem);
       return;
     }
     if (password !== confirm) {
@@ -110,6 +112,11 @@ export default function ResetPassword() {
       return;
     }
     setBusy(true);
+    if (await isBreachedPassword(password)) {
+      setError("This password has appeared in a data breach, so it's easy to guess. Choose a different one.");
+      setBusy(false);
+      return;
+    }
     const { error: updateError } = await supabase.auth.updateUser({ password });
     if (updateError) {
       setError(updateError.message);

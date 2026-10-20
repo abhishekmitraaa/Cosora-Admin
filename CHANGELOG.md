@@ -9,6 +9,16 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-20 (branch `fix/medium-2026-10-20`, with textile-spark-net branch `fix/medium-2026-10-20`, which holds migration `20261020130000_admin_audit_medium_fixes.sql`; built and tested locally, **NOT released**)
+  - Why: the 2026-10-20 admin audit; Mitra: "tackle leaked-password protection, the staff temporary-password gaps, and also the medium list".
+  - admin-staff: temporary passwords expire after 72 hours (`temp_password_issued_at` in app_metadata, set on register and reset); `set_password` refuses a password in Have I Been Pwned's breached list (k-anonymity; allowed if the service is down); a manager can't reset a deactivated super admin's or manager's password. The database now refuses an account on its temporary password (the migration above).
+  - ResetPassword (set-password and reset links): the same breached check (`lib/pwnedPassword.ts`) and the same rule as `set_password` (10 characters, letters and numbers). Supabase's own leaked-password protection needs a paid plan.
+  - Session: only a different person shows "Checking admin access"; the same person's events (the hourly token refresh) re-read the identity quietly and keep the page, so an unsaved blog draft or open form survives. A failed quiet re-read keeps the identity shown.
+  - Products, Video Closeups, Catalogues: approve and reject apply only if the listing still has the status the moderator was shown (`lib/moderation.ts`); otherwise "This changed since the list loaded" and the list refreshes.
+  - Refunds (`lib/refunds.ts`, admin-refund-payment): state comes from `refund_status`, not the refund id a failed refund keeps, so a failed refund can be retried and can't close the 7-day guarantee; a pending one isn't sent twice; the claim drops a failed refund's id so Razorpay's event can finish a retry; an unrecorded final write answers `recorded: false` ("don't refund again"); older invoices' paise are rounded (amount and gst_amount are whole rupees, so this was never wrong in practice).
+  - Ads: the Moderation view's pause dialog says only Cosora can resume (it said the vendor could). Scheduled campaigns already had a tab (Review › Scheduled); none added.
+  - Tests: textile-spark-net `tests/local/medium-fixes.spec.ts` 12/12; SQL harness 27/27 (3/14 before).
+
 - 2026-10-20 (branch `fix/serious-2026-10-20`, with textile-spark-net branch `fix/serious-2026-10-20`, which holds migration `20261020120000_serious_fixes.sql`; **RELEASED 2026-10-20**: main 48cccc6, migration applied to production)
   - Why: the 2026-10-20 admin audit; Mitra: "tackle all the serious issues".
   - Landing: each role is sent to a real route. The list named sections, and three sections' routes differ from their names (`rfq-review` → /requirement-review, `category-images` → /category-pictures, `hero-slides` → /new-arrivals-carousel), so super_admin, manager and product_moderator went to /rfq-review, the `*` route sent them back to "/", and the two redirected for ever after every sign-in. Account managers now land on My vendors instead of Reports.

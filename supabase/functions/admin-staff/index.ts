@@ -18,7 +18,13 @@
 //   { action: "set_password", password }
 //       The signed-in staff member, at first sign-in: replaces the temporary
 //       password and clears app_metadata.must_change_password. Refused when no
-//       temporary password is pending.
+//       temporary password is pending, when it is older than TEMP_PASSWORD_HOURS
+//       (app_metadata.temp_password_issued_at, set on register and reset), and
+//       when the new password is in Have I Been Pwned's breached list.
+//
+// While must_change_password is set, the database treats the account as no admin
+// at all (is_admin(), admin_role(), admin.am_staff(): textile-spark-net migration
+// 20261020130000), so the temporary password opens nothing but this change.
 //
 // How this differs from admin-invite: that function emails a Supabase set-password
 // link to the account's own address. A registered staff member's work email is
@@ -88,6 +94,39 @@ function normalisePhone(raw: string): string | null {
   else if (/^91[6-9]\d{9}$/.test(s)) e164 = `+${s}`;
   else return null;
   return /^\+[1-9]\d{7,14}$/.test(e164) ? e164 : null;
+}
+
+/** How long a temporary password can be used to choose a real one (2026-10-20 audit: it never expired). */
+const TEMP_PASSWORD_HOURS = 72;
+
+/**
+ * True when the password is in Have I Been Pwned's breached-password list, checked by k-anonymity: only
+ * the first 5 characters of its SHA-1 leave this function. Supabase's own leaked-password protection
+ * needs a paid plan (Cosora is on Free, 2026-10-20), so the panel's password screens check here. If the
+ * service can't be reached the password is allowed (logged): an outage there must not lock staff out.
+ * PWNED_PASSWORDS_URL names a stand-in for tests.
+ */
+async function pwned(password: string): Promise<boolean> {
+  try {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(password)));
+    const hex = Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    const base = Deno.env.get("PWNED_PASSWORDS_URL") || "https://api.pwnedpasswords.com";
+    const r = await fetch(`${base}/range/${hex.slice(0, 5)}`, { headers: { "Add-Padding": "true" } });
+    if (!r.ok) {
+      console.error("admin-staff: breached-password check unavailable", r.status);
+      return false;
+    }
+    const suffix = hex.slice(5);
+    for (const line of (await r.text()).split("\n")) {
+      const [s, count] = line.trim().split(":");
+      // Padding rows carry a count of 0.
+      if (s === suffix && Number(count) > 0) return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("admin-staff: breached-password check failed", String(e));
+    return false;
+  }
 }
 
 // No 0/O, 1/l/I: the password may be read aloud or copied by hand.
@@ -259,10 +298,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (user?.app_metadata?.must_change_password !== true) {
       return json({ error: "not_required", detail: "There's no temporary password to replace on this account." }, 409);
     }
+    // A temporary password works for TEMP_PASSWORD_HOURS from issue; after that only a new one from a super
+    // admin or manager does. No issue time (one issued before 2026-10-20) counts as expired.
+    const issuedAt = Date.parse(String(user?.app_metadata?.temp_password_issued_at ?? ""));
+    if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > TEMP_PASSWORD_HOURS * 3600_000) {
+      return json({
+        error: "temporary_password_expired",
+        detail: `This temporary password has expired (they last ${TEMP_PASSWORD_HOURS} hours). Ask a super admin or your manager for a new one.`,
+      }, 410);
+    }
+    if (await pwned(password)) {
+      return json({
+        error: "breached_password",
+        detail: "This password has appeared in a data breach, so it's easy to guess. Choose a different one.",
+      }, 400);
+    }
     const upd = await fetch(`${url}/auth/v1/admin/users/${callerId}`, {
       method: "PUT",
       headers: REST(serviceKey),
-      body: JSON.stringify({ password, app_metadata: { must_change_password: false } }),
+      body: JSON.stringify({ password, app_metadata: { must_change_password: false, temp_password_issued_at: null } }),
     });
     if (!upd.ok) return json({ error: "update_failed", detail: reason(await upd.text()) }, 400);
     await passwordEvent(callerId, "changed");
@@ -290,14 +344,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!staff) {
       return json({ error: "not_staff", detail: "This account wasn't registered here, so it signs in with its own email and can use “Forgot password”." }, 404);
     }
-    if (isManager && staff.is_active && !TEAM_ROLES.includes(staff.admin_role ?? "")) {
+    // Active or not: a deactivated super admin or manager keeps their role, and a manager who could reset
+    // their password (and, with email unconfigured, be shown it) could use it once they are reactivated
+    // (2026-10-20 audit). A team member with no role row is still a manager's to reset.
+    if (isManager && staff.admin_role && !TEAM_ROLES.includes(staff.admin_role)) {
       return json({ error: "forbidden", detail: "This person is a super admin or manager. Only a super admin can reset their password." }, 403);
     }
     const password = temporaryPassword();
     const upd = await fetch(`${url}/auth/v1/admin/users/${userId}`, {
       method: "PUT",
       headers: REST(serviceKey),
-      body: JSON.stringify({ password, app_metadata: { must_change_password: true } }),
+      body: JSON.stringify({ password, app_metadata: { must_change_password: true, temp_password_issued_at: new Date().toISOString() } }),
     });
     if (!upd.ok) return json({ error: "update_failed", detail: reason(await upd.text()) }, 502);
     const failure = await sendCredentials(staff.personal_email, {
@@ -374,7 +431,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         password,
         email_confirm: true,
         user_metadata: { full_name: fullName },
-        app_metadata: { created_by: "admin-staff", must_change_password: true },
+        app_metadata: { created_by: "admin-staff", must_change_password: true, temp_password_issued_at: new Date().toISOString() },
       }),
     });
     const text = await created.text();

@@ -1,9 +1,10 @@
+import { ListingChangedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Play } from "lucide-react";
-import { supabase, assertWrote, describeWriteError } from "@/lib/supabase";
+import { supabase, describeWriteError } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
@@ -138,27 +139,26 @@ export default function Videos() {
   const moderate = useMutation({
     mutationFn: async ({
       id,
+      from,
       status,
       rejection_reason,
     }: {
       id: string;
+      /** The status the moderator was shown; the update applies only if it still holds. */
+      from: string;
       status: Status;
       rejection_reason: string | null;
     }) => {
-      assertWrote(
-        await supabase
-          .from("product_videos")
-          .update({ status, rejection_reason })
-          .eq("id", id)
-          .select("id"),
-        `set video to ${status}`,
-      );
+      await moderateFrom("product_videos", id, from, { status, rejection_reason }, `set video to ${status}`);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["videos"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      if (e instanceof ListingChangedError) void qc.invalidateQueries({ queryKey: ["videos"] });
+    },
   });
 
   /**
@@ -186,7 +186,7 @@ export default function Videos() {
 
   function approve(v: VideoRow) {
     moderate.mutate(
-      { id: v.id, status: "live", rejection_reason: null },
+      { id: v.id, from: v.status, status: "live", rejection_reason: null },
       { onSuccess: () => toast.success(`"${v.brand_line}" is now live`) },
     );
   }
@@ -194,7 +194,7 @@ export default function Videos() {
   function submitRejection() {
     if (!rejecting || !reason.trim()) return;
     moderate.mutate(
-      { id: rejecting.id, status: "rejected", rejection_reason: reason.trim() },
+      { id: rejecting.id, from: rejecting.status, status: "rejected", rejection_reason: reason.trim() },
       {
         onSuccess: () => {
           toast.success(`"${rejecting.brand_line}" rejected`);
