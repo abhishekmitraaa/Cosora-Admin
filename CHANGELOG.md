@@ -9,7 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
-- 2026-10-20 (branch `fix/serious-2026-10-20`, with textile-spark-net branch `fix/serious-2026-10-20`, which holds migration `20261020120000_serious_fixes.sql`; built and tested locally, **NOT released**)
+- 2026-10-20 (branch `fix/serious-2026-10-20`, with textile-spark-net branch `fix/serious-2026-10-20`, which holds migration `20261020120000_serious_fixes.sql`; **RELEASED 2026-10-20**: main 48cccc6, migration applied to production)
   - Why: the 2026-10-20 admin audit; Mitra: "tackle all the serious issues".
   - Landing: each role is sent to a real route. The list named sections, and three sections' routes differ from their names (`rfq-review` → /requirement-review, `category-images` → /category-pictures, `hero-slides` → /new-arrivals-carousel), so super_admin, manager and product_moderator went to /rfq-review, the `*` route sent them back to "/", and the two redirected for ever after every sign-in. Account managers now land on My vendors instead of Reports.
   - Leads: a requirement's photo links are http(s) only (`useLeadDetail` filters with `safeHttpUrl`). `rfqs.images` is buyer-written text; a `javascript:` entry in the `<a href>` ran in the admin's session. The database refuses such addresses too (the migration above).
