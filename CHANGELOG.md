@@ -9,7 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
-- 2026-10-20 (branch `fix/low-2026-10-20`, with textile-spark-net branch `fix/low-2026-10-20`, which holds migration `20261020140000_account_search_by_phone.sql`; built and tested locally, **NOT released**)
+- 2026-10-20 (branch `fix/low-2026-10-20`, with textile-spark-net branch `fix/low-2026-10-20`, which holds migration `20261020140000_account_search_by_phone.sql`; **RELEASED 2026-10-21**: main e555ee8, migration applied)
   - Why: the 2026-10-20 admin audit's low list; Mitra: "go on with the low list".
   - Accounts: search by name, email or phone (the migration matches a number's digits; it never returns the number).
   - Certificates and Vendors read every row in pages (`lib/readAllPages.ts`): one read stopped at 1,000 rows with no error, which hid the newest certificate orders and the vendors late in the alphabet.
