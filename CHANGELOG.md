@@ -9,7 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
-- 2026-10-20 (branch `fix/medium-2026-10-20`, with textile-spark-net branch `fix/medium-2026-10-20`, which holds migration `20261020130000_admin_audit_medium_fixes.sql`; built and tested locally, **NOT released**)
+- 2026-10-20 (branch `fix/medium-2026-10-20`, with textile-spark-net branch `fix/medium-2026-10-20`, which holds migration `20261020130000_admin_audit_medium_fixes.sql`; **RELEASED 2026-10-20**: main 750256e, admin-staff v6 and admin-refund-payment v10 deployed, migration applied)
   - Why: the 2026-10-20 admin audit; Mitra: "tackle leaked-password protection, the staff temporary-password gaps, and also the medium list".
   - admin-staff: temporary passwords expire after 72 hours (`temp_password_issued_at` in app_metadata, set on register and reset); `set_password` refuses a password in Have I Been Pwned's breached list (k-anonymity; allowed if the service is down); a manager can't reset a deactivated super admin's or manager's password. The database now refuses an account on its temporary password (the migration above).
   - ResetPassword (set-password and reset links): the same breached check (`lib/pwnedPassword.ts`) and the same rule as `set_password` (10 characters, letters and numbers). Supabase's own leaked-password protection needs a paid plan.
