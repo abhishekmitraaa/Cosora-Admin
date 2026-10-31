@@ -9,6 +9,7 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-10-31 (branch `ranking/f3`, with textile-spark-net branch `ranking/f3`, which holds migration `20261031100000_ranking_f3_attribute_definitions.sql`) **Form questions** (Ranking F3). A new page under Content: the category questions of the buyer app's listing form (by category and subcategory, plus the per-seller-type ones) and requirement form (by question set and section). Super admins edit a question's label and its Hindi and Gujarati, options, placeholder, unit, required, and for requirement questions the listing question it matches and its weight; add questions (ordinary kinds only); turn questions off and on (the core requirement questions can't be turned off). A question's key and kind never change. Writes go through `admin_attribute_save` / `admin_attribute_set_active` (super admin only) and land in the Admin Log; managers read. Section `attributes`.
 - 2026-10-20 (branch `fix/low-2026-10-20`, with textile-spark-net branch `fix/low-2026-10-20`, which holds migration `20261020140000_account_search_by_phone.sql`; **RELEASED 2026-10-21**: main e555ee8, migration applied)
   - Why: the 2026-10-20 admin audit's low list; Mitra: "go on with the low list".
   - Accounts: search by name, email or phone (the migration matches a number's digits; it never returns the number).
