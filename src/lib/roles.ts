@@ -86,6 +86,9 @@ export type Section =
   // DATA: public.faqs, written only through admin_faq_* RPCs. The first
   // admin-editable content that was never dev-seed.
   | "faqs"
+  // DATA: public.attribute_definitions (Ranking F3), the category questions of the listing and requirement
+  // forms. admin_attribute_save / admin_attribute_set_active admit super_admin only; managers read.
+  | "attributes"
   // Account suspension, generalised. Not part of "vendors": buyers get
   // suspended too, and the role gate is different (support/super_admin via
   // set_account_status, NOT vendor_ops).
@@ -239,6 +242,7 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   // admin_faq_list() admits support + super_admin, the same audience as block
   // reasons. Support answers the questions buyers ask, so it reads what the FAQ says.
   faqs: ["super_admin", "support"],
+  attributes: ["super_admin", "manager"],
   accounts: ["super_admin", "support"],
 
   // ── Phase-4 sections ───────────────────────────────────────────────────
@@ -325,6 +329,8 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   // the answers current. Changing this means changing the RPC gates AND this line;
   // either alone is wrong.
   faqs: ["super_admin", "support"],
+  // The RPCs' own gate (migration 20261031100000): super admin only.
+  attributes: ["super_admin"],
   // set_account_status() gates itself to these two, so vendor_ops sees the page
   // (it is reachable from a vendor) but not the actions.
   accounts: ["super_admin", "support"],

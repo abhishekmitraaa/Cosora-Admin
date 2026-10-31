@@ -380,6 +380,96 @@ export type Database = {
           },
         ]
       }
+      attribute_definitions: {
+        Row: {
+          active: boolean
+          applies_to_subcategories: string[] | null
+          category_id: string | null
+          core: boolean
+          form: string
+          full_width: boolean
+          half: boolean
+          id: string
+          key: string
+          kind: string
+          label: string
+          label_gu: string | null
+          label_hi: string | null
+          layer: string | null
+          match_key: string | null
+          match_weight: number
+          options: string[] | null
+          placeholder: string | null
+          position: number
+          required: boolean
+          schema_key: string | null
+          section_position: number | null
+          section_title: string | null
+          seller_type: string | null
+          subcategory_id: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applies_to_subcategories?: string[] | null
+          category_id?: string | null
+          core?: boolean
+          form: string
+          full_width?: boolean
+          half?: boolean
+          id?: string
+          key: string
+          kind: string
+          label: string
+          label_gu?: string | null
+          label_hi?: string | null
+          layer?: string | null
+          match_key?: string | null
+          match_weight?: number
+          options?: string[] | null
+          placeholder?: string | null
+          position?: number
+          required?: boolean
+          schema_key?: string | null
+          section_position?: number | null
+          section_title?: string | null
+          seller_type?: string | null
+          subcategory_id?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applies_to_subcategories?: string[] | null
+          category_id?: string | null
+          core?: boolean
+          form?: string
+          full_width?: boolean
+          half?: boolean
+          id?: string
+          key?: string
+          kind?: string
+          label?: string
+          label_gu?: string | null
+          label_hi?: string | null
+          layer?: string | null
+          match_key?: string | null
+          match_weight?: number
+          options?: string[] | null
+          placeholder?: string | null
+          position?: number
+          required?: boolean
+          schema_key?: string | null
+          section_position?: number | null
+          section_title?: string | null
+          seller_type?: string | null
+          subcategory_id?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       authors: {
         Row: {
           avatar_url: string | null
@@ -4236,6 +4326,14 @@ export type Database = {
       }
     }
     Functions: {
+      admin_attribute_save: {
+        Args: { p_id: string | null; p_row: Json }
+        Returns: string
+      }
+      admin_attribute_set_active: {
+        Args: { p_active: boolean; p_id: string }
+        Returns: undefined
+      }
       account_deletion_blocker: { Args: { p_user: string }; Returns: string }
       account_deletion_channels: { Args: { p_user: string }; Returns: string[] }
       account_deletion_sweep_list: {

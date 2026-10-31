@@ -145,6 +145,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
       { to: "/requirement-reasons", section: "rfq-reasons", label: "Requirement reasons", icon: ListChecks },
       { to: "/faqs", section: "faqs", label: "FAQs", icon: CircleHelp },
+      { to: "/attributes", section: "attributes", label: "Form questions", icon: ListChecks },
       { to: "/admins", section: "admins", label: "Admins", icon: ShieldCheck },
       { to: "/admin-log", section: "admin-log", label: "Admin Log", icon: History },
       { to: "/feature-flags", section: "feature-flags", label: "Feature switches", icon: ToggleRight },

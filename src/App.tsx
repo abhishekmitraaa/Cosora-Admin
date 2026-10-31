@@ -33,6 +33,7 @@ import ChatReasons from "@/pages/ChatReasons";
 import RfqReview from "@/pages/RfqReview";
 import RfqReasons from "@/pages/RfqReasons";
 import Faqs from "@/pages/Faqs";
+import Attributes from "@/pages/Attributes";
 // Phase-4 sections. All of them read the database now: the development-only
 // seed they started on (src/lib/devSeed/) was removed in admin completion
 // Phase 11 (2026-10-02).
@@ -93,6 +94,7 @@ function Landing() {
         "chat-patterns",
         "chat-reasons",
         "faqs",
+        "attributes",
         "payments",
         "certificates",
         "discounts",
@@ -284,6 +286,14 @@ export default function App() {
                 element={
                   <RequireSection section="faqs">
                     <Faqs />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/attributes"
+                element={
+                  <RequireSection section="attributes">
+                    <Attributes />
                   </RequireSection>
                 }
               />
