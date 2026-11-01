@@ -6260,6 +6260,7 @@ export type Database = {
         Args: { match_count?: number; p_vendor_id: string }
         Returns: {
           category_match: boolean
+          near: boolean
           rfq_id: string
           score: number
           similarity: number
