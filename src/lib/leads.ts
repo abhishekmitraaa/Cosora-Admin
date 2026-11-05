@@ -13,6 +13,8 @@ import { safeHttpUrl } from "@/lib/productDetails";
  *   quoted      active, at least one quote, none accepted
  *   won         a quote was accepted
  *   closed      no longer active, none accepted
+ *   expired     still active but past its 7-day deadline (rfqs.expires_at), none accepted: sellers
+ *               can no longer quote (migration 20261105100000 in textile-spark-net)
  *   removed     taken down by an admin (admin_lead_remove), whatever its stage was;
  *               checked first (RFQ/leads R3, migration 20261003090200 in textile-spark-net)
  * An RFQ addressed to one vendor is "direct". Readable by super_admin, vendor_ops,
@@ -39,7 +41,7 @@ export type LeadRow = Omit<
   accepted_vendor_name: string | null;
 };
 
-export type LeadStage = "new" | "unanswered" | "quoted" | "won" | "closed" | "removed";
+export type LeadStage = "new" | "unanswered" | "quoted" | "won" | "closed" | "expired" | "removed";
 export type StageFilter = LeadStage | "overdue" | "all";
 
 export const STAGE_LABELS: Record<LeadStage | "overdue", string> = {
@@ -49,6 +51,7 @@ export const STAGE_LABELS: Record<LeadStage | "overdue", string> = {
   quoted: "Quoted",
   won: "Won",
   closed: "Closed",
+  expired: "Deadline passed",
   removed: "Removed",
 };
 
@@ -59,6 +62,7 @@ export const STAGE_RULES: Record<LeadStage | "overdue", string> = {
   quoted: "At least one quote, none accepted yet.",
   won: "The buyer accepted a quote.",
   closed: "Closed by the buyer without accepting a quote.",
+  expired: "Still open, but past its deadline: sellers can no longer quote.",
   removed: "Taken down by Cosora, with a reason the buyer reads.",
 };
 
@@ -82,6 +86,7 @@ export interface LeadsSummary {
     won: number;
     closed: number;
     removed: number;
+    expired: number;
     answered: number;
     median_first_quote_hours: number | null;
     eligible_24h: number;
@@ -101,6 +106,8 @@ export interface LeadDetail {
   description: string | null;
   images: string[];
   rfq_status: string;
+  /** When it stops taking quotes (7 days from approval; the buyer can extend it). */
+  expires_at: string | null;
   stage: LeadStage;
   overdue: boolean;
   direct: boolean;

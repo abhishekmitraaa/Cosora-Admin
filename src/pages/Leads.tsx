@@ -66,10 +66,11 @@ const STAGE_TONE: Record<LeadStage, Tone> = {
   quoted: "info",
   won: "positive",
   closed: "neutral",
+  expired: "neutral",
   removed: "critical",
 };
 
-const STAGE_FILTERS: StageFilter[] = ["all", "new", "unanswered", "overdue", "quoted", "won", "closed", "removed"];
+const STAGE_FILTERS: StageFilter[] = ["all", "new", "unanswered", "overdue", "quoted", "won", "closed", "expired", "removed"];
 const WINDOWS: { days: number | null; label: string }[] = [
   { days: 7, label: "Last 7 days" },
   { days: 30, label: "Last 30 days" },
@@ -157,7 +158,7 @@ export default function Leads() {
               {s && (
                 <Note>
                   {windowLabel(days)}: {s.window.rfqs} RFQ{s.window.rfqs === 1 ? "" : "s"} ({s.window.direct} direct),{" "}
-                  {s.window.won} won, {s.window.closed} closed, {s.window.removed} removed. {s.open.quoted} open RFQ
+                  {s.window.won} won, {s.window.closed} closed, {s.window.expired ?? 0} past their deadline, {s.window.removed} removed. {s.open.quoted} open RFQ
                   {s.open.quoted === 1 ? " has" : "s have"} quotes waiting on the buyer.
                 </Note>
               )}
@@ -370,6 +371,12 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
               </span>
             )}
             <span className="text-2xs text-ink-faint">
+              {d.expires_at && (
+                <span data-testid="lead-deadline">
+                  {new Date(d.expires_at) <= new Date() ? "Deadline passed" : "Takes quotes until"}{" "}
+                  {format(new Date(d.expires_at), "d MMM yyyy, HH:mm")} ·{" "}
+                </span>
+              )}
               Posted {format(new Date(d.created_at), "d MMM yyyy, HH:mm")} by{" "}
               <Link to={`/accounts?q=${encodeURIComponent(d.buyer.id)}`} className="underline-offset-2 hover:underline">
                 {d.buyer.name}
