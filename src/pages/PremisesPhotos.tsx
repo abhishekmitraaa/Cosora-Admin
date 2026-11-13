@@ -27,11 +27,23 @@ const SUBTITLE =
 
 const ADDED = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-/** The address when it is this project's public Storage, else null: the URL is the seller's to write. */
+const OWN_ORIGIN = (() => {
+  try {
+    return new URL(String(import.meta.env.VITE_SUPABASE_URL ?? "")).origin;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * The address when it is this project's own public Storage, else null: the URL is the seller's to write, and a
+ * photo on another host could change after approval and would log who looked (review #1). The database refuses to
+ * approve one too.
+ */
 function storageUrl(u: string): string | null {
   try {
     const parsed = new URL(u);
-    return (parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.pathname.includes("/storage/v1/object/public/product-images/")
+    return OWN_ORIGIN && parsed.origin === OWN_ORIGIN && parsed.pathname.startsWith("/storage/v1/object/public/product-images/")
       ? parsed.href
       : null;
   } catch {

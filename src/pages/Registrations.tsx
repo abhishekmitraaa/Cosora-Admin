@@ -64,7 +64,7 @@ export default function Registrations() {
 
   const decide = useMutation({
     mutationFn: ({ row, approve, why }: { row: RegistrationQueueRow; approve: boolean; why: string | null }) =>
-      decideRegistration(row.vendor_id, approve, why),
+      decideRegistration(row.vendor_id, row.submission_id ?? "", approve, why),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["registrations"] });
     },

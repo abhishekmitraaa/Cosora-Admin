@@ -30,7 +30,8 @@ export default function VendorRegistrationPanel({ vendorId }: { vendorId: string
   const [reason, setReason] = useState("");
 
   const decide = useMutation({
-    mutationFn: ({ approve, why }: { approve: boolean; why: string | null }) => decideRegistration(vendorId, approve, why),
+    mutationFn: ({ approve, why }: { approve: boolean; why: string | null }) =>
+      decideRegistration(vendorId, reg.data?.id ?? "", approve, why),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["registrations"] });
       void qc.invalidateQueries({ queryKey: ["vendor", vendorId] });

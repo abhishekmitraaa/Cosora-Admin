@@ -58,14 +58,18 @@ export async function fetchRegistrationQueue(kind: QueueKind, after: Cursor | nu
 }
 
 const DECIDE_ERRORS: Record<string, string> = {
-  not_pending: "This registration isn't waiting any more: someone else decided it, or the seller changed it. Reload.",
+  not_pending: "This registration isn't waiting any more, or the seller sent a newer one. Reload and review it again.",
   no_contract: "The seller hasn't signed the Supplier Agreement, so the registration can't be approved yet.",
 };
 
-/** Approve or reject an overseas registration. A rejection needs a reason the seller can act on. */
-export async function decideRegistration(vendorId: string, approve: boolean, reason: string | null): Promise<void> {
+/**
+ * Approve or reject an overseas registration: the submission the admin reviewed, so a stale screen can't approve a
+ * newer one nobody looked at. A rejection needs a reason the seller can act on.
+ */
+export async function decideRegistration(vendorId: string, submissionId: string, approve: boolean, reason: string | null): Promise<void> {
   const { error } = await supabase.rpc("admin_vendor_registration_decide", {
     p_vendor: vendorId,
+    p_submission: submissionId,
     p_approve: approve,
     // Always sent: p_reason has no default, so leaving it out matches no function. Empty reads as none.
     p_reason: reason?.trim() ?? "",

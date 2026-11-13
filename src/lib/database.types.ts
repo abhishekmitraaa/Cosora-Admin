@@ -5311,7 +5311,7 @@ export type Database = {
       }
       admin_registration_queue_counts: { Args: never; Returns: Json }
       admin_vendor_registration_decide: {
-        Args: { p_approve: boolean; p_reason?: string; p_vendor: string }
+        Args: { p_approve: boolean; p_reason?: string; p_submission: string; p_vendor: string }
         Returns: undefined
       }
       admin_rfq_pending_count: { Args: never; Returns: number }
