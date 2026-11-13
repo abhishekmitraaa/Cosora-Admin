@@ -702,7 +702,9 @@ export function Tabs<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex gap-1 overflow-x-auto border-b border-line", className)}>
+    // overflow-x-auto makes the other axis scroll too (CSS computes overflow-y: auto), so a tab hanging over the
+    // line by a pixel showed a vertical scrollbar with arrows on Windows. The y axis is hidden and nothing overhangs.
+    <div className={cn("mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line", className)}>
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -712,7 +714,7 @@ export function Tabs<T extends string>({
           onClick={() => onChange(t.id)}
           aria-current={active === t.id ? "page" : undefined}
           className={cn(
-            "-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+            "flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
             active === t.id
               ? "border-brand text-ink"
               : "border-transparent text-ink-muted hover:border-line-strong hover:text-ink",
