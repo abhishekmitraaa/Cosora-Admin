@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { countryLabel } from "@/lib/registrations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -75,6 +76,11 @@ const REG_KIND_LABELS: Record<string, string> = {
 const OWNER_ID_LABELS: Record<string, string> = { passport: "Passport", national_id: "National ID card" };
 
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+/** The registration stores the country's code ("AE"); show its name too. */
+const country = (v: unknown) => {
+  const t = text(v);
+  return t && /^[A-Z]{2}$/.test(t) ? countryLabel(t) : t;
+};
 
 /** What came with the file, in a line: the registration's kind and number, the catalogue file's name. */
 function detailLine(d: KycDocRow): string | null {
@@ -87,10 +93,10 @@ function detailLine(d: KycDocRow): string | null {
     return parts.filter(Boolean).join(" · ") || null;
   }
   if (d.doc_type === "gst") return text(x.number) ? `GSTIN ${text(x.number)}` : null;
-  if (d.doc_type === "tax_id") return [text(x.number), text(x.country)].filter(Boolean).join(" · ") || null;
-  if (d.doc_type === "owner_id") return [OWNER_ID_LABELS[String(x.kind ?? "")] ?? text(x.kind), text(x.country)].filter(Boolean).join(" · ") || null;
+  if (d.doc_type === "tax_id") return [text(x.number), country(x.country)].filter(Boolean).join(" · ") || null;
+  if (d.doc_type === "owner_id") return [OWNER_ID_LABELS[String(x.kind ?? "")] ?? text(x.kind), country(x.country)].filter(Boolean).join(" · ") || null;
   if (d.doc_type === "business_registration") {
-    return [REG_KIND_LABELS[String(x.kind ?? "")] ?? String(x.kind ?? ""), text(x.number), text(x.country)].filter(Boolean).join(" · ") || null;
+    return [REG_KIND_LABELS[String(x.kind ?? "")] ?? String(x.kind ?? ""), text(x.number), country(x.country)].filter(Boolean).join(" · ") || null;
   }
   if (d.doc_type === "catalog") return x.name ? String(x.name) : null;
   if (d.doc_type === "aadhaar") return "Masked copy; check that only the last 4 digits show";
