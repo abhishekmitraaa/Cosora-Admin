@@ -61,7 +61,13 @@ export type Section =
   // Seller catalogues (PDFs). The same two roles as products and videos, enforced the same way:
   // catalogues_moderation_guard (buyer repo, 20261010133347_catalogue_review).
   | "catalogues"
+  // Premises photos a seller added (2026-11-13): reviewed before buyers see them, by the catalogue roles.
+  // admin_premises_photo_review / admin_premises_photo_queue (buyer repo, 20261113100300_registration_admin).
+  | "premises-photos"
   | "vendors"
+  // Seller registrations waiting on Cosora (2026-11-13): overseas approvals and unreviewed documents.
+  // admin_registration_queue / admin_vendor_registration_decide admit the vendors roles plus support.
+  | "registrations"
   | "ads"
   | "subscriptions"
   | "reports"
@@ -218,7 +224,9 @@ const SECTION_READ: Record<Section, AdminRole[]> = {
   products: ["super_admin", "product_moderator", "support"],
   videos: ["super_admin", "product_moderator", "support"],
   catalogues: ["super_admin", "product_moderator", "support"],
+  "premises-photos": ["super_admin", "product_moderator", "support"],
   vendors: ["super_admin", "vendor_ops", "support"],
+  registrations: ["super_admin", "vendor_ops", "support"],
   ads: ["super_admin", "ads_moderator", "support"],
   subscriptions: ["super_admin", "finance_admin", "support"],
   reports: ALL_ROLES,
@@ -308,7 +316,10 @@ const SECTION_WRITE: Record<Section, AdminRole[]> = {
   products: ["super_admin", "product_moderator"],
   videos: ["super_admin", "product_moderator"],
   catalogues: ["super_admin", "product_moderator"],
+  "premises-photos": ["super_admin", "product_moderator"],
   vendors: ["super_admin", "vendor_ops"],
+  // Support decides registrations as it decides KYC documents (set_vendor_document_verified).
+  registrations: ["super_admin", "vendor_ops", "support"],
   ads: ["super_admin", "ads_moderator"],
   subscriptions: ["super_admin", "finance_admin"],
   reports: [],

@@ -43,11 +43,12 @@ import {
   Siren,
   Lightbulb,
   Clock,
-  Handshake, ClipboardCheck, ListChecks
+  Handshake, ClipboardCheck, ListChecks, BadgeCheck, Camera
 } from "lucide-react";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { canSee, ROLE_LABELS, type Section } from "@/lib/roles";
 import { useSupportCounts } from "@/lib/support";
+import { useRegistrationCounts } from "@/lib/registrations";
 import { useRecordPageViews } from "@/lib/activity";
 import { cn, Logo, ThemeToggle } from "./ui";
 
@@ -58,8 +59,8 @@ interface NavItem {
   icon: typeof Boxes;
   /** Active only on this exact path, so /support is not lit on /support/callbacks. */
   end?: boolean;
-  /** Shows the number waiting on staff: support requests, or requirements to review. */
-  badge?: "support" | "rfq";
+  /** Shows the number waiting on staff: support requests, requirements, registrations or premises photos. */
+  badge?: "support" | "rfq" | "registrations" | "photos";
 }
 
 /**
@@ -97,6 +98,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/products", section: "products", label: "Products", icon: Boxes },
       { to: "/videos", section: "videos", label: "Video Closeups", icon: Clapperboard },
       { to: "/catalogues", section: "catalogues", label: "Catalogues", icon: BookOpen },
+      { to: "/premises-photos", section: "premises-photos", label: "Premises photos", icon: Camera, badge: "photos" },
       { to: "/ads", section: "ads", label: "Ads", icon: Megaphone },
       { to: "/chat-review", section: "chat-review", label: "Review queue", icon: ShieldAlert },
       { to: "/review-reports", section: "review-reports", label: "Reported reviews", icon: Flag },
@@ -107,6 +109,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "People",
     items: [
       { to: "/vendors", section: "vendors", label: "Vendors", icon: Store },
+      { to: "/registrations", section: "registrations", label: "Registrations", icon: BadgeCheck, badge: "registrations" },
       { to: "/accounts", section: "accounts", label: "Accounts", icon: UserCog },
       { to: "/customers", section: "customers", label: "Customers", icon: Users },
       { to: "/geography", section: "geography", label: "Geography", icon: Map },
@@ -183,6 +186,13 @@ export default function Shell() {
   const supportCounts = useSupportCounts(canSee(role, "support"));
   const waiting = supportCounts.data?.awaiting ?? 0;
   const rfqWaiting = useRfqPendingCount(canSee(role, "rfq-review")).data ?? 0;
+  const regCounts = useRegistrationCounts(canSee(role, "registrations") || canSee(role, "premises-photos")).data;
+  const badgeCount: Record<NonNullable<NavItem["badge"]>, number> = {
+    support: waiting,
+    rfq: rfqWaiting,
+    registrations: (regCounts?.approval ?? 0) + (regCounts?.documents ?? 0),
+    photos: regCounts?.photos ?? 0,
+  };
 
   const groups = useMemo(
     () =>
@@ -317,12 +327,12 @@ export default function Shell() {
                             />
                             <Icon size={16} className="shrink-0" />
                             {label}
-                            {badge && (badge === "support" ? waiting : rfqWaiting) > 0 && (
+                            {badge && badgeCount[badge] > 0 && (
                               <span
                                 className="ml-auto rounded-md bg-white/[0.12] px-1.5 py-0.5 text-2xs tabular-nums text-rail-fg"
-                                aria-label={`${badge === "support" ? waiting : rfqWaiting} waiting`}
+                                aria-label={`${badgeCount[badge]} waiting`}
                               >
-                                {(badge === "support" ? waiting : rfqWaiting) > 99 ? "99+" : badge === "support" ? waiting : rfqWaiting}
+                                {badgeCount[badge] > 99 ? "99+" : badgeCount[badge]}
                               </span>
                             )}
                           </>

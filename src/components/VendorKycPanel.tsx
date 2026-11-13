@@ -58,6 +58,9 @@ const DOC_LABELS: Record<string, string> = {
   aadhaar: "Aadhaar (masked)",
   business_registration: "Business registration",
   catalog: "Product catalogue",
+  // Sellers outside India (2026-11-13): their country's documents.
+  tax_id: "Tax ID",
+  owner_id: "Owner's photo ID",
 };
 
 const REG_KIND_LABELS: Record<string, string> = {
@@ -66,13 +69,28 @@ const REG_KIND_LABELS: Record<string, string> = {
   shop_establishment: "Shop and establishment licence",
   partnership: "Partnership deed",
   other: "Other registration",
+  foreign_registration: "Registration certificate",
 };
+
+const OWNER_ID_LABELS: Record<string, string> = { passport: "Passport", national_id: "National ID card" };
+
+const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /** What came with the file, in a line: the registration's kind and number, the catalogue file's name. */
 function detailLine(d: KycDocRow): string | null {
   const x = d.detail ?? {};
+  // What the seller typed beside the file (2026-11-13), so the reviewer can compare it with the scan: the name and
+  // address on the PAN card, the GSTIN, an overseas seller's registration and tax numbers and their country. The PAN
+  // number itself is private (vendor_profiles.pan), shown with the seller's other private details.
+  if (d.doc_type === "pan") {
+    const parts = [text(x.holder_name) && `Name: ${text(x.holder_name)}`, text(x.address) && `Address: ${text(x.address)}`];
+    return parts.filter(Boolean).join(" · ") || null;
+  }
+  if (d.doc_type === "gst") return text(x.number) ? `GSTIN ${text(x.number)}` : null;
+  if (d.doc_type === "tax_id") return [text(x.number), text(x.country)].filter(Boolean).join(" · ") || null;
+  if (d.doc_type === "owner_id") return [OWNER_ID_LABELS[String(x.kind ?? "")] ?? text(x.kind), text(x.country)].filter(Boolean).join(" · ") || null;
   if (d.doc_type === "business_registration") {
-    return [REG_KIND_LABELS[String(x.kind ?? "")] ?? String(x.kind ?? ""), x.number ? String(x.number) : null].filter(Boolean).join(" · ") || null;
+    return [REG_KIND_LABELS[String(x.kind ?? "")] ?? String(x.kind ?? ""), text(x.number), text(x.country)].filter(Boolean).join(" · ") || null;
   }
   if (d.doc_type === "catalog") return x.name ? String(x.name) : null;
   if (d.doc_type === "aadhaar") return "Masked copy; check that only the last 4 digits show";

@@ -14,6 +14,8 @@ import ResetPassword from "@/pages/ResetPassword";
 import Products from "@/pages/Products";
 import Videos from "@/pages/Videos";
 import Catalogues from "@/pages/Catalogues";
+import PremisesPhotos from "@/pages/PremisesPhotos";
+import Registrations from "@/pages/Registrations";
 import ReviewReports from "@/pages/ReviewReports";
 import Vendors from "@/pages/Vendors";
 import VendorDetail from "@/pages/VendorDetail";
@@ -83,7 +85,9 @@ function Landing() {
         "products",
         "videos",
         "catalogues",
+        "premises-photos",
         "vendors",
+        "registrations",
         "ads",
         "subscriptions",
         "accounts",
@@ -174,6 +178,22 @@ export default function App() {
                 element={
                   <RequireSection section="vendors">
                     <Vendors />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/registrations"
+                element={
+                  <RequireSection section="registrations">
+                    <Registrations />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/premises-photos"
+                element={
+                  <RequireSection section="premises-photos">
+                    <PremisesPhotos />
                   </RequireSection>
                 }
               />

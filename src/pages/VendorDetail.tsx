@@ -11,6 +11,7 @@ import { sealSources } from "@/lib/trustSeal";
 import AccountStatus from "@/components/AccountStatus";
 import VendorKycPanel, { useVendorKycDocs, kycSummary } from "@/components/VendorKycPanel";
 import VendorContractPanel from "@/components/VendorContractPanel";
+import VendorRegistrationPanel from "@/components/VendorRegistrationPanel";
 import FlagLog from "@/components/FlagLog";
 import {
   Badge,
@@ -197,6 +198,8 @@ export default function VendorDetail() {
               .join(", ") || <span className="text-ink-ghost">No address on file</span>}
           </p>
         </Panel>
+
+        <VendorRegistrationPanel vendorId={v.id} />
 
         <VendorKycPanel vendorId={v.id} />
 
