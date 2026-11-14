@@ -14,7 +14,7 @@ import { safeHttpUrl } from "@/lib/productDetails";
  *   won         a quote was accepted
  *   closed      no longer active, none accepted
  *   expired     still active but past its 7-day deadline (rfqs.expires_at), none accepted: sellers
- *               can no longer quote (migration 20261105100000 in textile-spark-net)
+ *               can no longer quote (migration 20261114110000 in textile-spark-net)
  *   removed     taken down by an admin (admin_lead_remove), whatever its stage was;
  *               checked first (RFQ/leads R3, migration 20261003090200 in textile-spark-net)
  * An RFQ addressed to one vendor is "direct". Readable by super_admin, vendor_ops,
