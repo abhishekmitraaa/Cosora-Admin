@@ -5480,6 +5480,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_email_verified: {
+        Args: { p_ids: string[] }
+        Returns: { email_verified: boolean; id: string }[]
+      }
       admin_profile_emails: {
         Args: { p_ids: string[] }
         Returns: {

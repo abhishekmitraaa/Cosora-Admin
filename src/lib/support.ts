@@ -283,6 +283,8 @@ export interface SupportTicketDetail {
     has_store: boolean;
     is_staff: boolean;
     email: string | null;
+    /** False: the email was typed on the account and nobody confirmed it; null: no email (2026-11-14). */
+    email_verified?: boolean | null;
     phone_masked: string | null;
     /** Signed up through the test sign-in code, which accepts any 6 digits: the number was never verified (2026-10-16). */
     phone_unverified?: boolean;

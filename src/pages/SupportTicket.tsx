@@ -811,7 +811,16 @@ function RequesterPanel({ detail: d }: { detail: SupportTicketDetail }) {
       <dl className="grid grid-cols-2 gap-3">
         <DataField label="Name" value={<span data-no-translate>{r.name}</span>} />
         <DataField label="Joined" value={format(new Date(r.joined_at), "d MMM yyyy")} />
-        <DataField label="Email" value={r.email ? <span className="break-all text-xs">{r.email}</span> : "Phone sign-in"} />
+        <DataField
+          label="Email"
+          value={r.email ? (
+            <span className="break-all text-xs">
+              {r.email}
+              {/* Typed on the account and never confirmed (buyer sign-up audit item 14b). */}
+              {r.email_verified === false && <span className="ml-1.5 text-2xs text-caution-fg">not verified</span>}
+            </span>
+          ) : "Phone sign-in"}
+        />
         <RevealPhone ticketId={d.ticket.id} field="requester_phone" masked={r.phone_masked} label="Phone" />
       </dl>
       {r.is_staff && <Notice tone="info" className="mt-3">This request comes from a Cosora admin account.</Notice>}

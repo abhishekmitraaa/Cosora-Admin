@@ -28,6 +28,8 @@ interface AccountRow {
   id: string;
   full_name: string | null;
   email: string | null;
+  /** False: an address typed on the account that no one confirmed (admin_email_verified); null: no email, or unknown. */
+  emailVerified: boolean | null;
   account_status: string;
   active_role: string;
   created_at: string;
@@ -88,9 +90,12 @@ export default function Accounts() {
       // Brand names and open-suspension counts, merged client-side. Both reach
       // profiles by more than one path, so a PostgREST embed is ambiguous —
       // the same reason lib/vendors.ts and lib/accounts.ts resolve by id.
-      const [vendors, suspensions] = await Promise.all([
+      const [vendors, suspensions, verified] = await Promise.all([
         supabase.from("vendor_profiles").select("id, brand_name").in("id", ids),
         supabase.rpc("admin_account_suspension_list", { p_profile_ids: ids, p_active: true }),
+        // Whether each email is the account's confirmed sign-in address (buyer sign-up audit item 14b): Account
+        // Information lets a buyer type any address. A refusal leaves it unknown, never "verified".
+        supabase.rpc("admin_email_verified", { p_ids: ids }),
       ]);
       if (vendors.error) throw new Error(vendors.error.message);
       // A support/super_admin caller can read this; anyone else is refused
@@ -99,6 +104,7 @@ export default function Accounts() {
       // for roles that may write.
       const brands = new Map((vendors.data ?? []).map((v) => [v.id, v.brand_name]));
       const open = new Map<string, number>();
+      const emailOk = new Map((verified.data ?? []).map((v) => [v.id, v.email_verified]));
       for (const s of suspensions.data ?? []) {
         open.set(s.profile_id, (open.get(s.profile_id) ?? 0) + 1);
       }
@@ -107,6 +113,7 @@ export default function Accounts() {
         ...r,
         isVendor: brands.has(r.id),
         brand_name: brands.get(r.id) ?? null,
+        emailVerified: emailOk.get(r.id) ?? null,
         openSuspensions: open.get(r.id) ?? 0,
       }));
     },
@@ -176,6 +183,11 @@ export default function Accounts() {
                 </td>
                 <td className="px-3 py-2 text-ink-muted">
                   {r.email ?? <span className="text-ink-ghost">no email</span>}
+                  {r.email && r.emailVerified === false && (
+                    <span className="ml-1.5 text-2xs text-caution-fg" title="Typed on the account; nobody confirmed this address">
+                      not verified
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   {r.isVendor ? <Badge tone="info">vendor</Badge> : <Badge>buyer</Badge>}
