@@ -407,7 +407,8 @@ function AdCard({
               <Attr
                 label="Runs for"
                 value={a.starts_at && a.ends_at
-                  ? `${Math.max(1, Math.round((new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 86_400_000))} day(s) from approval`
+                  ? ((n: number) => `${n} day${n === 1 ? "" : "s"} from approval`)(
+                      Math.max(1, Math.round((new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 86_400_000)))
                   : null}
               />
             ) : (
