@@ -401,8 +401,29 @@ function AdCard({
             <Attr label="Daily budget" value={a.daily_budget != null ? `₹${a.daily_budget}` : null} />
             <Attr label="Impressions" value={a.impressions.toLocaleString("en-IN")} />
             <Attr label="Clicks" value={a.clicks.toLocaleString("en-IN")} />
-            <Attr label="Starts" value={a.starts_at ? format(new Date(a.starts_at), "d MMM yyyy") : null} />
-            <Attr label="Ends" value={a.ends_at ? format(new Date(a.ends_at), "d MMM yyyy") : null} />
+            {/* Paid days start at approval and are kept while paused (buyer migration 20261116110300). */}
+            {(a.status === "pending_review" || a.status === "changes_requested")
+              && !(a.starts_at && new Date(a.starts_at).getTime() > Date.now()) ? (
+              <Attr
+                label="Runs for"
+                value={a.starts_at && a.ends_at
+                  ? `${Math.max(1, Math.round((new Date(a.ends_at).getTime() - new Date(a.starts_at).getTime()) / 86_400_000))} day(s) from approval`
+                  : null}
+              />
+            ) : (
+              <>
+                <Attr label="Starts" value={a.starts_at ? format(new Date(a.starts_at), "d MMM yyyy") : null} />
+                <Attr label="Ends" value={a.ends_at ? format(new Date(a.ends_at), "d MMM yyyy") : null} />
+              </>
+            )}
+            {a.status.startsWith("paused") && (
+              <Attr
+                label="While paused"
+                value={/(^|,)\s*(trustedSeal|verifiedCertificate)\s*(,|$)/.test(a.placement ?? "")
+                  ? "Seal days keep running"
+                  : "Remaining days are kept; the end date moves on resume"}
+              />
+            )}
           </AttrGrid>
 
           {a.moderation_reason && (
