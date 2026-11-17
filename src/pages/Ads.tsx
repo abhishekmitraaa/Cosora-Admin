@@ -13,6 +13,7 @@ import { reasonLabel, useAdReasonCodes, type AdReasonCode } from "@/lib/adReason
 import FlagLog from "@/components/FlagLog";
 import AdsMonitoring from "@/components/AdsMonitoring";
 import AdReviewQueue from "@/components/AdReviewQueue";
+import AdManualWork from "@/components/AdManualWork";
 import {
   Attr,
   AttrGrid,
@@ -84,7 +85,7 @@ const TAB_STATUSES: Record<AdStatus, string[]> = {
  * above the page rather than a nav entry, so the rail does not grow an item
  * that leads to the same place.
  */
-type View = "review" | "moderation" | "monitoring";
+type View = "review" | "moderation" | "monitoring" | "manual";
 
 const SUBTITLE = "Post-publish moderation. Take down a live campaign and record why.";
 const REVIEW_SUBTITLE = "Approve or reject campaigns before they reach buyers.";
@@ -190,6 +191,7 @@ export default function Ads() {
       subtitle={
         view === "review" ? REVIEW_SUBTITLE
           : view === "moderation" ? SUBTITLE
+          : view === "manual" ? "Ad types the team sets up by hand, once a campaign is approved."
           : "Delivery and revenue across every campaign."
       }
       actions={<ViewSwitch value={view} onChange={setView} />}
@@ -201,6 +203,15 @@ export default function Ads() {
       <Page width="wide">
         {header}
         <AdsMonitoring />
+      </Page>
+    );
+  }
+
+  if (view === "manual") {
+    return (
+      <Page width="wide">
+        {header}
+        <AdManualWork />
       </Page>
     );
   }
@@ -338,6 +349,7 @@ function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => v
     { id: "review", label: "Review" },
     { id: "moderation", label: "Moderation" },
     { id: "monitoring", label: "Monitoring" },
+    { id: "manual", label: "Manual work" },
   ];
   return (
     <div role="radiogroup" aria-label="Ads view" className="flex gap-0.5 rounded-lg border border-line bg-surface-2 p-0.5">

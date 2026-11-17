@@ -4541,6 +4541,30 @@ export type Database = {
           suspended_by_full_name: string
         }[]
       }
+      admin_ad_manual_done: {
+        Args: { p_ad: string; p_done: boolean; p_note?: string }
+        Returns: Json
+      }
+      admin_ad_manual_list: {
+        Args: never
+        Returns: {
+          ad_id: string
+          vendor_id: string
+          vendor_name: string | null
+          title: string | null
+          placement: string | null
+          manual_types: string[]
+          status: string
+          starts_at: string | null
+          ends_at: string | null
+          created_at: string
+          product_id: string | null
+          product_name: string | null
+          done_at: string | null
+          done_by_name: string | null
+          note: string | null
+        }[]
+      }
       admin_ad_reason_codes: {
         Args: never
         Returns: {
