@@ -4563,6 +4563,7 @@ export type Database = {
           done_at: string | null
           done_by_name: string | null
           note: string | null
+          messages: number | null
         }[]
       }
       admin_ad_reason_codes: {

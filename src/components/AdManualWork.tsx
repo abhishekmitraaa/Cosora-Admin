@@ -48,6 +48,8 @@ interface ManualRow {
   done_at: string | null;
   done_by_name: string | null;
   note: string | null;
+  /** Direct Broadcast: messages per listing, as paid for (the order's spec). */
+  messages: number | null;
 }
 
 function tabOf(r: ManualRow): Tab {
@@ -139,7 +141,10 @@ export default function AdManualWork() {
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {r.manual_types.map((t) => (
-                    <Badge key={t} tone="caution">{TYPE_LABELS[t] ?? t}</Badge>
+                    <Badge key={t} tone="caution">
+                      {TYPE_LABELS[t] ?? t}
+                      {t === "directBroadcast" && r.messages ? ` · ${r.messages.toLocaleString("en-IN")} messages` : ""}
+                    </Badge>
                   ))}
                   <StatusBadge status={r.status} />
                 </div>
