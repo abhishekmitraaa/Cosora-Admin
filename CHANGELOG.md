@@ -10,8 +10,8 @@ entry in each, from that repo's point of view.
 ---
 
 - 2026-11-18 (branch `product-moderation/release`, merge `468c8e2` of `product-moderation/removal` into main `37ecb85`, with
-  textile-spark-net's merge, which holds migration `20261118190000_product_moderation.sql`; **MERGED, NOT RELEASED**: the
-  migration waits for production access) **Products: Remove, Flag and Reinstate, with a reason picked in the dialog;
+  textile-spark-net's merge, which holds migration `20261118190000_product_moderation.sql`; **LIVE 2026-11-19**: migration
+  applied, main `1f0d7f7`, bundle `index-DxG0TmSY.js`) **Products: Remove, Flag and Reinstate, with a reason picked in the dialog;
   Moderation reasons page.** Merged with what main added since 2026-10-07: the Paused tab, the "edited after review"
   badge and notice, Review details (its buttons now follow the card: Flag or Reject, Remove, Approve) and the
   stale-status check. Manager moderates products; super admins and managers edit the reasons and reinstate.
