@@ -9,6 +9,13 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-18 (branch `product-moderation/release`, merge `468c8e2` of `product-moderation/removal` into main `37ecb85`, with
+  textile-spark-net's merge, which holds migration `20261118190000_product_moderation.sql`; **MERGED, NOT RELEASED**: the
+  migration waits for production access) **Products: Remove, Flag and Reinstate, with a reason picked in the dialog;
+  Moderation reasons page.** Merged with what main added since 2026-10-07: the Paused tab, the "edited after review"
+  badge and notice, Review details (its buttons now follow the card: Flag or Reject, Remove, Approve) and the
+  stale-status check. Manager moderates products; super admins and managers edit the reasons and reinstate.
+
 - 2026-11-14 (branch `fix/todo-open-items-2026-11-05`, with textile-spark-net branch of the same name, which holds migration `20261114110000_lead_deadline_everywhere.sql`) **Leads: "Deadline passed".** A requirement still open but past its 7-day deadline (`rfqs.expires_at`) is its own stage, `expired`, labelled "Deadline passed", with its own filter chip and a count in the window summary; it is no longer counted as overdue. A lead's detail says "Takes quotes until …" or "Deadline passed …". Mitra, 2026-11-05: "complete them fully" (ToDo "Apply the requirement deadline everywhere leads are counted or announced").
 
 - 2026-11-14 (branch `buyer-signup/email-verified`, with textile-spark-net branch `buyer-signup/fixes`, which holds migration `20261114100300_staff_email_verified.sql`; not released) **Unverified emails are labelled.** A buyer can type any email on sign-up's Account Information, and staff saw it beside the account as if it were theirs. Accounts and a support request's Requester now say "not verified" beside an email that isn't the account's confirmed sign-in address (`admin_email_verified(ids)`, the roles of `admin_profile_emails`; `admin_support_get().requester.email_verified`). The requester's "Open vendor page" now shows only for a real seller (`has_store` follows `admin.is_real_seller()`), not for a buyer who once ticked Seller on Register. Buyer sign-up audit 2026-11-13, item 14b.
