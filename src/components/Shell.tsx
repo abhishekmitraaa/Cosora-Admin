@@ -145,6 +145,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: "/blogs", section: "blogs", label: "Blog", icon: Newspaper },
       { to: "/chat-keywords", section: "chat-keywords", label: "Keyword blocklist", icon: Ban },
       { to: "/chat-patterns", section: "chat-patterns", label: "Flag patterns", icon: Regex },
+      { to: "/moderation-reasons", section: "moderation-reasons", label: "Moderation reasons", icon: ListChecks },
       { to: "/chat-reasons", section: "chat-reasons", label: "Block reasons", icon: ScrollText },
       { to: "/requirement-reasons", section: "rfq-reasons", label: "Requirement reasons", icon: ListChecks },
       { to: "/faqs", section: "faqs", label: "FAQs", icon: CircleHelp },

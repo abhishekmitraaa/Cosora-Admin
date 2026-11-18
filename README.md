@@ -75,7 +75,7 @@ denial. Keep that pattern for any new write. (INSERTs are fine either way: a
 | `ads_moderator` | – | – | – | write | – | read | – |
 | `finance_admin` | – | – | – | – | write | read | – |
 | `support` | read | read | read | read | read | read | – |
-| `manager` | – | – | – | – | – | read | **write**, teammates in the team roles only |
+| `manager` | **write** (since 2026-10-07) | – | – | – | – | read | **write**, teammates in the team roles only |
 
 `support` can additionally write the flagged-items log (`admin_flags`).
 
@@ -470,6 +470,22 @@ migration `20260928070410`, admin completion Phase 6) read `admin.customer_summa
 - **Tags** (`admin.customer_tags`, `admin.profile_tags`) are live tables, and every change is
   in the Admin Log. super_admin and support add, apply, remove and delete them.
 - A phone sign-in account's placeholder email shows as "Phone sign-in".
+
+### Products: remove and flag with managed reasons (2026-10-07)
+
+textile-spark-net migration `20261007160000_product_moderation`, design
+`documentation/product-moderation-design-2026-10-07.md` there.
+- **Remove** (super_admin, product_moderator, manager): a final takedown. **Flag** (same roles, live listings): hidden and
+  back in the queue until approved, rejected or removed. Both open `ProductModerationDialog`, where **a reason from the
+  managed list is required and picked in the dialog**, with optional details for the vendor and a preview of the notice.
+- **Reinstate** (super_admin, manager, with a note): the listing goes back to the vendor's drafts.
+- **Removed** tab, a flagged badge in the queue, and each listing's moderation history (`admin_product_moderation_history`).
+  Tabs page 50 at a time.
+- **`/moderation-reasons`** (`ModerationReasons.tsx`): super_admin and manager add, edit, switch off and reorder; product
+  moderators read. Reasons are never deleted.
+- Every action notifies the vendor and is in the Admin Log with its reason. The page never writes the removal or flag
+  columns: `trg_products_moderation_guard` refuses that for every browser client.
+- A `'product'` note in the flagged-items log needs one of the three moderation roles; support reads.
 
 ### Leads: the RFQ pipeline (2026-09-28)
 

@@ -34,6 +34,7 @@ import ChatPatterns from "@/pages/ChatPatterns";
 import ChatReasons from "@/pages/ChatReasons";
 import RfqReview from "@/pages/RfqReview";
 import RfqReasons from "@/pages/RfqReasons";
+import ModerationReasons from "@/pages/ModerationReasons";
 import Faqs from "@/pages/Faqs";
 import Attributes from "@/pages/Attributes";
 // Phase-4 sections. All of them read the database now: the development-only
@@ -274,6 +275,14 @@ export default function App() {
                 element={
                   <RequireSection section="chat-patterns">
                     <ChatPatterns />
+                  </RequireSection>
+                }
+              />
+              <Route
+                path="/moderation-reasons"
+                element={
+                  <RequireSection section="moderation-reasons">
+                    <ModerationReasons />
                   </RequireSection>
                 }
               />
