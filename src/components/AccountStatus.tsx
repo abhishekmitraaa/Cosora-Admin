@@ -6,6 +6,7 @@ import { supabase, describeWriteError } from "@/lib/supabase";
 import { canSuspendAccounts, ROLE_LABELS } from "@/lib/roles";
 import { useAdminSession, useRole } from "@/hooks/useAdminSession";
 import ReasonPicker from "./ReasonPicker";
+import { fetchAccountStatus } from "@/lib/accounts";
 import { Badge, Button, Card, ErrorNote, Note, Notice, SubHeading, Spinner } from "./ui";
 
 interface SuspensionRow {
@@ -78,14 +79,10 @@ export default function AccountStatus({
 
   const account = useQuery({
     queryKey: ["account-status", profileId],
+    // Through admin_account_statuses() (buyer review L-89): the column isn't client-readable any more.
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, account_status")
-        .eq("id", profileId)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return data;
+      const status = await fetchAccountStatus(profileId);
+      return status === null ? null : { id: profileId, account_status: status };
     },
   });
 

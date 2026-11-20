@@ -23,14 +23,16 @@ export async function fetchAccountStatuses(ids: string[]): Promise<Map<string, s
 
   // The ids go in the URL: a few hundred of them outgrow the gateway's limit (the Vendors
   // page asks for every vendor), so they go 100 at a time (subscriptions sweep, 2026-10-09).
+  // Through admin_account_statuses() (buyer review L-89, 2026-11-20): account_status is no longer readable to
+  // signed-in accounts, staff included. It takes up to 500 ids; 100 a call keeps the old batching.
   const parts = await Promise.all(
     chunks(unique, IN_CHUNK).map(async (part) => {
-      const { data, error } = await supabase.from("profiles").select("id, account_status").in("id", part);
-      if (error) throw new Error(error.message);
-      return data ?? [];
+      const { data, error } = await supabase.rpc("admin_account_statuses" as never, { p_ids: part } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      return ((data ?? []) as unknown) as { id: string; account_status: string }[];
     }),
   );
-  return new Map(parts.flat().map((p) => [p.id, p.account_status as string]));
+  return new Map(parts.flat().map((p) => [p.id, p.account_status]));
 }
 
 /** How many ids one `.in()` filter carries, so the URL stays well under the gateway's limit. */
@@ -44,11 +46,5 @@ export function chunks<T>(list: T[], size: number): T[][] {
 
 /** Single-account form of the above. Returns null when there is no profiles row. */
 export async function fetchAccountStatus(id: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("account_status")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return (data?.account_status as string) ?? null;
+  return (await fetchAccountStatuses([id])).get(id) ?? null;
 }

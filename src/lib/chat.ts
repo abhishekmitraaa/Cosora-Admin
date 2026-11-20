@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { fetchAccountStatuses } from "./accounts";
 
 /**
  * Shared reads for the chat-moderation screens.
@@ -36,10 +37,12 @@ export async function fetchParticipants(ids: string[]): Promise<Map<string, Part
 
   // Email through the admin-gated RPC: profiles.email is not client-selectable
   // (MPF-3). Every other column is still a plain select.
-  const [profiles, emails, vendors] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, account_status").in("id", unique),
+  // Status through admin_account_statuses() (buyer review L-89): the column isn't client-readable any more.
+  const [profiles, emails, vendors, statuses] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").in("id", unique),
     supabase.rpc("admin_profile_emails", { p_ids: unique }),
     supabase.from("vendor_profiles").select("id, brand_name").in("id", unique),
+    fetchAccountStatuses(unique),
   ]);
   if (profiles.error) throw new Error(profiles.error.message);
   if (emails.error) throw new Error(emails.error.message);
@@ -55,7 +58,7 @@ export async function fetchParticipants(ids: string[]): Promise<Map<string, Part
         id: p.id,
         full_name: p.full_name,
         email: emailOf.get(p.id) ?? null,
-        account_status: p.account_status,
+        account_status: statuses.get(p.id) ?? "active",
         isVendor: brands.has(p.id),
         brand_name: brands.get(p.id) ?? null,
       },
