@@ -36,6 +36,8 @@ export const FEATURE_FLAG_LABELS: Record<string, string> = {
   account_managers: "Account managers and priority support",
   featured_listings: "Featured listings, spotlight and seal tiers",
   bulk_import: "Bulk catalogue import",
+  // The buyer app's /careers page and the seller landing page's "Work with us" link (review L-68, 2026-11-20).
+  careers_page: "Careers page",
 };
 
 export function useFeatureFlags() {
