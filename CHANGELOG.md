@@ -9,9 +9,16 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-22 (branch `fix/admin-review-medium3-2026-11-22`; database in textile-spark-net migration `20261122130000`;
+  **LIVE 2026-11-22** with Medium batches 1 and 2)
+  **Admin review 2026-11-22: Medium batch 3 (AR-M42–M46).**
+  - `vercel.json`: Content-Security-Policy, X-Robots-Tag, HSTS, COOP; `public/robots.txt`; robots meta (M45).
+  - Videos: Approve disabled with the reason for a video with no file or over 60 s (M42). Subscriptions and Invoices
+    page by (created_at, id) (M43). Feature switches save over the loaded version, refresh on a clash (M46).
+
 - 2026-11-22 (branch `fix/admin-review-medium2-2026-11-22`, on top of Medium batch 1; database in textile-spark-net
-  migration `20261122120000`; plan `textile-spark-net/documentation/admin-review-medium2-plan-2026-11-22.md`; **built and
-  tested on the local stack, NOT released**)
+  migration `20261122120000`; plan `textile-spark-net/documentation/admin-review-medium2-plan-2026-11-22.md`; **LIVE
+  2026-11-22**)
   **Admin review 2026-11-22: Medium batch 2 (AR-M22–M41).**
   - Lists: Ads and its review queue 50 at a time, Ads Monitoring every row with India-time days and live money,
     Certificates one tab at a time with counts, Requirement review in pages of 100 with a confirmed Approve
@@ -26,8 +33,8 @@ entry in each, from that repo's point of view.
     named.
 
 - 2026-11-22 (branch `fix/admin-review-medium1-2026-11-22`; database in textile-spark-net migration `20261122110000`;
-  plan `textile-spark-net/documentation/admin-review-medium1-plan-2026-11-22.md`; **built and tested on the local stack,
-  NOT released**)
+  plan `textile-spark-net/documentation/admin-review-medium1-plan-2026-11-22.md`; **LIVE
+  2026-11-22**)
   **Admin review 2026-11-22: Medium batch 1 (AR-M01–M05, M07–M21).**
   - Address state: `hooks/useUrlState.ts` (`useUrlState`, `useUrlFilters`) keeps tabs, filters and searches in the
     address on 25 pages (Products, Videos, Catalogues, Ads and its queues, Admin Log, Payments, Customers, Leads, Support
