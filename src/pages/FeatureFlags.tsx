@@ -87,12 +87,14 @@ function FlagPanel({ flag, writable }: { flag: FeatureFlag; writable: boolean })
   async function save() {
     setBusy(true);
     try {
-      await saveFeatureFlag(flag.key, everyone, people.map((p) => p.id), reason.trim());
+      await saveFeatureFlag(flag.key, everyone, people.map((p) => p.id), reason.trim(), flag.updatedAt);
       toast.success("Switch saved.");
       setReason("");
       void qc.invalidateQueries({ queryKey: ["feature-flags"] });
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error((e as Error).message, { duration: 8000 });
+      // A colleague saved first: show their version (AR-M46).
+      void qc.invalidateQueries({ queryKey: ["feature-flags"] });
     } finally {
       setBusy(false);
     }

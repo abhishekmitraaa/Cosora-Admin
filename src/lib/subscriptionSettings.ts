@@ -55,11 +55,19 @@ export function useFeatureFlags() {
   });
 }
 
-export async function saveFeatureFlag(key: string, enabled: boolean, allowProfileIds: string[], reason: string): Promise<void> {
-  const { error } = await supabase.rpc("admin_feature_flag_set", {
+/** Saves over the switch as loaded (`expectedUpdatedAt`): refused if another super admin saved since (AR-M46). */
+export async function saveFeatureFlag(
+  key: string,
+  enabled: boolean,
+  allowProfileIds: string[],
+  reason: string,
+  expectedUpdatedAt: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("admin_feature_flag_set" as never, {
     p_key: key, p_enabled: enabled, p_allow_profile_ids: allowProfileIds, p_reason: reason,
-  });
-  if (error) throw new Error(describeWriteError(error));
+    p_expected_updated_at: expectedUpdatedAt,
+  } as never);
+  if (error) throw new Error(describeWriteError(error as Parameters<typeof describeWriteError>[0]));
 }
 
 // ── Billing details ─────────────────────────────────────────────────────────────

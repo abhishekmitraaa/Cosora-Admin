@@ -379,7 +379,7 @@ export default function Videos() {
           own screens.
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          There is no bulk undo. Reversing it means rejecting each item individually.
+          There is no bulk undo. Reversing it means rejecting each item individually. Videos with no file or longer than 60 seconds stay in the queue for a decision of their own.
         </p>
         <div className="mt-3 flex justify-end gap-2">
           <Button onClick={() => setBulkFor(null)}>Cancel</Button>
@@ -529,11 +529,22 @@ function VideoCard({
         </div>
 
         <div className="flex w-full flex-col gap-1.5 sm:w-40">
-          {v.status !== "live" && (
-            <Button variant="primary" disabled={!writable || busy} onClick={onApprove}>
-              Approve
-            </Button>
-          )}
+          {v.status !== "live" && (() => {
+            // The database refuses these too (AR-M42): no file, or over the 60-second cap.
+            const blocked = !v.video_url
+              ? "This video has no file. Reject it with a reason."
+              : (v.duration_seconds ?? 0) > 60
+                ? "This video is longer than 60 seconds. Reject it with a reason."
+                : null;
+            return (
+              <>
+                <Button variant="primary" disabled={!writable || busy || blocked !== null} title={blocked ?? undefined} onClick={onApprove}>
+                  Approve
+                </Button>
+                {blocked && <span className="text-2xs text-caution-fg">{blocked}</span>}
+              </>
+            );
+          })()}
           {v.status !== "rejected" && (
             <Button variant="danger" disabled={!writable || busy} onClick={onReject}>
               {v.status === "live" ? "Pull down" : "Reject"}

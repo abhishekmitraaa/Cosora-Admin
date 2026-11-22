@@ -193,13 +193,19 @@ export default function Subscriptions() {
   const subs = useInfiniteQuery({
     queryKey: ["subscriptions"],
     enabled: plainOnly,
-    initialPageParam: null as string | null,
+    initialPageParam: null as { at: string; id: string } | null,
     queryFn: async ({ pageParam }): Promise<PlainSubRow[]> => {
       const base = `id, vendor_id, plan_id, billing_cycle, status, current_period_start,
            current_period_end, auto_renew, created_at, vendor:vendor_profiles(brand_name, city)`;
       const read = (columns: string) => {
-        let q = supabase.from("vendor_subscriptions").select(columns).order("created_at", { ascending: false }).limit(PAGE);
-        if (pageParam) q = q.lt("created_at", pageParam);
+        // (created_at, id) so rows sharing a time are never skipped between pages (AR-M43).
+        let q = supabase
+          .from("vendor_subscriptions")
+          .select(columns)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(PAGE);
+        if (pageParam) q = q.or(`created_at.lt.${pageParam.at},and(created_at.eq.${pageParam.at},id.lt.${pageParam.id})`);
         return q;
       };
       let { data, error } = await read(`${base}, scheduled_plan_id, scheduled_from`);
@@ -208,20 +214,29 @@ export default function Subscriptions() {
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as PlainSubRow[];
     },
-    getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
+    getNextPageParam: (last) => {
+      const r = last[last.length - 1];
+      return last.length === PAGE && r ? { at: r.created_at, id: r.id } : undefined;
+    },
   });
 
   const invoices = useInfiniteQuery({
     queryKey: ["invoices"],
-    initialPageParam: null as string | null,
+    initialPageParam: null as { at: string; id: string } | null,
     queryFn: async ({ pageParam }): Promise<InvoiceRow[]> => {
       const base = `id, vendor_id, plan_id, amount, gst_amount, currency, status, invoice_number,
            razorpay_payment_id, razorpay_refund_id, refund_status, refunded_at,
            billing_period_start, billing_period_end, created_at,
            vendor:vendor_profiles(brand_name)`;
       const read = (columns: string) => {
-        let q = supabase.from("subscription_invoices").select(columns).order("created_at", { ascending: false }).limit(PAGE);
-        if (pageParam) q = q.lt("created_at", pageParam);
+        // (created_at, id) so rows sharing a time are never skipped between pages (AR-M43).
+        let q = supabase
+          .from("subscription_invoices")
+          .select(columns)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(PAGE);
+        if (pageParam) q = q.or(`created_at.lt.${pageParam.at},and(created_at.eq.${pageParam.at},id.lt.${pageParam.id})`);
         return q;
       };
       let { data, error } = await read(`${base}, document_type, payment_mode, total_paise, superseded_at`);
@@ -230,7 +245,10 @@ export default function Subscriptions() {
       if (error) throw new Error(error.message);
       return (data ?? []) as unknown as InvoiceRow[];
     },
-    getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
+    getNextPageParam: (last) => {
+      const r = last[last.length - 1];
+      return last.length === PAGE && r ? { at: r.created_at, id: r.id } : undefined;
+    },
   });
 
   // Every money and plan list at once (AR-M35).
