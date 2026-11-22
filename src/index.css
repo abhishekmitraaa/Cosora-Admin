@@ -400,3 +400,26 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Phone tap targets of at least 24 px (review AR-L33, WCAG 2.5.8). Touch screens only, so desktop density stays.
+   Links inside a sentence are exempt by the rule and keep flowing with the text. */
+@media (pointer: coarse) {
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 24px;
+    min-height: 24px;
+  }
+  button,
+  [role="button"],
+  [role="tab"],
+  summary,
+  select {
+    min-height: 24px;
+    min-width: 24px;
+  }
+  a:not(p a, li a) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+  }
+}

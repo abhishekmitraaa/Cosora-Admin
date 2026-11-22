@@ -188,7 +188,7 @@ export default function HeroSlides() {
                       )}
                     </div>
                     <div className="mt-3 grid gap-3 pl-8 sm:grid-cols-2">
-                      <Field label="Starts (optional)" htmlFor={`start-${r.product_id}`}>
+                      <Field label="Starts, India time (optional)" htmlFor={`start-${r.product_id}`}>
                         <Input
                           id={`start-${r.product_id}`}
                           type="datetime-local"
@@ -198,7 +198,7 @@ export default function HeroSlides() {
                         />
                       </Field>
                       <Field
-                        label="Ends (optional)"
+                        label="Ends, India time (optional)"
                         htmlFor={`end-${r.product_id}`}
                         error={badWindow === i ? "Ends before it starts." : null}
                       >
@@ -304,5 +304,5 @@ function Thumb({ src, alt, small = false }: { src: string | null; alt: string; s
       </span>
     );
   }
-  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={cn(box, "object-cover")} />;
+  return <img src={src} alt={alt} loading="lazy" data-own-fallback="" onError={() => setFailed(true)} className={cn(box, "object-cover")} />;
 }

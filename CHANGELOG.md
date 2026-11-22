@@ -9,6 +9,14 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-23 (branch `fix/admin-review-low2-2026-11-23`, on top of Low batch 1; database in textile-spark-net migration
+  `20261123100000`; **built and tested on the local stack, NOT released**)
+  **Admin review: Low batch 2 (AR-L21–L40).** Confirmations for picture replace / default, blog category delete and role
+  changes; Reports keep paise; carousel times in India time; failed reads are errors (System Health, Reports, Admins);
+  sign-out is this browser only; managers aren't offered refused resets; the role notice names sections; unknown requests
+  and malformed vendor ids are "not found"; broken pictures show a tile; phone tap targets and 15-row queues; two page
+  widths and a larger Geography map; tab roles; overdue cues; System Health shows embedding usage and CSP reports.
+
 - 2026-11-23 (branch `fix/admin-review-low1-2026-11-22`; database in textile-spark-net migration `20261122140000`;
   **built and tested on the local stack, NOT released**)
   **Admin review: Low batch 1 (AR-L01–L20).** Approvals no longer refetch every loaded queue page; Paused is look-only;

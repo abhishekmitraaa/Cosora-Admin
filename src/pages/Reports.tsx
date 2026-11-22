@@ -133,7 +133,9 @@ const RANGES = [
 ] as const;
 type RangeId = (typeof RANGES)[number]["id"];
 
-const rupees = (paise: number) => Math.round(paise / 100);
+// Paise kept (AR-L22): rounding to whole rupees made Reports disagree with Payments by a few rupees.
+const rupees = (paise: number) => paise / 100;
+const inrText = (r: number) => `₹${r.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(r) ? 0 : 2, maximumFractionDigits: 2 })}`;
 
 export default function Reports() {
   const ink = useChartInk();
@@ -230,8 +232,8 @@ export default function Reports() {
           <Stat
             icon={<IndianRupee size={18} />}
             label={`Revenue, ${RANGES.find((r) => r.id === range)?.label.toLowerCase()}`}
-            value={`₹${totalRevenue.toLocaleString("en-IN")}`}
-            sub={`net of ₹${d.gst.toLocaleString("en-IN")} GST collected`}
+            value={inrText(totalRevenue)}
+            sub={`net of ${inrText(d.gst)} GST collected`}
           />
           <Stat icon={<Layers size={18} />} label="Categories in use" value={String(d.categories.length)} />
         </div>
@@ -278,7 +280,7 @@ export default function Reports() {
               All revenue to date falls on a single day (
               {format(new Date(d.revenueByDay[0].day), "d MMM yyyy")}):{" "}
               <span className="font-semibold tabular-nums text-ink">
-                ₹{d.revenueByDay[0].total.toLocaleString("en-IN")}
+                {inrText(d.revenueByDay[0].total)}
               </span>
               . A trend line needs at least two days of activity.
             </Note>
@@ -296,7 +298,7 @@ export default function Reports() {
                   <YAxis tick={{ fontSize: 11, fill: ink.axisText }} stroke={ink.axis} width={48} />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
+                    formatter={(v: number) => [inrText(v), "Revenue"]}
                     labelFormatter={(v: string) => format(new Date(v), "d MMM yyyy")}
                   />
                   <Line type="monotone" dataKey="total" stroke={ink.series} strokeWidth={2} dot={{ r: 3 }} />
@@ -309,7 +311,7 @@ export default function Reports() {
           {d.unverified > 0 && (
             <Note className="mt-4">
               <span className="font-medium text-ink">
-                Not counted above: ₹{d.unverified.toLocaleString("en-IN")} (GST included) of payments that moved no money.
+                Not counted above: {inrText(d.unverified)} (GST included) of payments that moved no money.
               </span>{" "}
               They were made with Razorpay's test keys or in demo checkouts. Payments shows each one, with the Money filter.
             </Note>
@@ -319,18 +321,18 @@ export default function Reports() {
             <div>
               <div className="text-xs text-ink-faint">Subscriptions (net)</div>
               <div className="font-semibold tabular-nums text-ink">
-                ₹{d.subscriptionRevenue.toLocaleString("en-IN")}
+                {inrText(d.subscriptionRevenue)}
               </div>
             </div>
             <div>
               <div className="text-xs text-ink-faint">Ads ({d.adOrderCount} paid orders)</div>
               <div className="font-semibold tabular-nums text-ink">
-                ₹{d.adRevenue.toLocaleString("en-IN")}
+                {inrText(d.adRevenue)}
               </div>
             </div>
             <div>
               <div className="text-xs text-ink-faint">GST collected (not revenue)</div>
-              <div className="font-semibold tabular-nums text-ink-muted">₹{d.gst.toLocaleString("en-IN")}</div>
+              <div className="font-semibold tabular-nums text-ink-muted">{inrText(d.gst)}</div>
             </div>
           </div>
         </Panel>
@@ -409,6 +411,8 @@ export default function Reports() {
         >
           {flags.isLoading ? (
             <Spinner label="Loading log…" />
+          ) : flags.error ? (
+            <ErrorNote message={`The log couldn't load: ${(flags.error as Error).message}`} />
           ) : (flags.data ?? []).length === 0 ? (
             <Empty>Nothing flagged.</Empty>
           ) : (

@@ -8,7 +8,9 @@ import type { InfiniteData, QueryClient } from "@tanstack/react-query";
  * so nothing waits past the promised 24–48 h; Mitra, "Toggle on the page"), newest first
  * on the other tabs. Index: (status, created_at, id) on each table.
  */
-export const QUEUE_PAGE = 50;
+// On a phone 15 at a time (AR-L34): 50 cards made the Products queue 26,000 px long. Read once at load.
+export const QUEUE_PAGE =
+  typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches ? 15 : 50;
 
 export type QueueCursor = { at: string; id: string } | null;
 export type QueueSort = "oldest" | "newest";

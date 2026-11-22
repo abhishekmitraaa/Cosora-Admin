@@ -115,8 +115,9 @@ export function AuthLayout({ children, footer }: { children: ReactNode; footer?:
  * picking their own max-w-4xl / 5xl / 6xl.
  * ------------------------------------------------------------------ */
 const WIDTHS = {
-  narrow: "max-w-3xl", // single-column forms and short lists
-  default: "max-w-5xl", // card queues, the common case
+  // Two widths, not three (AR-L35): "narrow" pages jumped in from the others' edge. It stays as a name and reads as default.
+  narrow: "max-w-5xl",
+  default: "max-w-5xl", // card queues, forms, the common case
   wide: "max-w-7xl", // wide tables and the map
 } as const;
 
@@ -810,6 +811,8 @@ export const ROW_HOVER = "transition-colors hover:bg-surface-2";
 /* ------------------------------------------------------------------ *
  * Tabs
  * ------------------------------------------------------------------ */
+let tabKeyMoveAt = 0;
+
 export function Tabs<T extends string>({
   tabs,
   active,
@@ -841,8 +844,14 @@ export function Tabs<T extends string>({
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.length]);
+  // An arrow key moves focus with the selection once the new tab has rendered (AR-L36). Kept outside the component:
+  // six pages swap the whole page, tabs included, for a skeleton while a tab loads, so the strip remounts.
   useEffect(() => {
-    const el = stripRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    const el = stripRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (tabKeyMoveAt && Date.now() - tabKeyMoveAt < 5000) {
+      tabKeyMoveAt = 0;
+      el?.focus();
+    }
     el?.scrollIntoView({ block: "nearest", inline: "nearest" });
     measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -853,15 +862,36 @@ export function Tabs<T extends string>({
     <div className={cn("relative mb-4", className)}>
       {/* overflow-x-auto makes the other axis scroll too (CSS computes overflow-y: auto), so a tab hanging over the
           line by a pixel showed a vertical scrollbar with arrows on Windows. The y axis is hidden and nothing overhangs. */}
-      <div ref={stripRef} onScroll={measure} className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line">
+      {/* A tab list to a screen reader (AR-L36): one tab in the Tab order, arrows, Home and End move between them. */}
+      <div
+        ref={stripRef}
+        onScroll={measure}
+        role="tablist"
+        onKeyDown={(e) => {
+          const i = tabs.findIndex((t) => t.id === active);
+          const next =
+            e.key === "ArrowRight" ? (i + 1) % tabs.length
+            : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length
+            : e.key === "Home" ? 0
+            : e.key === "End" ? tabs.length - 1
+            : -1;
+          if (next < 0 || i < 0) return;
+          e.preventDefault();
+          tabKeyMoveAt = Date.now();
+          onChange(tabs[next].id);
+        }}
+        className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line"
+      >
         {tabs.map((t) => (
           <button
             key={t.id}
             // Not a submit button: Tabs can sit inside a form (the Quick Guide editor's
             // language tabs), and a bare <button> there saved and closed the form.
             type="button"
+            role="tab"
             onClick={() => onChange(t.id)}
-            aria-current={active === t.id ? "page" : undefined}
+            aria-selected={active === t.id}
+            tabIndex={active === t.id ? 0 : -1}
             className={cn(
               "flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
               active === t.id

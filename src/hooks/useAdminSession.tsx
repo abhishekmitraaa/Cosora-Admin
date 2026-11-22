@@ -163,7 +163,8 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       // Admin Log (MPF-26): record the sign-out while the session still exists.
       // Best effort: a failed record never blocks signing out.
       await supabase.rpc("admin_audit_session", { p_action: "sign_out" }).then(() => undefined, () => undefined);
-      await supabase.auth.signOut();
+      // This browser only (AR-L25): the default signed the admin out on every device.
+      await supabase.auth.signOut({ scope: "local" });
       queryClient.clear();
       setIdentity(null);
     },

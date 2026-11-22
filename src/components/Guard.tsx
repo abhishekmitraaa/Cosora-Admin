@@ -5,6 +5,7 @@ import { canSee, type Section } from "@/lib/roles";
 import { mustChangePassword } from "@/lib/staff";
 import ChangeTemporaryPassword from "@/pages/ChangeTemporaryPassword";
 import { Card, ErrorNote, Spinner } from "./ui";
+import { sectionLabel } from "@/components/Shell";
 
 /**
  * Blocks entry to the whole app unless the signed-in user's `profiles` row says
@@ -65,7 +66,7 @@ export function RequireSection({ section, children }: { section: Section; childr
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
           Your admin role does not include the{" "}
-          <span className="font-medium text-ink">{section}</span> section. If you reached this by a
+          <span className="font-medium text-ink">{sectionLabel(section)}</span> section. If you reached this by a
           link, ask a super admin to change your role.
         </p>
       </Card>

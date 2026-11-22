@@ -201,11 +201,28 @@ function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable:
                 if (f) run(f);
               }}
             />
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => input.current?.click()} title={SURFACE_HINT[slot.surface]}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                // Replacing is live at once on the buyer app, so it asks first (AR-L21).
+                if (slot.image_path && !window.confirm(`Replace the picture for ${slot.label}? Visitors see the new one straight away.`)) return;
+                input.current?.click();
+              }}
+              title={SURFACE_HINT[slot.surface]}
+            >
               <Upload size={12} /> {slot.image_path ? "Replace" : "Upload"}
             </Button>
             {slot.image_path && (
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => run(null)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm(`Go back to the app's own picture for ${slot.label}? The uploaded one is removed.`)) run(null);
+                }}
+              >
                 <RotateCcw size={12} /> Use default
               </Button>
             )}

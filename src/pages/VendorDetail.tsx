@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import { BackLink } from "@/components/BackLink";
 import { siteVendorUrl } from "@/lib/site";
+import { isUuid } from "@/lib/uuid";
 
 interface VendorDetailRow {
   id: string;
@@ -59,7 +60,9 @@ interface VendorDetailRow {
 }
 
 export default function VendorDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id: rawId } = useParams<{ id: string }>();
+  // A malformed address reads nothing and says "not found" (AR-L31).
+  const id = isUuid(rawId) ? rawId : undefined;
   useRecordView("public.vendor_profiles", id);
   const role = useRole();
   const qc = useQueryClient();
@@ -130,6 +133,14 @@ export default function VendorDetail() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  if (!id) {
+    return (
+      <Page>
+        <BackLink fallback="/vendors" label="All vendors" />
+        <ErrorNote message="Vendor not found: this address isn't a vendor's id." />
+      </Page>
+    );
+  }
   if (vendor.isLoading) {
     return (
       <Page>

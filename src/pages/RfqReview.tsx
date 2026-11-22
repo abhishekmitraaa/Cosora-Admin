@@ -28,6 +28,20 @@ const TABS: { id: SubmissionState; label: string }[] = [
   { id: "rejected", label: "Not approved" },
 ];
 
+/** Buyers are told a requirement is checked in 3–5 minutes (PostRequirement); past that it is late (AR-L37). */
+const PROMISED_MIN = 5;
+function WaitCue({ since }: { since: string }) {
+  const mins = (Date.now() - new Date(since).getTime()) / 60000;
+  if (!(mins > PROMISED_MIN)) return null;
+  const hours = mins / 60;
+  const text = hours >= 24 ? `${Math.floor(hours / 24)} d overdue` : hours >= 1 ? `${Math.floor(hours)} h overdue` : `${Math.floor(mins)} min overdue`;
+  return (
+    <span className="ml-1.5" title="Buyers are told a requirement is checked in 3–5 minutes">
+      <Badge tone={hours >= 1 ? "critical" : "caution"}>{text}</Badge>
+    </span>
+  );
+}
+
 export default function RfqReview() {
   const role = useRole();
   const qc = useQueryClient();
@@ -123,6 +137,7 @@ export default function RfqReview() {
                   </div>
                   <div className="mt-1 text-xs text-ink-muted">
                     {s.buyerName ?? "A buyer"} · posted {formatDistanceToNow(new Date(s.createdAt), { addSuffix: true })}
+                    {s.state === "pending" && <WaitCue since={s.createdAt} />}
                     {s.buyerPhoneUnverified && <span className="ml-1.5"><Badge tone="caution">phone not verified</Badge></span>}
                   </div>
                   <AttrGrid cols={3}>

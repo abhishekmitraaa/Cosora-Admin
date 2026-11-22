@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { istInputFromIso, isoFromIstInput } from "@/lib/blogs";
 
 /**
  * NEW ARRIVALS CAROUSEL (2026-10-14; migration 20261014150000_hero_slides in textile-spark-net).
@@ -104,16 +105,11 @@ export function useSaveHeroSlides() {
 
 /** An ISO time as a datetime-local value in this browser's time zone, or "". */
 export function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // India time whatever the browser's zone (AR-L22): a slide scheduled from abroad started hours off.
+  return iso ? istInputFromIso(iso) : "";
 }
 
 /** A datetime-local value (this browser's time zone) as ISO, or null when empty. */
 export function fromLocalInput(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  return value ? isoFromIstInput(value) : null;
 }

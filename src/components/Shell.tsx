@@ -157,6 +157,16 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
+/** A section's name as the sidebar shows it (AR-L29: the role notice printed the key, "rfq-review"). */
+export function sectionLabel(section: Section): string {
+  for (const g of NAV_GROUPS) {
+    const hit = g.items.find((i) => i.section === section);
+    if (hit) return section === "support" ? "Support" : hit.label;
+  }
+  const words = String(section).replace(/-/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 const COLLAPSE_KEY = "cosora-admin-nav-collapsed";
 
 function readCollapsed(): string[] {

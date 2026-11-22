@@ -129,6 +129,7 @@ export default function Registrations() {
                     </Link>
                     <Badge tone={r.days_waiting > OVERDUE_DAYS ? "critical" : r.days_waiting >= 3 ? "caution" : "neutral"}>
                       {r.days_waiting === 0 ? "today" : r.days_waiting === 1 ? "1 day waiting" : `${r.days_waiting} days waiting`}
+                      {r.days_waiting > OVERDUE_DAYS && " · overdue (sellers are told 3–5 days)"}
                     </Badge>
                   </div>
                   <p className="mt-0.5 text-xs text-ink-muted">

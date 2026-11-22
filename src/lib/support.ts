@@ -329,8 +329,10 @@ export function useSupportTicket(ticketNo: string | undefined) {
     queryKey: ["support", "ticket", ticketNo],
     enabled: Boolean(ticketNo),
     refetchOnWindowFocus: true,
-    queryFn: async (): Promise<SupportTicketDetail> => {
+    queryFn: async (): Promise<SupportTicketDetail | null> => {
       const { data, error } = await supabase.rpc("admin_support_get", { p_ticket_no: ticketNo! });
+      // No such request (or a number in the wrong shape): "not found", not an error retried (AR-L30).
+      if (error && ["P0002", "22P02", "PGRST116"].includes(error.code ?? "")) return null;
       if (error) throw new Error(error.message);
       return data as unknown as SupportTicketDetail;
     },

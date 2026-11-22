@@ -145,7 +145,8 @@ export function StaffDirectoryPanel({ myRole, myId }: { myRole: AdminRole | null
             const isSelf = s.user_id === myId;
             // A manager resets teammates in the team roles only; the function refuses the rest too.
             const managerBlocked =
-              myRole === "manager" && s.is_active && s.admin_role !== null && !TEAM_ROLES.includes(s.admin_role);
+              // Deactivated rows keep their last role, and the function refuses those too (AR-L28).
+              myRole === "manager" && s.admin_role !== null && !TEAM_ROLES.includes(s.admin_role);
             return (
               <tr key={s.user_id} className={ROW_HOVER}>
                 <td className="px-3 py-2">

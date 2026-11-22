@@ -170,6 +170,32 @@ const fmt = (iso: string) =>
     minute: "2-digit",
   });
 
+const USAGE_DAYS = 14;
+
+type UsageRow = {
+  day: string;
+  source_table: string;
+  jobs_processed: number;
+  chars_embedded: number;
+  est_usd: number;
+  avg_queue_seconds: number | null;
+  max_queue_seconds: number | null;
+  retried_jobs: number;
+};
+
+type CspRow = {
+  id: number;
+  directive: string;
+  blocked: string;
+  document_path: string;
+  source: string | null;
+  sample: string | null;
+  disposition: string | null;
+  hits: number;
+  first_seen: string;
+  last_seen: string;
+};
+
 export default function SystemHealth() {
   // Super admins may send themselves a delivery test (subscriptions P2); nothing else here writes.
   const role = useRole();
@@ -206,6 +232,28 @@ export default function SystemHealth() {
     refetchInterval: 60_000,
   });
   const cronRows = cron.data ?? [];
+  // Embedding usage per India day (AR-L39) and the buyer site's CSP reports (AR-L40).
+  const usage = useQuery({
+    queryKey: ["admin_embedding_usage", USAGE_DAYS],
+    queryFn: async (): Promise<UsageRow[]> => {
+      const { data, error } = await supabase.rpc("admin_embedding_usage" as never, { p_days: USAGE_DAYS } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      return (data ?? []) as UsageRow[];
+    },
+    staleTime: 10 * 60_000,
+  });
+  const csp = useQuery({
+    queryKey: ["admin_csp_violations"],
+    queryFn: async (): Promise<CspRow[]> => {
+      const { data, error } = await supabase.rpc("admin_csp_violations" as never, { p_limit: 100 } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      return (data ?? []) as CspRow[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const usageRows = usage.data ?? [];
+  const usageUsd = usageRows.reduce((n, r) => n + Number(r.est_usd ?? 0), 0);
+  const usageJobs = usageRows.reduce((n, r) => n + Number(r.jobs_processed ?? 0), 0);
 
   const failureRows = failures.data ?? [];
   const refused = failureRows.reduce((n, r) => n + r.count, 0);
@@ -236,8 +284,6 @@ export default function SystemHealth() {
       />
 
       <Stack>
-        {error && <ErrorNote message={(error as Error).message} />}
-
         <NotificationDeliveryPanel canTest={role === "super_admin"} />
 
         <Panel
@@ -246,6 +292,8 @@ export default function SystemHealth() {
         >
           {isPending ? (
             <SkeletonList rows={1} height="h-20" />
+          ) : error ? (
+            <ErrorNote message={`The pipeline samples couldn't load: ${(error as Error).message}`} />
           ) : !latest ? (
             <Empty>
               No samples recorded yet. The embedding-health-log cron writes one every 10 minutes.
@@ -372,6 +420,8 @@ export default function SystemHealth() {
         >
           {isPending ? (
             <SkeletonList rows={4} height="h-10" />
+          ) : error ? (
+            <ErrorNote message={`The pipeline samples couldn't load: ${(error as Error).message}`} />
           ) : rows.length === 0 ? (
             <Empty>Nothing recorded yet.</Empty>
           ) : (
@@ -429,6 +479,71 @@ export default function SystemHealth() {
                     {r.last_event_type ?? "—"} / {r.last_source ?? "—"}
                   </td>
                   <td className="px-3 py-2 text-ink-muted">{r.message ?? "—"}</td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Panel>
+
+        <Panel
+          title="Embedding usage"
+          description={
+            usageRows.length > 0
+              ? `Last ${USAGE_DAYS} days (India time): ${usageJobs.toLocaleString("en-IN")} jobs, about $${usageUsd.toFixed(2)} of OpenAI embeddings (estimated from characters sent, about 4 a token).`
+              : `Embedding jobs finished per day and table, last ${USAGE_DAYS} days (India time), with an estimate of the OpenAI cost.`
+          }
+        >
+          {usage.error ? (
+            <ErrorNote message={`Embedding usage couldn't load: ${(usage.error as Error).message}`} />
+          ) : usage.isPending ? (
+            <SkeletonList rows={2} height="h-10" />
+          ) : usageRows.length === 0 ? (
+            <Empty>No embedding jobs finished in the last {USAGE_DAYS} days.</Empty>
+          ) : (
+            <Table head={["Day", "Table", "Jobs", "Characters", "Est. cost", "Queue wait (avg / max)", "Retried"]}>
+              {usageRows.map((r) => (
+                <tr key={`${r.day}-${r.source_table}`}>
+                  <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{r.day}</td>
+                  <td className="px-3 py-2 font-mono text-2xs">{r.source_table}</td>
+                  <td className="px-3 py-2 tabular-nums">{Number(r.jobs_processed).toLocaleString("en-IN")}</td>
+                  <td className="px-3 py-2 tabular-nums">{Number(r.chars_embedded).toLocaleString("en-IN")}</td>
+                  <td className="px-3 py-2 tabular-nums">${Number(r.est_usd).toFixed(4)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-muted">
+                    {r.avg_queue_seconds ?? "—"} s / {r.max_queue_seconds ?? "—"} s
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {r.retried_jobs > 0 ? <Badge tone="caution">{r.retried_jobs}</Badge> : 0}
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Panel>
+
+        <Panel
+          title="Content Security Policy reports"
+          description="What browsers on cosora.in reported their security policy would block (report-only: nothing was blocked), grouped by directive, address and page; newest first, 100 at most."
+        >
+          {csp.error ? (
+            <ErrorNote message={`CSP reports couldn't load: ${(csp.error as Error).message}`} />
+          ) : csp.isPending ? (
+            <SkeletonList rows={2} height="h-10" />
+          ) : (csp.data ?? []).length === 0 ? (
+            <Empty>No reports.</Empty>
+          ) : (
+            <Table head={["Last seen", "Directive", "Blocked", "Page", "Hits", "First seen"]}>
+              {(csp.data ?? []).map((r) => (
+                <tr key={r.id}>
+                  <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{fmt(r.last_seen)}</td>
+                  <td className="px-3 py-2">
+                    <Badge tone={r.disposition === "enforce" ? "critical" : "caution"}>{r.directive}</Badge>
+                  </td>
+                  <td className="max-w-[16rem] break-all px-3 py-2 font-mono text-2xs" title={r.sample ?? undefined}>
+                    {r.blocked}
+                  </td>
+                  <td className="max-w-[12rem] break-all px-3 py-2 font-mono text-2xs">{r.document_path}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.hits.toLocaleString("en-IN")}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{fmt(r.first_seen)}</td>
                 </tr>
               ))}
             </Table>

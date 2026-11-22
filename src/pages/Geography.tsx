@@ -390,7 +390,8 @@ function HeatMap({ agg }: { agg: Aggregation }) {
   return (
     <div
       ref={container}
-      className="h-[28rem] w-full overflow-hidden rounded-xl border border-line bg-surface-2"
+      // India is taller than wide: a short, full-width box left it a third of the panel (AR-L35).
+      className="mx-auto h-[28rem] w-full max-w-3xl overflow-hidden rounded-xl border border-line bg-surface-2 lg:h-[40rem]"
       // The map is a visual summary of the table directly below it, which is
       // the accessible copy of the same data.
       role="img"

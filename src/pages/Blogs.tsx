@@ -841,12 +841,14 @@ function CategoriesTab({ writable }: { writable: boolean }) {
                       variant="ghost"
                       aria-label={`Delete ${c.name}`}
                       disabled={!writable || del.isPending}
-                      onClick={() =>
+                      onClick={() => {
+                        // A deletion can't be undone, so it asks first (AR-L21).
+                        if (!window.confirm(`Delete the blog category "${c.name}"? This can't be undone.`)) return;
                         del.mutate(c.id, {
                           onSuccess: () => toast.success("Category deleted"),
                           onError: (e: Error) => toast.error(e.message),
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Trash2 size={14} />
                     </Button>

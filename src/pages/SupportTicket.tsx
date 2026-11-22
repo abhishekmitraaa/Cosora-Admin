@@ -95,6 +95,13 @@ export default function SupportTicket() {
   }
   // A failed background refresh keeps the last good data (React Query keeps it), so the
   // page, and any reply being typed, stay put. Only a first load that fails shows the error.
+  if (ticket.data === null) {
+    return (
+      <Page width="wide">
+        <ErrorNote message={`There is no request ${ticketNo ?? ""}. Check the number, or find it on the Support board.`} />
+      </Page>
+    );
+  }
   if (!ticket.data) return <ErrorNote message={(ticket.error as Error | null)?.message ?? "Could not load this request."} />;
   const d = ticket.data;
   const t = d.ticket;

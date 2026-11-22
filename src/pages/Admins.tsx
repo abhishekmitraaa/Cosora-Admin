@@ -20,8 +20,7 @@ import {
   Select,
   SkeletonList,
   Stack,
-  Table,
-} from "@/components/ui";
+  Table, ErrorNote } from "@/components/ui";
 
 const SUBTITLE =
   "Grant, change, and revoke admin access. Super admins manage everyone; managers manage teammates in the team roles. The database enforces that, not this page.";
@@ -203,6 +202,14 @@ export default function Admins() {
     );
   }
 
+  if (admins.error) {
+    return (
+      <Page>
+        <PageHeader title="Admins" subtitle={SUBTITLE} />
+        <ErrorNote message={`The admin list couldn't load: ${(admins.error as Error).message}`} />
+      </Page>
+    );
+  }
   const superAdminCount = (admins.data ?? []).filter((a) => a.admin_role === "super_admin").length;
 
   return (
@@ -239,7 +246,15 @@ export default function Admins() {
                       aria-label={`Role for ${a.email ?? "this admin"}`}
                       value={a.admin_role}
                       disabled={isSelf || setRole.isPending}
-                      onChange={(e) => setRole.mutate({ id: a.id, role: e.target.value as AdminRole })}
+                      onChange={(e) => {
+                        const next = e.target.value as AdminRole;
+                        // A role change takes effect at once, so it is confirmed (AR-L27).
+                        if (window.confirm(`Change ${a.full_name || a.email || "this admin"}'s role to ${ROLE_LABELS[next] ?? next}? It takes effect straight away.`)) {
+                          setRole.mutate({ id: a.id, role: next });
+                        } else {
+                          e.target.value = a.admin_role ?? "";
+                        }
+                      }}
                     >
                       {assignable.map((r) => (
                         <option key={r} value={r}>
