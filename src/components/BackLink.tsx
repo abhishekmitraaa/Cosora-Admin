@@ -23,7 +23,8 @@ export function BackLink({ fallback, label }: { fallback: string; label: string 
     <Link
       to={fallback}
       onClick={onClick}
-      className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink"
+      // A full 44 px row on a phone, padded rather than enlarged on a computer (AR-L46).
+      className="-ml-2 mb-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink sm:min-h-9"
     >
       <ArrowLeft size={14} /> {inApp ? "Back" : label}
     </Link>

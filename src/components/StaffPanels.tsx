@@ -5,6 +5,7 @@ import { Copy, KeyRound, Mail, TriangleAlert } from "lucide-react";
 import { ROLE_LABELS, TEAM_ROLES, assignableRoles, type AdminRole } from "@/lib/roles";
 import { registerStaff, resetStaffPassword, useStaffDirectory, type CredentialResult, type StaffRow } from "@/lib/staff";
 import { Badge, Button, Empty, Field, Input, Notice, Panel, ROW_HOVER, Select, SkeletonList, Table } from "@/components/ui";
+import { useConfirm } from "@/components/Confirm";
 
 const DATE = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
 
@@ -115,6 +116,7 @@ export function RegisterStaffPanel({ myRole }: { myRole: AdminRole | null }) {
 
 /** The registered staff, with "Send a new temporary password". */
 export function StaffDirectoryPanel({ myRole, myId }: { myRole: AdminRole | null; myId: string | undefined }) {
+  const ask = useConfirm();
   const directory = useStaffDirectory(myRole === "super_admin" || myRole === "manager");
   const [result, setResult] = useState<{ name: string; r: CredentialResult } | null>(null);
   const qc = useQueryClient();
@@ -186,10 +188,16 @@ export function StaffDirectoryPanel({ myRole, myId }: { myRole: AdminRole | null
                           : undefined
                     }
                     onClick={() => {
-                      if (confirm(`Send ${s.full_name} a new temporary password? Their current password stops working.`)) {
+                      void ask({
+                        title: `Send ${s.full_name} a new temporary password?`,
+                        message: "Their current password stops working at once.",
+                        confirmLabel: "Send new password",
+                        danger: true,
+                      }).then((ok) => {
+                        if (!ok) return;
                         setResult(null);
                         reset.mutate(s);
-                      }
+                      });
                     }}
                   >
                     <KeyRound size={13} /> New temporary password

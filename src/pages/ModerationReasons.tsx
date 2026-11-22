@@ -117,7 +117,7 @@ export default function ModerationReasons() {
       {rows.length === 0 ? (
         <Empty>No reasons yet, so no listing can be removed or flagged until one exists.</Empty>
       ) : (
-        <Table head={["Reason", "Used for", "State", ""]}>
+        <Table fit head={["Reason", "Used for", "State", ""]}>
           {rows.map((r, i) => (
             <tr key={r.id} className={r.active ? ROW_HOVER : `opacity-60 ${ROW_HOVER}`} data-testid={`reason-${r.label}`}>
               <td className="px-3 py-2">
@@ -137,7 +137,7 @@ export default function ModerationReasons() {
                 {r.active ? <Badge tone="positive" dot>on</Badge> : <Badge dot>off</Badge>}
               </td>
               <td className="px-3 py-2">
-                <div className="flex justify-end gap-1.5">
+                <div className="flex flex-wrap justify-end gap-1.5">
                   <Button
                     size="sm"
                     variant="ghost"

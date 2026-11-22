@@ -60,6 +60,7 @@ import {
   type BlogStatus, blogHrefOk, BLOG_HREF_HINT, blogImagePaths, cleanupBlogImages } from "@/lib/blogs";
 import { useUrlState } from "@/hooks/useUrlState";
 import { istDate } from "@/lib/ist";
+import { useConfirm } from "@/components/Confirm";
 
 const BLOG_URL = "https://www.cosora.in/blogs";
 
@@ -781,6 +782,7 @@ function ArticleEditor({
 // ── Categories ──────────────────────────────────────────────────────────────
 
 function CategoriesTab({ writable }: { writable: boolean }) {
+  const ask = useConfirm();
   const categories = useBlogCategories();
   const save = useSaveBlogCategory();
   const del = useDeleteBlogCategory();
@@ -843,10 +845,17 @@ function CategoriesTab({ writable }: { writable: boolean }) {
                       disabled={!writable || del.isPending}
                       onClick={() => {
                         // A deletion can't be undone, so it asks first (AR-L21).
-                        if (!window.confirm(`Delete the blog category "${c.name}"? This can't be undone.`)) return;
-                        del.mutate(c.id, {
-                          onSuccess: () => toast.success("Category deleted"),
-                          onError: (e: Error) => toast.error(e.message),
+                        void ask({
+                          title: "Delete this blog category?",
+                          message: `"${c.name}" is deleted. This can't be undone.`,
+                          confirmLabel: "Delete category",
+                          danger: true,
+                        }).then((ok) => {
+                          if (!ok) return;
+                          del.mutate(c.id, {
+                            onSuccess: () => toast.success("Category deleted"),
+                            onError: (e: Error) => toast.error(e.message),
+                          });
                         });
                       }}
                     >

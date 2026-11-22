@@ -9,6 +9,13 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-23 (branch `fix/admin-review-low3-2026-11-23`, on top of Low batch 2; database in textile-spark-net migration
+  `20261123110000`; **built and tested on the local stack, NOT released**)
+  **Admin review: Low batch 3 (AR-L41–L48, L50–L52).** One in-app confirmation (`useConfirm()`) replaces every browser
+  `confirm()`; the vendor page shows bulk imports and contact reveals; `/leads?lead=` opens a request (Support's links
+  now land on it) with Copy link; tables say when they scroll and short ones fit a phone; Products tab counts; 44 px back
+  links; "More below" in the rail; review notes say why a message is missing; long searches are cut. L49 kept (Mitra).
+
 - 2026-11-23 (branch `fix/admin-review-low2-2026-11-23`, on top of Low batch 1; database in textile-spark-net migration
   `20261123100000`; **built and tested on the local stack, NOT released**)
   **Admin review: Low batch 2 (AR-L21–L40).** Confirmations for picture replace / default, blog category delete and role

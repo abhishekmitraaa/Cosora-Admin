@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "@/components/Confirm";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Mail, TriangleAlert, UserCheck } from "lucide-react";
@@ -20,7 +21,9 @@ import {
   Select,
   SkeletonList,
   Stack,
-  Table, ErrorNote } from "@/components/ui";
+  Table,
+  ErrorNote,
+} from "@/components/ui";
 
 const SUBTITLE =
   "Grant, change, and revoke admin access. Super admins manage everyone; managers manage teammates in the team roles. The database enforces that, not this page.";
@@ -71,6 +74,7 @@ interface InviteResult {
  * database refuses the rest anyway.
  */
 export default function Admins() {
+  const ask = useConfirm();
   const qc = useQueryClient();
   const { identity } = useAdminSession();
   const myRole = identity?.role ?? null;
@@ -247,13 +251,17 @@ export default function Admins() {
                       value={a.admin_role}
                       disabled={isSelf || setRole.isPending}
                       onChange={(e) => {
-                        const next = e.target.value as AdminRole;
-                        // A role change takes effect at once, so it is confirmed (AR-L27).
-                        if (window.confirm(`Change ${a.full_name || a.email || "this admin"}'s role to ${ROLE_LABELS[next] ?? next}? It takes effect straight away.`)) {
-                          setRole.mutate({ id: a.id, role: next });
-                        } else {
-                          e.target.value = a.admin_role ?? "";
-                        }
+                        const el = e.target;
+                        const next = el.value as AdminRole;
+                        // A role change takes effect at once, so it is confirmed (AR-L27); Cancel puts the dropdown back.
+                        void ask({
+                          title: "Change this admin's role?",
+                          message: `${a.full_name || a.email || "This admin"} becomes ${ROLE_LABELS[next] ?? next}. It takes effect straight away.`,
+                          confirmLabel: "Change role",
+                        }).then((ok) => {
+                          if (ok) setRole.mutate({ id: a.id, role: next });
+                          else el.value = a.admin_role ?? "";
+                        });
                       }}
                     >
                       {assignable.map((r) => (
@@ -270,7 +278,12 @@ export default function Admins() {
                     size="sm"
                     disabled={isSelf || isLastSuperAdmin || managerReadOnly || demote.isPending}
                     onClick={() => {
-                      if (confirm(`Remove admin access for ${a.email}?`)) demote.mutate(a.id);
+                      void ask({
+                        title: "Remove admin access?",
+                        message: `${a.email} can no longer sign in to Cosora-Admin.`,
+                        confirmLabel: "Remove admin",
+                        danger: true,
+                      }).then((ok) => ok && demote.mutate(a.id));
                     }}
                   >
                     Remove admin

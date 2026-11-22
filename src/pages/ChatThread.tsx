@@ -255,7 +255,7 @@ export default function ChatThread() {
 
   return (
     <Page>
-<BackLink fallback="/chats" label="All chats" />
+      <BackLink fallback="/chats" label="All chats" />
 
       <PageHeader
         title={`${participantLabel(a, c.user_a)} ↔ ${participantLabel(b, c.user_b)}`}

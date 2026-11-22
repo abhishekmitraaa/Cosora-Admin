@@ -109,7 +109,7 @@ export default function SupportTicket() {
 
   return (
     <Page width="wide">
-<BackLink fallback={board.to} label={board.label} />
+      <BackLink fallback={board.to} label={board.label} />
       <PageHeader
         title={`${t.ticket_no} · ${CHANNEL_LABELS[t.channel]}`}
         subtitle={`${labelText(t.category_label)} · from ${d.requester?.name ?? "a removed account"} (${t.requester_side}) · opened ${istTime(t.created_at)}`}
@@ -942,8 +942,8 @@ function entityLink(
   switch (type) {
     case "conversation": return canSee(role, "chats") ? { to: `/chats/${id}` } : null;
     case "vendor": return canSee(role, "vendors") ? { to: `/vendors/${id}` } : null;
-    case "rfq": return canSee(role, "leads") ? { to: `/leads?open=${id}` } : null;
-    case "quote": return rfqId && canSee(role, "leads") ? { to: `/leads?open=${rfqId}` } : null;
+    case "rfq": return canSee(role, "leads") ? { to: `/leads?lead=${id}` } : null;
+    case "quote": return rfqId && canSee(role, "leads") ? { to: `/leads?lead=${rfqId}` } : null;
     case "product": return { to: siteProductUrl(id), external: true };
     case "video": return { to: siteVideoUrl(id), external: true };
     case "account": return canSee(role, "accounts") ? { to: `/accounts?q=${id}` } : null;

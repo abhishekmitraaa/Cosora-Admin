@@ -705,7 +705,7 @@ export function Modal({
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const box = boxRef.current;
-    const first = box?.querySelector<HTMLElement>("input, textarea, select, [autofocus]") ?? box;
+    const first = box?.querySelector<HTMLElement>("[data-autofocus], input, textarea, select, [autofocus]") ?? box;
     first?.focus({ preventScroll: true });
     return () => {
       window.removeEventListener("popstate", onPop);
@@ -786,10 +786,30 @@ export function Modal({
 /* ------------------------------------------------------------------ *
  * Table
  * ------------------------------------------------------------------ */
-export function Table({ head, children }: { head: string[]; children: ReactNode }) {
+export function Table({ head, children, fit = false }: { head: string[]; children: ReactNode; fit?: boolean }) {
+  // A wide table on a phone scrolls sideways; a fade and "Scroll for more" say columns are off screen (AR-L44).
+  // `fit` drops the 640 px floor so a short table wraps to the screen instead (AR-L52: reasons, keywords, block reasons).
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = () => {
+    const el = boxRef.current;
+    if (!el) return;
+    const next = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setMore((m) => (m === next ? m : next));
+  };
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-card">
-      <table className="w-full min-w-[640px] text-sm">
+    <div className="relative">
+    <div ref={boxRef} onScroll={measure} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-card">
+      <table className={cn("w-full text-sm", !fit && "min-w-[640px]")}>
         <thead className="border-b border-line bg-surface-2 text-left text-2xs uppercase tracking-wider text-ink-faint">
           <tr>
             {head.map((h, i) => (
@@ -801,6 +821,15 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
         </thead>
         <tbody className="divide-y divide-line">{children}</tbody>
       </table>
+    </div>
+      {more && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-px right-px flex w-16 items-end justify-end rounded-r-xl bg-gradient-to-l from-surface via-surface/80 to-transparent pb-2 pr-2"
+        >
+          <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-ink-muted shadow-xs">Scroll ›</span>
+        </div>
+      )}
     </div>
   );
 }

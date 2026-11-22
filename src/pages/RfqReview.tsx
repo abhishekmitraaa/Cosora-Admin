@@ -123,11 +123,16 @@ export default function RfqReview() {
             <div key={s.id} data-testid="rfq-submission-card">
             <Card>
               <div className="flex flex-wrap gap-4">
-                {s.images.length > 0 && (
+                {s.images.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {s.images.slice(0, 3).map((src) => (
                       <img key={src} src={src} alt="" className="h-20 w-20 rounded-lg border border-line object-cover" />
                     ))}
+                  </div>
+                ) : (
+                  // Same footprint as one photo, so every card lines up (AR-L42).
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg border border-dashed border-line-strong bg-surface-2 text-center text-2xs text-ink-faint">
+                    No photos
                   </div>
                 )}
                 <div className="min-w-[240px] flex-1">

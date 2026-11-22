@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "@/components/Confirm";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ interface PatternRow {
 }
 
 export default function ChatPatterns() {
+  const ask = useConfirm();
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-patterns");
@@ -313,9 +315,12 @@ export default function ChatPatterns() {
                     size="sm"
                     disabled={!writable || remove.isPending}
                     onClick={() => {
-                      if (confirm(`Delete the pattern "${p.label}"? Deactivating is usually what you want.`)) {
-                        remove.mutate(p.id);
-                      }
+                      void ask({
+                        title: "Delete this pattern?",
+                        message: `"${p.label}" is deleted. Deactivating is usually what you want.`,
+                        confirmLabel: "Delete pattern",
+                        danger: true,
+                      }).then((ok) => ok && remove.mutate(p.id));
                     }}
                   >
                     Delete

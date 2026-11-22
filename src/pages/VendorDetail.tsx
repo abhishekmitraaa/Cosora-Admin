@@ -12,6 +12,7 @@ import VendorKycPanel, { useVendorKycDocs, kycSummary } from "@/components/Vendo
 import VendorContractPanel from "@/components/VendorContractPanel";
 import VendorRegistrationPanel from "@/components/VendorRegistrationPanel";
 import FlagLog from "@/components/FlagLog";
+import { VendorActivityPanels } from "@/components/VendorActivityPanels";
 import {
   Badge,
   Button,
@@ -156,7 +157,7 @@ export default function VendorDetail() {
 
   return (
     <Page>
-<BackLink fallback="/vendors" label="All vendors" />
+      <BackLink fallback="/vendors" label="All vendors" />
       <a
         href={siteVendorUrl(id!)}
         target="_blank"
@@ -307,6 +308,7 @@ export default function VendorDetail() {
         */}
         <AccountStatus profileId={v.id} name={v.brand_name || "this vendor"} kind="vendor" />
 
+        <VendorActivityPanels vendorId={v.id} />
         <FlagLog entityType="vendor" entityId={v.id} />
       </Stack>
     </Page>

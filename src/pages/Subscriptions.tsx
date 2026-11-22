@@ -37,6 +37,7 @@ import { announceRefund, canRefund, refundBlockedReason, refundState, type Refun
 import { CreditNotes } from "@/components/CreditNotes";
 import { useUrlState } from "@/hooks/useUrlState";
 import { refreshMoney } from "@/lib/moneyRefresh";
+import { useConfirm } from "@/components/Confirm";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -156,7 +157,10 @@ interface PlanRow {
 
 const SUBTITLE = "Plans, prices, worklists, invoices, refunds and billing incidents.";
 
+const SEARCH_MAX = 100;
+
 export default function Subscriptions() {
+  const ask = useConfirm();
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "subscriptions");
@@ -177,7 +181,9 @@ export default function Subscriptions() {
   const [view, setView] = useUrlState<WorklistView>("view", "all");
   const [days, setDays] = useState(7);
   const [planFilter, setPlanFilter] = useState<string | null>(null);
-  const [search, setSearch] = useUrlState<string>("q", "");
+  // The function takes at most 100 characters; a longer ?q= from a link is cut, not sent to be refused (AR-L48).
+  const [rawSearch, setSearch] = useUrlState<string>("q", "");
+  const search = rawSearch.trim().slice(0, SEARCH_MAX);
   const [typed, setTyped] = useState(search);
   useEffect(() => {
     const t = setTimeout(() => setSearch(typed), 300);
@@ -378,7 +384,7 @@ export default function Subscriptions() {
               <Tabs tabs={VIEWS.map((v) => ({ id: v.id, label: v.label }))} active={view} onChange={setView} />
               <div className="mb-3 flex flex-wrap items-end gap-3">
                 <Field label="Vendor" htmlFor="sub-search" className="w-56">
-                  <Input id="sub-search" placeholder="Part of the brand name" maxLength={100} value={typed} onChange={(e) => setTyped(e.target.value)} />
+                  <Input id="sub-search" placeholder="Part of the brand name" maxLength={SEARCH_MAX} value={typed} onChange={(e) => setTyped(e.target.value)} />
                 </Field>
                 <Field label="Plan" htmlFor="sub-plan" className="w-40">
                   <Select id="sub-plan" value={planFilter ?? ""} onChange={(e) => setPlanFilter(e.target.value || null)}>
@@ -593,14 +599,18 @@ export default function Subscriptions() {
                           disabled={!writable || !refundable || refund.isPending}
                           title={refundBlockedReason(inv) ?? undefined}
                           onClick={() => {
-                            if (
-                              !confirm(
-                                `Refund ${inr(total)} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?\n\n` +
-                                  "Their plan stays active: a refund doesn't end it. To end it, cancel the subscription too.",
-                              )
-                            )
-                              return;
-                            refund.mutate(inv.id);
+                            // The app's own confirmation, like every other one (AR-L51).
+                            void ask({
+                              title: "Refund through Razorpay?",
+                              message: (
+                                <>
+                                  <p>{`${inr(total)} goes back to ${inv.vendor?.brand_name ?? "this vendor"}.`}</p>
+                                  <p className="mt-2">Their plan stays active: a refund doesn't end it. To end it, cancel the subscription too.</p>
+                                </>
+                              ),
+                              confirmLabel: `Refund ${inr(total)}`,
+                              danger: true,
+                            }).then((ok) => ok && refund.mutate(inv.id));
                           }}
                         >
                           Refund

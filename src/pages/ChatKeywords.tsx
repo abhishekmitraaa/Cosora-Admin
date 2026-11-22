@@ -20,6 +20,7 @@ import {
   SkeletonList,
   Table,
 } from "@/components/ui";
+import { useConfirm } from "@/components/Confirm";
 
 const SUBTITLE =
   "Plain terms that chat messages are checked against. Not regular expressions; for those, use Flag patterns.";
@@ -34,6 +35,7 @@ interface KeywordRow {
 }
 
 export default function ChatKeywords() {
+  const ask = useConfirm();
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-keywords");
@@ -127,7 +129,7 @@ export default function ChatKeywords() {
       {rows.length === 0 ? (
         <Empty>The blocklist is empty.</Empty>
       ) : (
-        <Table head={["Term", "Added by", "Added", ""]}>
+        <Table fit head={["Term", "Added by", "Added", ""]}>
           {rows.map((k) => (
             <tr key={k.id} className={ROW_HOVER}>
               <td className="px-3 py-2 font-mono text-xs text-ink">{k.term}</td>
@@ -145,7 +147,8 @@ export default function ChatKeywords() {
                   size="sm"
                   disabled={!writable || remove.isPending}
                   onClick={() => {
-                    if (confirm(`Remove "${k.term}" from the blocklist?`)) remove.mutate(k.id);
+                    void ask({ title: "Remove from the blocklist?", message: `"${k.term}" is no longer blocked in chats.`, confirmLabel: "Remove", danger: true })
+                      .then((ok) => ok && remove.mutate(k.id));
                   }}
                 >
                   Remove

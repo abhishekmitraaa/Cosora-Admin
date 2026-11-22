@@ -26,6 +26,7 @@ import {
   SkeletonList,
   cn,
 } from "@/components/ui";
+import { useConfirm } from "@/components/Confirm";
 
 /**
  * CATEGORY PICTURES (2026-10-14). Real data: lib/categoryImages.ts and the admin_category_image*
@@ -138,6 +139,7 @@ function SlotGrid({ slots, writable, wide = false }: { slots: CategoryImageSlot[
 }
 
 function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable: boolean; wide: boolean }) {
+  const ask = useConfirm();
   const set = useSetCategoryImage();
   const input = useRef<HTMLInputElement | null>(null);
   const busy = set.isPending;
@@ -207,8 +209,12 @@ function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable:
               disabled={busy}
               onClick={() => {
                 // Replacing is live at once on the buyer app, so it asks first (AR-L21).
-                if (slot.image_path && !window.confirm(`Replace the picture for ${slot.label}? Visitors see the new one straight away.`)) return;
-                input.current?.click();
+                if (!slot.image_path) return input.current?.click();
+                void ask({
+                  title: "Replace this picture?",
+                  message: `Visitors see the new picture for ${slot.label} straight away.`,
+                  confirmLabel: "Choose a picture",
+                }).then((ok) => ok && input.current?.click());
               }}
               title={SURFACE_HINT[slot.surface]}
             >
@@ -220,7 +226,12 @@ function SlotCard({ slot, writable, wide }: { slot: CategoryImageSlot; writable:
                 variant="ghost"
                 disabled={busy}
                 onClick={() => {
-                  if (window.confirm(`Go back to the app's own picture for ${slot.label}? The uploaded one is removed.`)) run(null);
+                  void ask({
+                    title: "Use the app's own picture?",
+                    message: `The uploaded picture for ${slot.label} is removed.`,
+                    confirmLabel: "Use default",
+                    danger: true,
+                  }).then((ok) => ok && run(null));
                 }}
               >
                 <RotateCcw size={12} /> Use default

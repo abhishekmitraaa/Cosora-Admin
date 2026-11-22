@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { format, formatDistanceToNow } from "date-fns";
-import { Inbox } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Inbox, Link2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { isUuid } from "@/lib/uuid";
+import { istDate, istDateTime } from "@/lib/ist";
 import { toast } from "sonner";
 import FlagLog from "@/components/FlagLog";
 import { useRole } from "@/hooks/useAdminSession";
@@ -92,6 +95,25 @@ export default function Leads() {
   const [filters, setFilters] = useUrlFilters<LeadFilters>(NO_FILTERS);
   const [draft, setDraft] = useState<LeadFilters>(filters);
   const [open, setOpen] = useState<string | null>(null);
+  // A link to one request (AR-L43): /leads?lead=<id> opens it (Support's links used ?open=, read too). The parameter is
+  // taken out of the address as the dialog opens, so the dialog's own history entry (Back closes it) stays intact.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("lead") ?? params.get("open");
+  useEffect(() => {
+    if (!linked) return;
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete("lead");
+        p.delete("open");
+        return p;
+      },
+      { replace: true, state: window.history.state?.usr },
+    );
+    if (isUuid(linked)) setOpen(linked);
+    else toast.error("That link doesn't name a request.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
   useEffect(() => {
     const t = setTimeout(() => setFilters(draft), draft.search === filters.search ? 0 : SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -334,7 +356,7 @@ function LeadLine({ lead: r, onOpen }: { lead: LeadRow; onOpen: () => void }) {
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-2xs tabular-nums text-ink-faint">
         {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
-        <span className="block">{format(new Date(r.created_at), "d MMM yyyy")}</span>
+        <span className="block">{istDate(r.created_at)}</span>
       </td>
       <td className="px-3 py-2 text-right">
         <Button size="sm" onClick={onOpen}>
@@ -360,6 +382,19 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
         <div className="space-y-4 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <StageBadge stage={d.stage} overdue={d.overdue} />
+            <button
+              type="button"
+              className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-brand hover:bg-surface-2"
+              onClick={() => {
+                const url = `${window.location.origin}/leads?lead=${id}`;
+                navigator.clipboard?.writeText(url).then(
+                  () => toast.success("Link copied"),
+                  () => toast.error(`Couldn't copy. The link is ${url}`),
+                );
+              }}
+            >
+              <Link2 size={13} aria-hidden /> Copy link
+            </button>
             {d.direct && <Badge>direct</Badge>}
             {d.overseas && (
               <Badge tone="info">
@@ -368,17 +403,17 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
             )}
             {d.overseas?.vip_until && new Date(d.overseas.vip_until) > new Date() && (
               <span className="text-2xs text-ink-faint" data-testid="lead-vip-until">
-                VIP vendors only until {format(new Date(d.overseas.vip_until), "d MMM, HH:mm")}
+                VIP vendors only until {istDateTime(d.overseas.vip_until)}
               </span>
             )}
             <span className="text-2xs text-ink-faint">
               {d.expires_at && (
                 <span data-testid="lead-deadline">
                   {new Date(d.expires_at) <= new Date() ? "Deadline passed" : "Takes quotes until"}{" "}
-                  {format(new Date(d.expires_at), "d MMM yyyy, HH:mm")} ·{" "}
+                  {istDateTime(d.expires_at)} ·{" "}
                 </span>
               )}
-              Posted {format(new Date(d.created_at), "d MMM yyyy, HH:mm")} by{" "}
+              Posted {istDateTime(d.created_at)} by{" "}
               <RoleLink section="accounts" to={`/accounts?q=${encodeURIComponent(d.buyer.id)}`} className="underline-offset-2 hover:underline">
                 {d.buyer.name}
               </RoleLink>
@@ -397,7 +432,7 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
           {d.removal && (
             <div className="rounded-md border border-critical-line bg-critical-bg p-3 text-xs">
               <span className="font-semibold text-critical-fg">Removed by {d.removal.by ?? "an admin"}</span>{" "}
-              <span className="text-ink-faint">{format(new Date(d.removal.at), "d MMM yyyy, HH:mm")}</span>
+              <span className="text-ink-faint">{istDateTime(d.removal.at)}</span>
               <p className="mt-1 whitespace-pre-line text-ink" data-no-translate>
                 {d.removal.reason}
               </p>

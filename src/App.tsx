@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { ConfirmProvider } from "@/components/Confirm";
 
 import { ADMIN_REFUSED_EVENT, AdminSessionProvider, useAdminSession } from "@/hooks/useAdminSession";
 import { RequireAdmin, RequireSection } from "@/components/Guard";
@@ -142,6 +143,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AdminSessionProvider>
         <BrowserRouter>
+          <ConfirmProvider>
           <Toaster richColors position="top-right" />
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -546,6 +548,7 @@ export default function App() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ConfirmProvider>
         </BrowserRouter>
       </AdminSessionProvider>
     </QueryClientProvider>

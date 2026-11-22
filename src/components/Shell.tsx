@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRfqPendingCount } from "@/lib/rfqReview";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
@@ -243,6 +243,25 @@ export default function Shell() {
     setOpen(false);
   }, [location.pathname]);
 
+  // The rail scrolls on a short screen; a fade and "More below" say sections are out of sight (AR-L50).
+  const railRef = useRef<HTMLElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureRail = () => {
+    const el = railRef.current;
+    if (!el) return;
+    const next = el.scrollTop + el.clientHeight < el.scrollHeight - 8;
+    setMoreBelow((m) => (m === next ? m : next));
+  };
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    measureRail();
+    const ro = new ResizeObserver(measureRail);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [open]);
+
   // Lock the page behind the drawer and allow Escape to dismiss it.
   useEffect(() => {
     if (!open) return;
@@ -269,6 +288,8 @@ export default function Shell() {
 
       {/* Rail: a slide-in drawer below lg, a sticky column at lg and up. */}
       <aside
+        ref={railRef}
+        onScroll={measureRail}
         className={cn(
           "warp rail-scroll fixed inset-y-0 left-0 z-50 flex w-[17rem] max-w-[85vw] flex-col overflow-y-auto",
           "border-r border-rail-line bg-rail text-rail-fg shadow-pop transition-transform duration-300 ease-out",
@@ -382,6 +403,15 @@ export default function Shell() {
             <LogOut size={14} /> Sign out
           </button>
         </div>
+        {moreBelow && (
+          <button
+            type="button"
+            onClick={() => railRef.current?.scrollBy({ top: railRef.current.clientHeight * 0.6, behavior: "smooth" })}
+            className="sticky bottom-0 -mt-12 flex h-12 w-full shrink-0 items-end justify-center bg-gradient-to-t from-rail via-rail/90 to-transparent pb-2 text-2xs font-medium text-rail-muted"
+          >
+            More below ⌄
+          </button>
+        )}
       </aside>
 
       {/* Content column: a mobile top bar, then the routed page. */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { istDate } from "@/lib/ist";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
@@ -158,23 +158,27 @@ export default function ChatReasons() {
       {rows.length === 0 ? (
         <Empty>No block reasons defined, so no account can be suspended until one exists.</Empty>
       ) : (
-        <Table head={["Reason", "State", "Added by", "Added", ""]}>
+        <Table
+          // Three columns, so the table fits a phone (AR-L52): the state sits under the reason, who added it over when.
+          fit
+          head={["Reason", "Added", ""]}
+        >
           {rows.map((r) => (
             <tr key={r.id} className={r.active ? ROW_HOVER : `opacity-60 ${ROW_HOVER}`}>
-              <td className="px-3 py-2 text-ink">{r.reason}</td>
-              <td className="px-3 py-2">
-                {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
+              <td className="px-3 py-2 text-ink">
+                <div>{r.reason}</div>
+                <div className="mt-1">
+                  {r.active ? <Badge tone="positive" dot>active</Badge> : <Badge dot>inactive</Badge>}
+                </div>
               </td>
-              <td className="px-3 py-2 text-ink-muted">
+              <td className="break-all px-3 py-2 text-ink-muted">
                 {r.creator_full_name || r.creator_email || (
-                  <span className="text-ink-faint">unknown</span>
+                  <span className="text-ink-faint" title="Added before Cosora-Admin recorded who adds a reason">not recorded</span>
                 )}
-              </td>
-              <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">
-                {format(new Date(r.created_at), "d MMM yyyy")}
+                <div className="text-xs tabular-nums text-ink-faint">{istDate(r.created_at)}</div>
               </td>
               <td className="px-3 py-2">
-                <div className="flex justify-end gap-1.5">
+                <div className="flex flex-wrap justify-end gap-1.5">
                   <Button
                     size="sm"
                     disabled={!writable}

@@ -8,6 +8,7 @@ import { useAdminSession, useRole } from "@/hooks/useAdminSession";
 import ReasonPicker from "./ReasonPicker";
 import { fetchAccountStatus } from "@/lib/accounts";
 import { Badge, Button, Card, ErrorNote, Note, Notice, SubHeading, Spinner } from "./ui";
+import { useConfirm } from "@/components/Confirm";
 
 interface SuspensionRow {
   id: string;
@@ -68,6 +69,7 @@ export default function AccountStatus({
   /** Only affects the wording. */
   kind?: "buyer" | "vendor" | "account";
 }) {
+  const ask = useConfirm();
   const role = useRole();
   const qc = useQueryClient();
   const writable = canSuspendAccounts(role);
@@ -210,11 +212,13 @@ export default function AccountStatus({
           disabled={setStatus.isPending}
           onClick={() => {
             if (suspended) {
-              if (!confirm(`Reinstate ${name}? Their ${noun} becomes active again.`)) return;
-              setStatus.mutate(
-                { status: "active", reasonId: null },
-                { onSuccess: () => toast.success(`${name} reinstated`) },
-              );
+              void ask({ title: `Reinstate ${name}?`, message: `Their ${noun} becomes active again.`, confirmLabel: "Reinstate" }).then((ok) => {
+                if (!ok) return;
+                setStatus.mutate(
+                  { status: "active", reasonId: null },
+                  { onSuccess: () => toast.success(`${name} reinstated`) },
+                );
+              });
             } else {
               setPicking(true);
             }

@@ -7,6 +7,7 @@ import { Badge, Button, Empty, Modal, Note, Panel, SkeletonList, Table, Textarea
 import { announceRefund, canRefund, refundSettledOrUnderway, refundState, type RefundResult } from "@/lib/refunds";
 import { withAutopayOff } from "@/lib/subscriptionAdmin";
 import { refreshMoney } from "@/lib/moneyRefresh";
+import { useConfirm } from "@/components/Confirm";
 
 interface GuaranteeInvoice {
   id: string;
@@ -54,6 +55,7 @@ export function RefundGuaranteePanel({
   /** A plan id as its name (AR-L15). */
   planName?: (id: string) => string;
 }) {
+  const ask = useConfirm();
   const qc = useQueryClient();
   const [closing, setClosing] = useState<GuaranteeRequest | null>(null);
   const [note, setNote] = useState("");
@@ -166,8 +168,12 @@ export function RefundGuaranteePanel({
                           size="sm"
                           disabled={!writable || !canRefund(i) || refund.isPending}
                           onClick={() => {
-                            if (!confirm(`Refund ${inr(i.total_rupees)} to ${r.vendor_name ?? "this vendor"} via Razorpay?`)) return;
-                            refund.mutate(i.id);
+                            void ask({
+                              title: "Refund through Razorpay?",
+                              message: `${inr(i.total_rupees)} goes back to ${r.vendor_name ?? "this vendor"} under the 7-day guarantee, and the plan ends.`,
+                              confirmLabel: `Refund ${inr(i.total_rupees)}`,
+                              danger: true,
+                            }).then((ok) => ok && refund.mutate(i.id));
                           }}
                         >
                           Refund

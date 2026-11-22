@@ -23,6 +23,7 @@ import {
   Tabs, Explainer } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
 import type { Database } from "@/lib/database.types";
+import { useConfirm } from "@/components/Confirm";
 
 interface ReviewRow {
   id: string;
@@ -64,6 +65,7 @@ const TABS: { id: ReviewStatus; label: string }[] = [
 const REVIEW_PAGE = 100;
 
 export default function ChatReview() {
+  const ask = useConfirm();
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-review");
@@ -343,7 +345,9 @@ export default function ChatReview() {
                           <span className="text-ink-faint">
                             {r.flagged
                               ? `No text. This is a "${r.flagged.kind}" message.`
-                              : "The flagged message is not available (deleted, or this review has no message attached)."}
+                              : r.source === "user_report"
+                                ? "No single message: the chat was reported as a whole. Open the chat to read it."
+                                : "The message that matched was deleted with its sender's account, so only the pattern is left."}
                           </span>
                         )}
                       </p>
@@ -395,11 +399,17 @@ export default function ChatReview() {
                       variant="primary"
                       disabled={!writable || busy}
                       onClick={() => {
-                        if (!confirm("Resume this chat? Both participants can message again, and the review closes as \"resumed\".")) return;
-                        resolve.mutate(
-                          { reviewId: r.id, verdict: "resumed" },
-                          { onSuccess: () => toast.success("Chat resumed") },
-                        );
+                        void ask({
+                          title: "Resume this chat?",
+                          message: 'Both participants can message again, and the review closes as "resumed".',
+                          confirmLabel: "Resume chat",
+                        }).then((ok) => {
+                          if (!ok) return;
+                          resolve.mutate(
+                            { reviewId: r.id, verdict: "resumed" },
+                            { onSuccess: () => toast.success("Chat resumed") },
+                          );
+                        });
                       }}
                     >
                       Resume

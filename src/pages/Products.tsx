@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -90,6 +90,23 @@ const COLUMNS = `id, name, price_value, currency, moq, fabric, gsm, colour, stat
 
 type Cursor = QueueCursor;
 
+/** How many listings each tab holds (AR-L45): one head-only count per tab, on the same (status, …) index the pages use. */
+async function fetchTabCounts(): Promise<Record<Tab, number>> {
+  const out = {} as Record<Tab, number>;
+  await Promise.all(
+    TABS.map(async ({ id }) => {
+      let q = supabase.from("products").select("id", { count: "exact", head: true });
+      if (id === "removed") q = q.eq("status", "rejected").not("removed_at", "is", null);
+      else if (id === "rejected") q = q.eq("status", "rejected").is("removed_at", null);
+      else q = q.eq("status", id);
+      const { count, error } = await q;
+      if (error) throw new Error(error.message);
+      out[id] = count ?? 0;
+    }),
+  );
+  return out;
+}
+
 async function fetchPage(tab: Tab, cursor: Cursor, sort: QueueSort) {
   let q = supabase.from("products").select(COLUMNS);
   // A removal is status 'rejected' plus removed_at, so the two tabs split one status.
@@ -127,6 +144,7 @@ export default function Products() {
   const [viewing, setViewing] = useState<ProductRow | null>(null);
 
   const [sort, setSort] = useUrlState<QueueSort>("sort", defaultQueueSort(tab), QUEUE_SORTS);
+  const tabCounts = useQuery({ queryKey: ["products", "tab-counts"], queryFn: fetchTabCounts, staleTime: 30_000 });
   const products = useInfiniteQuery({
     queryKey: ["products", tab, sort],
     initialPageParam: null as Cursor,
@@ -167,6 +185,7 @@ export default function Products() {
     onSuccess: (_d, v) => {
       dropFromQueue(qc, ["products", tab, sort], v.id);
       void qc.invalidateQueries({ queryKey: ["products"], refetchType: "none" });
+      void qc.invalidateQueries({ queryKey: ["products", "tab-counts"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
     onError: (e: Error) => {
@@ -214,7 +233,7 @@ export default function Products() {
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "products")} />}
 
-      <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      <Tabs tabs={TABS.map((t) => ({ ...t, count: tabCounts.data?.[t.id] }))} active={tab} onChange={setTab} />
       <QueueSortToggle value={sort} onChange={setSort} />
 
       {rows.length === 0 ? (
