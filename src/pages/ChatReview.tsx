@@ -15,14 +15,12 @@ import {
   Card,
   Empty,
   ErrorNote,
-  Note,
   Page,
   PageHeader,
   ReadOnlyBanner,
   SkeletonList,
   StatusBadge,
-  Tabs,
-} from "@/components/ui";
+  Tabs, Explainer } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
 import type { Database } from "@/lib/database.types";
 
@@ -250,20 +248,19 @@ export default function ChatReview() {
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
       {pendingTab ? (
-        <Note className="mb-4">
+        <Explainer className="mb-4">
           <span className="font-medium text-ink">Resume</span> unlocks the chat and closes the
           review. <span className="font-medium text-ink">Keep locked</span> closes the review and leaves
           the chat locked, for the &ldquo;seen, still deciding&rdquo; case, so items do not sit in
           the queue forever. <span className="font-medium text-ink">Block</span> suspends that
           participant's account against this review on the audit ledger, and asks whether to reopen
           the chat for the other party.
-        </Note>
+        </Explainer>
       ) : (
-        <Note className="mb-4">
-          Closed reviews, newest decision first. Read-only: a verdict is recorded once, and{" "}
-          <span className="font-mono text-2xs">resolve_conversation_review()</span> refuses a
-          second one on the same row so two admins cannot overwrite each other.
-        </Note>
+        <Explainer className="mb-4">
+          Closed reviews, newest decision first. Read-only: a decision is recorded once, and a second one on the same
+          review is refused, so two admins can't overwrite each other.
+        </Explainer>
       )}
 
       {rows.length === 0 ? (

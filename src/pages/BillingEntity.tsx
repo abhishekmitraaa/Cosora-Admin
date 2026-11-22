@@ -10,6 +10,7 @@ import {
 import {
   billingEntityProblems, EMPTY_BILLING_ENTITY, saveBillingEntity, useBillingEntity, useIndiaStates, type BillingEntity as Entity,
 } from "@/lib/subscriptionSettings";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 /**
  * BILLING DETAILS (subscriptions P0, 2026-10-08).
@@ -54,6 +55,8 @@ export default function BillingEntity() {
   const problems = useMemo(() => billingEntityProblems(form, states.data ?? []), [form, states.data]);
   const valid = Object.keys(problems).length === 0;
   const changed = JSON.stringify(form) !== JSON.stringify(stored.data ? pick(stored.data) : EMPTY_BILLING_ENTITY);
+  // Leaving with unsaved edits asks first (AR-M24).
+  useUnsavedChanges(changed);
 
   async function save() {
     setTried(true);

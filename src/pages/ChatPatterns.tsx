@@ -13,15 +13,13 @@ import {
   ErrorNote,
   Field,
   Input,
-  Note,
   Notice,
   Page,
   PageHeader,
   ReadOnlyBanner,
   ROW_HOVER,
   SkeletonList,
-  Table,
-} from "@/components/ui";
+  Table, Explainer } from "@/components/ui";
 
 const SUBTITLE =
   "Regular expressions that hold a conversation for review when a message matches. The label is what reviewers see in the queue.";
@@ -157,19 +155,14 @@ export default function ChatPatterns() {
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "chat-patterns")} />}
 
-      <Note className="mb-4">
-        <span className="font-medium text-ink">These are POSIX regular expressions, not keywords.</span>{" "}
-        <span className="font-mono text-2xs">.</span>, <span className="font-mono text-2xs">*</span>,{" "}
-        <span className="font-mono text-2xs">+</span>, <span className="font-mono text-2xs">|</span>,{" "}
-        <span className="font-mono text-2xs">( )</span> and{" "}
-        <span className="font-mono text-2xs">[ ]</span> are operators, so escape them with a
-        backslash to match them literally. Postgres validates the expression when you save, and
-        rejects anything it cannot compile. For plain terms use the{" "}
-        <span className="font-medium text-ink">Keyword blocklist</span> instead.
+      <Explainer className="mb-4">
+        <span className="font-medium text-ink">These are patterns, not keywords.</span> The characters{" "}
+        <span className="font-mono text-2xs">. * + | ( ) [ ]</span> have special meanings; put a backslash before one
+        to match it as itself. A pattern that can't be read is refused when you save, and so is one that would catch
+        ordinary messages. For plain words use the <span className="font-medium text-ink">Keyword blocklist</span>.
         <br />
-        Deleting a pattern is not the same as deactivating it: existing review rows point at it, and
-        a deleted one leaves them without a label. Deactivate unless you mean to erase it.
-      </Note>
+        Deactivate a pattern rather than deleting it: chats it already held keep its label only while it exists.
+      </Explainer>
 
       <Card className="mb-4">
         <form

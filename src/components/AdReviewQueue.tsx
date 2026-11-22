@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -8,10 +8,10 @@ import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
 import { reasonLabel, useAdReasonCodes } from "@/lib/adReasons";
 import {
-  Attr, AttrGrid, Badge, Button, Card, Empty, ErrorNote, Field, Modal, Note,
-  Notice, ReadOnlyBanner, Select, SkeletonList, Stat, StatusBadge, Tabs, Textarea,
-} from "./ui";
+  Attr, AttrGrid, Badge, Button, Card, Empty, ErrorNote, Field, Modal, Notice, ReadOnlyBanner, Select, SkeletonList, Stat, StatusBadge, Tabs, Textarea, Explainer } from "./ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { afterCursor, mergeQueuePages, nextCursor, QUEUE_PAGE, type QueueCursor } from "@/lib/queuePaging";
+import { LoadMore } from "@/components/LoadMore";
 
 /**
  * Phase 4 — the ad-campaign review surface.
@@ -127,10 +127,11 @@ export default function AdReviewQueue() {
   // note is empty.
   const noteRequired = action?.kind === "changes";
 
-  const queue = useQuery({
+  const queue = useInfiniteQuery({
     queryKey: ["ad-review", tab],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: null as QueueCursor,
+    queryFn: async ({ pageParam }) => {
+      let q = supabase
         .from("advertisements")
         .select(
           `id, title, placement, status, daily_budget, impressions, clicks, starts_at, ends_at,
@@ -138,16 +139,22 @@ export default function AdReviewQueue() {
            target_states, target_countries,
            moderation_reason, moderated_at`,
         )
-        .eq("status", tab)
-        // Oldest first. A review queue ordered newest-first starves the
-        // campaign that has been waiting longest, which is the one the vendor
-        // has already paid for and is most likely to complain about.
-        .order("created_at", { ascending: true });
+        .eq("status", tab);
+      // Oldest first. A review queue ordered newest-first starves the
+      // campaign that has been waiting longest, which is the one the vendor
+      // has already paid for and is most likely to complain about.
+      // 50 at a time (AR-M23: the queue stopped silently at 1,000).
+      if (pageParam) q = q.or(afterCursor(pageParam, "oldest"));
+      const { data, error } = await q
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(QUEUE_PAGE);
       if (error) throw new Error(error.message);
       const rows = (data ?? []) as QueueAd[];
       const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, vendors };
+      return { rows, vendors, edits: new Map<string, never>(), next: nextCursor(rows) };
     },
+    getNextPageParam: (last) => last.next,
   });
 
   /**
@@ -221,7 +228,7 @@ export default function AdReviewQueue() {
   if (queue.isLoading) return <SkeletonList rows={3} height="h-44" />;
   if (queue.error) return <ErrorNote message={(queue.error as Error).message} />;
 
-  const { rows, vendors } = queue.data!;
+  const { rows, vendors } = mergeQueuePages(queue.data?.pages ?? []);
   const m = metrics.data;
   const counts = m?.queue_depth ?? {};
   const rejections = Object.entries(m?.rejection_reasons ?? {}).sort((a, b) => b[1] - a[1]);
@@ -230,14 +237,11 @@ export default function AdReviewQueue() {
     <>
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "ads")} />}
 
-      <Note className="mb-4">
-        <span className="font-semibold text-ink">Payment is not approval.</span> A paid campaign lands
-        on <span className="font-mono text-2xs">pending_review</span> and is served to nobody until it
-        is approved here. Approving a campaign whose start date is in the future lands it on{" "}
-        <span className="font-mono text-2xs">scheduled</span>; a sweep promotes it when the date
-        arrives. Every decision is recorded on{" "}
-        <span className="font-mono text-2xs">ad_review_log</span> and cannot be edited or deleted.
-      </Note>
+      <Explainer className="mb-4">
+        <span className="font-semibold text-ink">Payment is not approval.</span> A paid campaign waits here and is
+        shown to nobody until it is approved. One approved before its start date is scheduled and starts by itself on
+        the day. Every decision is kept in the campaign's history and can't be edited or deleted.
+      </Explainer>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
@@ -299,6 +303,7 @@ export default function AdReviewQueue() {
               onAct={(kind) => openAction(a, kind)}
             />
           ))}
+          <LoadMore query={queue} />
         </div>
       )}
 

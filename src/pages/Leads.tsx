@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { Inbox } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +44,7 @@ import {
 } from "@/components/ui";
 import { LeadAlertsPanel } from "@/components/LeadAlertsPanel";
 import { useUrlFilters } from "@/hooks/useUrlState";
+import { RoleLink } from "@/components/RoleLink";
 
 /**
  * LEADS: THE RFQ PIPELINE (admin completion Phase 7).
@@ -304,13 +304,12 @@ function LeadLine({ lead: r, onOpen }: { lead: LeadRow; onOpen: () => void }) {
         {facts && <span className="block text-2xs text-ink-faint">{facts}</span>}
       </td>
       <td className="px-3 py-2">
-        <Link
-          to={`/accounts?q=${encodeURIComponent(r.buyer_id)}`}
+        <RoleLink section="accounts" to={`/accounts?q=${encodeURIComponent(r.buyer_id)}`}
           className="text-ink underline-offset-2 hover:underline"
           title="Open this buyer in Accounts"
         >
           {r.buyer_name}
-        </Link>
+        </RoleLink>
       </td>
       <td className="px-3 py-2">
         <StageBadge stage={stage} overdue={r.overdue} />
@@ -324,9 +323,9 @@ function LeadLine({ lead: r, onOpen }: { lead: LeadRow; onOpen: () => void }) {
       <td className="px-3 py-2">
         {vendorId ? (
           <>
-            <Link to={`/vendors/${vendorId}`} className="text-ink underline-offset-2 hover:underline">
+            <RoleLink section="vendors" to={`/vendors/${vendorId}`} className="text-ink underline-offset-2 hover:underline">
               {vendorName ?? "Unnamed vendor"}
-            </Link>
+            </RoleLink>
             <span className="block text-2xs text-ink-faint">{r.accepted_vendor_id ? "won it" : "direct request"}</span>
           </>
         ) : (
@@ -380,16 +379,16 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
                 </span>
               )}
               Posted {format(new Date(d.created_at), "d MMM yyyy, HH:mm")} by{" "}
-              <Link to={`/accounts?q=${encodeURIComponent(d.buyer.id)}`} className="underline-offset-2 hover:underline">
+              <RoleLink section="accounts" to={`/accounts?q=${encodeURIComponent(d.buyer.id)}`} className="underline-offset-2 hover:underline">
                 {d.buyer.name}
-              </Link>
+              </RoleLink>
               {d.target_vendor && (
                 <>
                   {" "}
                   for{" "}
-                  <Link to={`/vendors/${d.target_vendor.id}`} className="underline-offset-2 hover:underline">
+                  <RoleLink section="vendors" to={`/vendors/${d.target_vendor.id}`} className="underline-offset-2 hover:underline">
                     {d.target_vendor.name ?? "a vendor"}
-                  </Link>
+                  </RoleLink>
                 </>
               )}
             </span>
@@ -435,8 +434,8 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
           {d.images.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {d.images.slice(0, 6).map((src) => (
-                <a key={src} href={src} target="_blank" rel="noreferrer">
-                  <img src={src} alt="" className="h-20 w-20 rounded-md object-cover ring-1 ring-line" />
+                <a key={src} href={src} target="_blank" rel="noopener noreferrer" aria-label="Open the requirement's photo in a new tab">
+                  <img src={src} alt="" loading="lazy" className="h-20 w-20 rounded-md object-cover ring-1 ring-line" />
                 </a>
               ))}
             </div>
@@ -449,9 +448,9 @@ function LeadDetailModal({ id, onClose }: { id: string | null; onClose: () => vo
               {d.quotes.map((q) => (
                 <tr key={q.id} className={ROW_HOVER}>
                   <td className="px-3 py-2">
-                    <Link to={`/vendors/${q.vendor_id}`} className="underline-offset-2 hover:underline">
+                    <RoleLink section="vendors" to={`/vendors/${q.vendor_id}`} className="underline-offset-2 hover:underline">
                       {q.vendor_name ?? "Unnamed vendor"}
-                    </Link>
+                    </RoleLink>
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {q.price_per_unit != null ? `${q.currency}${q.price_per_unit}` : "—"}

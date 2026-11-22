@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
 // assertWrote is no longer imported here: every write on this page now goes
@@ -24,7 +24,6 @@ import {
   ErrorNote,
   Field,
   Modal,
-  Note,
   Notice,
   Page,
   PageHeader,
@@ -33,9 +32,10 @@ import {
   SkeletonList,
   StatusBadge,
   Tabs,
-  Textarea,
-} from "@/components/ui";
+  Textarea, Explainer } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { afterCursor, mergeQueuePages, nextCursor, QUEUE_PAGE, type QueueCursor } from "@/lib/queuePaging";
+import { LoadMore } from "@/components/LoadMore";
 
 type AdStatus = "active" | "paused" | "rejected" | "expired";
 
@@ -108,23 +108,30 @@ export default function Ads() {
   const [note, setNote] = useState("");
   const reasons = useAdReasonCodes();
 
-  const ads = useQuery({
+  // 50 at a time, newest first (AR-M23: the tab stopped silently at 1,000).
+  const ads = useInfiniteQuery({
     queryKey: ["ads", tab],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: null as QueueCursor,
+    queryFn: async ({ pageParam }) => {
+      let q = supabase
         .from("advertisements")
         .select(
           `id, title, placement, status, daily_budget, impressions, clicks,
            starts_at, ends_at, created_at, vendor_id, moderation_reason, moderated_at`,
         )
-        .in("status", TAB_STATUSES[tab])
-        .order("created_at", { ascending: false });
+        .in("status", TAB_STATUSES[tab]);
+      if (pageParam) q = q.or(afterCursor(pageParam, "newest"));
+      const { data, error } = await q
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(QUEUE_PAGE);
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as AdRow[];
       const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, vendors };
+      return { rows, vendors, edits: new Map<string, never>(), next: nextCursor(rows) };
     },
+    getNextPageParam: (last) => last.next,
   });
 
   /**
@@ -236,7 +243,7 @@ export default function Ads() {
   }
   if (ads.error) return <ErrorNote message={(ads.error as Error).message} />;
 
-  const { rows, vendors } = ads.data!;
+  const { rows, vendors } = mergeQueuePages(ads.data?.pages ?? []);
 
   return (
     <Page>
@@ -250,7 +257,7 @@ export default function Ads() {
         most misleading sentence in the panel: a moderator would believe live
         campaigns had never been reviewed.
       */}
-      <Note className="mb-4">
+      <Explainer className="mb-4">
         <span className="font-semibold text-ink">Campaigns are reviewed before they run.</span> Paid
         campaigns land in the <span className="font-medium text-ink">Review</span> tab and reach no
         buyer until approved. This screen handles campaigns that are already live.{" "}
@@ -259,8 +266,8 @@ export default function Ads() {
         <span className="font-medium text-ink">cannot</span> lift it themselves.{" "}
         <span className="font-medium text-ink">Rejecting</span> also stops serving and cannot be
         reactivated by the vendor. Both are recorded on{" "}
-        <span className="font-mono text-2xs">ad_review_log</span>.
-      </Note>
+        the campaign's history.
+      </Explainer>
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -284,6 +291,7 @@ export default function Ads() {
               onRestore={() => restore.mutate(a.id)}
             />
           ))}
+          <LoadMore query={ads} />
         </div>
       )}
 

@@ -113,6 +113,8 @@ export async function setOwnPassword(password: string): Promise<void> {
   // in again with the new password: that session carries must_change_password = false.
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`Your password was saved, but signing in again failed: ${error.message}`);
+  // Admin Log (AR-M30): this is a sign-in like the sign-in page's. Best effort.
+  await supabase.rpc("admin_audit_session", { p_action: "sign_in" }).then(() => undefined, () => undefined);
 }
 
 /** True while the signed-in account still has a temporary password to replace. */

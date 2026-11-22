@@ -144,6 +144,8 @@ export default function AccountStatus({
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["account-status", profileId] });
+      // The Accounts results show the status too (AR-M26).
+      void qc.invalidateQueries({ queryKey: ["accounts"] });
       void qc.invalidateQueries({ queryKey: ["account-suspensions", profileId] });
       void qc.invalidateQueries({ queryKey: ["chats"] });
       void qc.invalidateQueries({ queryKey: ["chat-review"] });

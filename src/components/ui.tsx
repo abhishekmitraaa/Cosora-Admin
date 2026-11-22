@@ -572,6 +572,35 @@ export function Note({ children, className }: { children: ReactNode; className?:
   );
 }
 
+/**
+ * "How this works" for a page (review AR-M38, 2026-11-22). Long explanations filled a phone's first screen and pushed
+ * the search or form below it, so on a phone it starts closed; on a wider screen it starts open. Plain words only:
+ * no table, column or function names (those belong in the code comments).
+ */
+export function Explainer({
+  summary = "How this works",
+  children,
+  className,
+}: {
+  summary?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 640px)").matches);
+  return (
+    <details
+      open={open}
+      className={cn("group rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-xs leading-relaxed text-ink-muted", className)}
+    >
+      <summary className="flex min-h-[28px] cursor-pointer list-none items-center gap-1.5 font-medium text-ink [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="inline-block transition-transform group-open:rotate-90">›</span>
+        {summary}
+      </summary>
+      <div className="mt-1.5">{children}</div>
+    </details>
+  );
+}
+
 export function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong bg-surface/60 px-6 py-12 text-center">
@@ -792,38 +821,88 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
   className?: string;
 }) {
+  // On a phone the strip scrolls sideways; a fade and an arrow say more tabs are off screen (review AR-M37), and the
+  // open tab is scrolled into view (a tab opened from the address could sit off screen).
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = stripRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
+  };
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs.length]);
+  useEffect(() => {
+    const el = stripRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+  const nudge = (dir: 1 | -1) => stripRef.current?.scrollBy({ left: dir * stripRef.current.clientWidth * 0.7, behavior: "smooth" });
+
   return (
-    // overflow-x-auto makes the other axis scroll too (CSS computes overflow-y: auto), so a tab hanging over the
-    // line by a pixel showed a vertical scrollbar with arrows on Windows. The y axis is hidden and nothing overhangs.
-    <div className={cn("mb-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line", className)}>
-      {tabs.map((t) => (
+    <div className={cn("relative mb-4", className)}>
+      {/* overflow-x-auto makes the other axis scroll too (CSS computes overflow-y: auto), so a tab hanging over the
+          line by a pixel showed a vertical scrollbar with arrows on Windows. The y axis is hidden and nothing overhangs. */}
+      <div ref={stripRef} onScroll={measure} className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            // Not a submit button: Tabs can sit inside a form (the Quick Guide editor's
+            // language tabs), and a bare <button> there saved and closed the form.
+            type="button"
+            onClick={() => onChange(t.id)}
+            aria-current={active === t.id ? "page" : undefined}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+              active === t.id
+                ? "border-brand text-ink"
+                : "border-transparent text-ink-muted hover:border-line-strong hover:text-ink",
+            )}
+          >
+            {t.label}
+            {t.count != null && (
+              <span
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-2xs tabular-nums",
+                  active === t.id ? "bg-brand-tint text-ink" : "bg-surface-2 text-ink-faint",
+                )}
+              >
+                {t.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      {edges.left && (
         <button
-          key={t.id}
-          // Not a submit button: Tabs can sit inside a form (the Quick Guide editor's
-          // language tabs), and a bare <button> there saved and closed the form.
           type="button"
-          onClick={() => onChange(t.id)}
-          aria-current={active === t.id ? "page" : undefined}
-          className={cn(
-            "flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
-            active === t.id
-              ? "border-brand text-ink"
-              : "border-transparent text-ink-muted hover:border-line-strong hover:text-ink",
-          )}
+          aria-label="Earlier tabs"
+          onClick={() => nudge(-1)}
+          className="absolute inset-y-0 left-0 flex w-10 items-center justify-start bg-gradient-to-r from-canvas via-canvas/90 to-transparent pl-1 text-ink-muted"
         >
-          {t.label}
-          {t.count != null && (
-            <span
-              className={cn(
-                "rounded-md px-1.5 py-0.5 text-2xs tabular-nums",
-                active === t.id ? "bg-brand-tint text-ink" : "bg-surface-2 text-ink-faint",
-              )}
-            >
-              {t.count}
-            </span>
-          )}
+          <span aria-hidden className="text-base leading-none">‹</span>
         </button>
-      ))}
+      )}
+      {edges.right && (
+        <button
+          type="button"
+          aria-label="More tabs"
+          onClick={() => nudge(1)}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-end bg-gradient-to-l from-canvas via-canvas/90 to-transparent pr-1 text-ink-muted"
+        >
+          <span aria-hidden className="text-base leading-none">›</span>
+        </button>
+      )}
     </div>
   );
 }

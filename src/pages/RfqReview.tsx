@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import {
-  fetchReasons, fetchSubmissions, reviewSubmission, useRfqPendingCount,
+  fetchReasons, fetchSubmissions, reviewSubmission, useRfqPendingCount, type SubmissionCursor,
   type RfqSubmission, type SubmissionState,
 } from "@/lib/rfqReview";
 import {
@@ -14,6 +14,7 @@ import {
   ReadOnlyBanner, Select, SkeletonList, Tabs, Textarea,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { LoadMore } from "@/components/LoadMore";
 
 /**
  * REQUIREMENT REVIEW (2026-10-17). lib/rfqReview.ts. Buyers are told review "usually takes 3–5 minutes", so the
@@ -37,11 +38,16 @@ export default function RfqReview() {
   const [note, setNote] = useState("");
   const count = useRfqPendingCount();
 
-  const list = useQuery({
+  const list = useInfiniteQuery({
     queryKey: ["rfq-review", tab],
-    queryFn: () => fetchSubmissions(tab),
+    initialPageParam: null as SubmissionCursor,
+    queryFn: ({ pageParam }) => fetchSubmissions(tab, pageParam),
+    getNextPageParam: (last) => last.next,
     refetchInterval: tab === "pending" ? 30_000 : false,
   });
+  const rows = list.data?.pages.flatMap((p) => p.rows) ?? [];
+  // Approving puts the requirement live and sends sellers their alerts, so it is confirmed (AR-M31).
+  const [approving, setApproving] = useState<RfqSubmission | null>(null);
   const reasons = useQuery({ queryKey: ["rfq-review", "reasons"], queryFn: fetchReasons });
   const activeReasons = (reasons.data ?? []).filter((r) => r.active);
 
@@ -53,7 +59,15 @@ export default function RfqReview() {
   });
 
   const approve = (s: RfqSubmission) =>
-    decide.mutate({ id: s.id, decision: "approve" }, { onSuccess: () => toast.success(`"${s.title}" is live for sellers`) });
+    decide.mutate(
+      { id: s.id, decision: "approve" },
+      {
+        onSuccess: () => {
+          toast.success(`"${s.title}" is live for sellers`);
+          setApproving(null);
+        },
+      },
+    );
 
   const submitRejection = () => {
     if (!rejecting || !reasonId) return;
@@ -87,11 +101,11 @@ export default function RfqReview() {
         <SkeletonList rows={3} height="h-36" />
       ) : list.error ? (
         <ErrorNote message={(list.error as Error).message} />
-      ) : (list.data ?? []).length === 0 ? (
+      ) : rows.length === 0 ? (
         <Empty>{tab === "pending" ? "Nothing waiting. New requirements appear here on their own." : "None yet."}</Empty>
       ) : (
         <div className="space-y-3" data-testid="rfq-review-list">
-          {list.data!.map((s) => (
+          {rows.map((s) => (
             <div key={s.id} data-testid="rfq-submission-card">
             <Card>
               <div className="flex flex-wrap gap-4">
@@ -133,7 +147,7 @@ export default function RfqReview() {
                 </div>
                 {s.state === "pending" && (
                   <div className="flex w-full flex-col gap-1.5 sm:w-36">
-                    <Button variant="primary" disabled={!writable || decide.isPending} onClick={() => approve(s)}>Approve</Button>
+                    <Button variant="primary" disabled={!writable || decide.isPending} onClick={() => setApproving(s)}>Approve</Button>
                     <Button variant="danger" disabled={!writable || decide.isPending}
                       onClick={() => { setRejecting(s); setReasonId(""); setNote(""); }}>
                       Not approve
@@ -144,8 +158,22 @@ export default function RfqReview() {
             </Card>
             </div>
           ))}
+          <LoadMore query={list} />
         </div>
       )}
+
+      <Modal open={approving !== null} title={`Approve "${approving?.title ?? ""}"`} onClose={() => setApproving(null)}>
+        <p className="text-sm text-ink-muted">
+          It goes live for sellers now, and sellers whose plan sends lead alerts are told about it. This can't be undone
+          from here.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={() => setApproving(null)}>Keep in the queue</Button>
+          <Button variant="primary" disabled={!approving || decide.isPending} onClick={() => approving && approve(approving)}>
+            {decide.isPending ? "Approving…" : "Approve and publish"}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={rejecting !== null} title={`Not approve "${rejecting?.title ?? ""}"`} onClose={() => setRejecting(null)}>
         {activeReasons.length === 0 ? (

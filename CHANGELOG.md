@@ -9,6 +9,22 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-22 (branch `fix/admin-review-medium2-2026-11-22`, on top of Medium batch 1; database in textile-spark-net
+  migration `20261122120000`; plan `textile-spark-net/documentation/admin-review-medium2-plan-2026-11-22.md`; **built and
+  tested on the local stack, NOT released**)
+  **Admin review 2026-11-22: Medium batch 2 (AR-M22–M41).**
+  - Lists: Ads and its review queue 50 at a time, Ads Monitoring every row with India-time days and live money,
+    Certificates one tab at a time with counts, Requirement review in pages of 100 with a confirmed Approve
+    (`components/LoadMore.tsx`).
+  - Customers reads when its summary was built (a 10-minute job rebuilds it, Mitra) and warns when that failed.
+  - Safety: `hooks/useUnsavedChanges.ts` on Theme, the carousel and Billing details; identity re-read every minute, on
+    focus and after a refusal; invite, recovery and new-password sign-ins logged; buyer pictures only from Cosora's
+    Storage (`lib/storageUrl.ts`); `components/RoleLink.tsx` hides links a role can't open; `lib/moneyRefresh.ts`.
+  - Accounts debounced and in the address, refreshed after a status change; Support settings panels keep each other's
+    edits; plan dialogs say listings over the limit are paused; incident help text corrected.
+  - Look: `Tabs` show More tabs on phones; `Explainer` folds page explanations on phones, in plain words; photo links
+    named.
+
 - 2026-11-22 (branch `fix/admin-review-medium1-2026-11-22`; database in textile-spark-net migration `20261122110000`;
   plan `textile-spark-net/documentation/admin-review-medium1-plan-2026-11-22.md`; **built and tested on the local stack,
   NOT released**)

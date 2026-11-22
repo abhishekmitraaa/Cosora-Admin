@@ -15,15 +15,13 @@ import {
   ErrorNote,
   Field,
   Input,
-  Note,
   Page,
   PageHeader,
   ReadOnlyBanner,
   ROW_HOVER,
   Select,
   SkeletonList,
-  Table,
-} from "@/components/ui";
+  Table, Explainer } from "@/components/ui";
 
 interface VendorListRow {
   id: string;
@@ -125,14 +123,12 @@ export default function Vendors() {
         flag, and "why is this one verified?" is the question this table exists
         to answer.
       */}
-      <Note className="mb-4">
-        <span className="font-semibold text-ink">Trust seal</span> shows when{" "}
-        <span className="font-medium text-ink">any</span> of these is true: the admin flag{" "}
-        <span className="font-mono text-2xs">is_verified</span>, an active paid subscription (
-        <span className="font-mono text-2xs">plan_expires_at</span> in the future), or an ad-purchased
-        seal (<span className="font-mono text-2xs">ad_verified_until</span> in the future). They are
-        independent, so clearing the admin flag will not remove a seal the other two are granting.
-      </Note>
+      <Explainer className="mb-4">
+        A vendor shows the <span className="font-semibold text-ink">trust seal</span> when{" "}
+        <span className="font-medium text-ink">any</span> of these holds: Cosora verified them, they have a paid plan
+        running, or they bought the seal. The three are separate, so removing Cosora's verification doesn't remove a
+        seal their plan or purchase gives them.
+      </Explainer>
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <Field label="Search" htmlFor="vendor-search" className="w-72 max-w-full">

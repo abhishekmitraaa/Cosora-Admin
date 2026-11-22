@@ -97,6 +97,7 @@ const JOBS: Record<string, { purpose: string; maxGapMinutes?: number }> = {
   "blog-scheduled-sweep": { purpose: "Publishes blog articles at their scheduled time" },
   "crm-followups": { purpose: "Sends sellers their CRM follow-up reminders" },
   "cron-history-prune": { purpose: "Deletes job history (successes after 2 days, failures after 14)" },
+  "customer-summary-refresh": { purpose: "Rebuilds the Customers summary" },
   "daily-dedupe-prune": { purpose: "Clears the daily view, enquiry and click dedupe tables" },
   "embedding-health-alarm": { purpose: "Alerts admins when the embedding pipeline stalls" },
   "embedding-health-log": { purpose: "Samples the embedding pipeline for this page" },

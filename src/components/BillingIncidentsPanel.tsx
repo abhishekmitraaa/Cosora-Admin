@@ -30,12 +30,12 @@ const KIND: Record<Incident["kind"], { label: string; tone: "critical" | "cautio
   activation_failed: {
     label: "Paid, plan not activated",
     tone: "critical",
-    help: "Razorpay took the money but the plan couldn't change (for example, a paid next period was already waiting). Change the plan by hand, or refund the payment from the Invoices list.",
+    help: "Razorpay took the money but the plan couldn't change (for example, a paid next period was already waiting). Change the plan by hand (Change plan on the subscription), or refund the payment in the Razorpay dashboard: no invoice was issued, so there is nothing to refund from the Invoices list.",
   },
   invoice_incomplete: {
     label: "Receipt without GST details",
     tone: "caution",
-    help: "A live payment was received before Cosora's billing details were set, so the vendor got a payment receipt, not a tax invoice. Set the billing details, then issue the tax invoice.",
+    help: "A live payment was received before Cosora's billing details were set, so the vendor got a payment receipt, not a tax invoice. Set the billing details so later payments get tax invoices. Cosora-Admin can't reissue this one: if the vendor needs a tax invoice for it, finance makes it outside Cosora, then resolves this with its number.",
   },
   dispute: {
     label: "Payment disputed",

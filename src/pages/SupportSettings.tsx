@@ -124,10 +124,14 @@ function RolloutPanel({ s }: { s: Settings }) {
   const [confirmAll, setConfirmAll] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Follow the SAVED values only when they really change (AR-M33). The list is a new array on every refetch, so saving
+  // any other panel used to throw away an unsaved rollout or test-account edit here.
+  const savedRollout = JSON.stringify([s.rollout, s.test_profiles.map((p) => p.id)]);
   useEffect(() => {
     setRollout(s.rollout);
     setPeople(s.test_profiles);
-  }, [s.rollout, s.test_profiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedRollout]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(term.trim()), 300);
@@ -277,7 +281,10 @@ function HoursPanel({ s }: { s: Settings }) {
   const qc = useQueryClient();
   const [rows, setRows] = useState<SupportHoursRow[]>(s.hours);
   const [busy, setBusy] = useState(false);
-  useEffect(() => setRows(s.hours), [s.hours]);
+  // Only when the saved hours change (AR-M33): s.hours is a new array on every refetch.
+  const savedHours = JSON.stringify(s.hours);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setRows(s.hours), [savedHours]);
 
   const byDay = (weekday: number) => rows.find((r) => r.weekday === weekday)!;
   const edit = (weekday: number, patch: Partial<SupportHoursRow>) =>

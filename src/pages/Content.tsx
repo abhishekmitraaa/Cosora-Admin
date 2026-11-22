@@ -46,6 +46,7 @@ import {
   type Tone,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 /**
  * SITE CONTENT (admin completion Phase 9). Real data: lib/siteContent.ts and the
@@ -473,6 +474,14 @@ function ThemeTab({ writable }: { writable: boolean }) {
   useEffect(() => {
     if (state.data && draft === null) setDraft(pickTheme(state.data.theme));
   }, [state.data, draft]);
+
+  // Leaving with unsaved edits asks first (AR-M24). Worked out before the early returns: it is a hook.
+  const themeDirty =
+    !!state.data &&
+    !!draft &&
+    JSON.stringify({ ...draft, ...Object.fromEntries(COLOURS.map((k) => [k, draft[k].toLowerCase()])) }) !==
+      JSON.stringify(pickTheme(state.data.theme));
+  useUnsavedChanges(themeDirty);
 
   if (state.isLoading || (state.data && !draft)) return <SkeletonList rows={2} height="h-40" />;
   if (state.error) return <ErrorNote message={(state.error as Error).message} />;

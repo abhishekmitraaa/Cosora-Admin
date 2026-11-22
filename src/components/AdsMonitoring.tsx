@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { CalendarRange, IndianRupee, MousePointerClick, Eye } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fetchVendorsByIds } from "@/lib/vendors";
@@ -9,6 +8,8 @@ import {
   ctr,
   formatCtr,
   inr,
+  istDayLabel,
+  istMonthLabel,
   monthWindow,
   rollUpByVendor,
   schedule,
@@ -30,6 +31,7 @@ import {
   Stat,
   Table,
 } from "@/components/ui";
+import { readAllPages } from "@/lib/readAllPages";
 
 /**
  * B1 - AGGREGATE ADS DASHBOARD. Real rows, no schema change, no seed.
@@ -56,21 +58,30 @@ export default function AdsMonitoring() {
       // Every campaign, not one status tab: a monitoring view that hid paused
       // and rejected campaigns would report a platform CTR that quietly
       // excluded the campaigns most likely to be underperforming.
-      const [ads, orders] = await Promise.all([
-        supabase
-          .from("advertisements")
-          .select(
-            "id, title, status, vendor_id, placement, daily_budget, impressions, clicks, starts_at, ends_at",
-          )
-          .order("impressions", { ascending: false }),
-        supabase.from("ad_orders").select("amount, status, paid_at, created_at"),
+      // Every row, 1,000 a page (AR-M23: a single read stopped silently at 1,000).
+      const [rows, orders] = await Promise.all([
+        readAllPages((from, to) =>
+          supabase
+            .from("advertisements")
+            .select(
+              "id, title, status, vendor_id, placement, daily_budget, impressions, clicks, starts_at, ends_at",
+            )
+            .order("impressions", { ascending: false })
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+        readAllPages((from, to) =>
+          supabase
+            .from("ad_orders")
+            .select("amount, status, paid_at, created_at, payment_mode")
+            .eq("status", "paid")
+            .order("created_at", { ascending: true })
+            .order("order_id", { ascending: true })
+            .range(from, to),
+        ),
       ]);
-      if (ads.error) throw new Error(ads.error.message);
-      if (orders.error) throw new Error(orders.error.message);
-
-      const rows = ads.data ?? [];
       const vendors = await fetchVendorsByIds(rows.map((r) => r.vendor_id));
-      return { rows, orders: (orders.data ?? []) as PaidOrder[], vendors };
+      return { rows, orders: orders as unknown as PaidOrder[], vendors };
     },
   });
 
@@ -109,13 +120,13 @@ export default function AdsMonitoring() {
           icon={<IndianRupee size={18} />}
           label="Booked today"
           value={inr(bookedToday)}
-          sub={format(now, "d MMM yyyy")}
+          sub={`${istDayLabel(now)} · live money, India time`}
         />
         <Stat
           icon={<CalendarRange size={18} />}
           label="Booked this month"
           value={inr(bookedMonth)}
-          sub={format(now, "MMMM yyyy")}
+          sub={`${istMonthLabel(now)} · live money`}
         />
         <Stat
           icon={<Eye size={18} />}

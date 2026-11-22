@@ -155,6 +155,8 @@ export interface PaidOrder {
   status: string;
   paid_at: string | null;
   created_at: string;
+  /** live, test, demo or free (AR-H13). Booked money counts live and free only, as Payments does. */
+  payment_mode?: string | null;
 }
 
 /**
@@ -169,23 +171,38 @@ export function bookedBetween(orders: PaidOrder[], fromMs: number, toMs: number)
   let rupees = 0;
   for (const o of orders) {
     if (o.status !== "paid") continue;
+    if (o.payment_mode && o.payment_mode !== "live" && o.payment_mode !== "free") continue;
     const t = orderClock(o);
     if (t >= fromMs && t < toMs) rupees += paiseToRupees(o.amount);
   }
   return rupees;
 }
 
-/** Local-midnight boundaries. Cosora is an IST product; the browser's zone is the admin's. */
+/**
+ * India-time boundaries (AR-M23): Cosora counts days in IST whatever the admin's browser
+ * says, so "today" is the same figure for every admin and matches Payments and Reports.
+ */
+const IST_OFFSET_MS = 330 * 60_000;
+const istParts = (now: Date) => {
+  const shifted = new Date(now.getTime() + IST_OFFSET_MS);
+  return { y: shifted.getUTCFullYear(), m: shifted.getUTCMonth(), d: shifted.getUTCDate() };
+};
+
 export function todayWindow(now = new Date()): [number, number] {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const { y, m, d } = istParts(now);
+  const start = Date.UTC(y, m, d) - IST_OFFSET_MS;
   return [start, start + DAY_MS];
 }
 
 export function monthWindow(now = new Date()): [number, number] {
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
-  return [start, end];
+  const { y, m } = istParts(now);
+  return [Date.UTC(y, m, 1) - IST_OFFSET_MS, Date.UTC(y, m + 1, 1) - IST_OFFSET_MS];
 }
+
+export const istDayLabel = (now = new Date()) =>
+  new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }).format(now);
+export const istMonthLabel = (now = new Date()) =>
+  new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", month: "long", year: "numeric" }).format(now);
 
 /* ------------------------------------------------------------------ *
  * Attention flags

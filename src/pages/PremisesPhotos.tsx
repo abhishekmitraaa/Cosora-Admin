@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { canWrite, readOnlyReason } from "@/lib/roles";
@@ -19,6 +18,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { RoleLink } from "@/components/RoleLink";
 
 type Tab = "queue" | "live";
 
@@ -133,7 +133,14 @@ export default function PremisesPhotos() {
                 <Card key={p.id} className="p-3">
                   <div className="flex flex-col gap-2.5" data-testid="photo-card">
                   {src ? (
-                    <a href={src} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-line">
+                    <a
+                      href={src}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      // Named on the link itself (AR-M39): each opens the full photo in a new tab.
+                      aria-label={`Open the premises photo from ${p.brand_name ?? "this seller"} in a new tab`}
+                      className="block overflow-hidden rounded-lg border border-line"
+                    >
                       <img src={src} alt={`Premises photo from ${p.brand_name ?? "a seller"}`} className="aspect-[4/3] w-full object-cover" loading="lazy" />
                     </a>
                   ) : (
@@ -142,9 +149,9 @@ export default function PremisesPhotos() {
                     </div>
                   )}
                   <div className="text-xs text-ink-muted">
-                    <Link to={`/vendors/${p.vendor_id}`} className="font-semibold text-ink hover:underline">
+                    <RoleLink section="vendors" to={`/vendors/${p.vendor_id}`} className="font-semibold text-ink hover:underline">
                       {p.brand_name ?? "Unnamed seller"}
-                    </Link>{" "}
+                    </RoleLink>{" "}
                     · {tab === "queue" ? "added" : "approved"} {ADDED.format(new Date(p.created_at))}
                   </div>
                   <div className="flex gap-1.5">

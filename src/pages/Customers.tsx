@@ -14,7 +14,7 @@ import {
   TAG_LABEL_RE,
   useCustomerList,
   useCustomerTags,
-  useRefreshCustomers,
+  useCustomerFreshness,
   useSegmentCounts,
   useTagWrites,
   type CustomerFilters,
@@ -45,6 +45,7 @@ import {
   Table,
   cn,
   type Tone,
+  Notice,
 } from "@/components/ui";
 import { useUrlFilters } from "@/hooks/useUrlState";
 
@@ -90,14 +91,7 @@ export default function Customers() {
   const counts = useSegmentCounts();
   const list = useCustomerList(filters);
   const tags = useCustomerTags();
-  const refresh = useRefreshCustomers();
-
-  // Rebuild the summary on open. The database does it at most once every 10
-  // minutes and otherwise just answers with the current data's time.
-  const { mutate: refreshNow } = refresh;
-  useEffect(() => {
-    refreshNow();
-  }, [refreshNow]);
+  const freshness = useCustomerFreshness();
 
   const rows = list.data?.pages.flat() ?? [];
   const c = counts.data;
@@ -106,8 +100,10 @@ export default function Customers() {
   const filtersActive =
     Boolean(filters.search.trim()) || filters.kind !== "all" || filters.segment !== "all" || filters.tag !== "all";
 
-  const refreshedAt = refresh.data?.refreshed_at ?? c?.refreshed_at ?? null;
-  const fresh = refreshedAt ? Date.now() - new Date(refreshedAt).getTime() < REFRESH_MINUTES * 60_000 : false;
+  const refreshedAt = freshness.data?.refreshed_at ?? c?.refreshed_at ?? null;
+  // Late: three missed rebuilds. Either way the figures shown are the last good ones.
+  const late = refreshedAt ? Date.now() - new Date(refreshedAt).getTime() > 3 * REFRESH_MINUTES * 60_000 : false;
+  const lastError = freshness.data?.last_error ?? null;
 
   return (
     <Page width="wide">
@@ -117,21 +113,23 @@ export default function Customers() {
         actions={
           <>
             {refreshedAt && (
-              <span className="text-2xs text-ink-faint">Data as of {format(new Date(refreshedAt), "d MMM, HH:mm")}</span>
+              <span className="text-2xs text-ink-faint">
+                Data as of {format(new Date(refreshedAt), "d MMM, HH:mm")} · updated every {REFRESH_MINUTES} minutes
+              </span>
             )}
-            <Button
-              size="sm"
-              disabled={refresh.isPending || fresh}
-              title={fresh ? `Refreshes at most every ${REFRESH_MINUTES} minutes` : undefined}
-              onClick={() => refresh.mutate()}
-            >
-              {refresh.isPending ? "Refreshing…" : "Refresh"}
-            </Button>
           </>
         }
       />
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "customers")} />}
+      {(lastError || late) && (
+        <Notice tone="caution" title="These figures may be out of date" className="mb-4 text-xs">
+          {lastError
+            ? `The last update failed (${lastError}). The figures are from the last one that worked.`
+            : "The figures haven't been updated for a while. They are from the last update that worked."}{" "}
+          System Health shows the update job.
+        </Notice>
+      )}
 
       <Stack>
         <Note>

@@ -8,9 +8,9 @@ import type { Database } from "@/lib/database.types";
  *
  * admin.customer_summary is a materialized view: one row per account that isn't
  * deleted and isn't active Cosora staff. It holds joined / last-active times, an
- * interaction count and lifetime spend in paise. admin_customer_refresh()
- * rebuilds it at most once every 10 minutes: the page asks on open, and there is
- * no scheduled job. Segments are computed at read time from the stored times, so
+ * interaction count and lifetime spend in paise. The job customer-summary-refresh
+ * rebuilds it every 10 minutes (admin.customer_summary_rebuild, AR-M28); the page only
+ * reads when it was built. Segments are computed at read time from the stored times, so
  * they're never stale. Tags are live tables, so a tag change shows at once.
  *
  * Read: super_admin, support, finance_admin. Tags: super_admin, support.
@@ -136,21 +136,33 @@ export function useCustomerTags() {
   });
 }
 
+/** When the summary was built, from admin_customer_refresh(), which only reads since AR-M28. */
+export interface CustomerFreshness {
+  refreshed_at: string | null;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  every_minutes: number;
+}
+
 /**
- * Rebuild the summary. The database refuses to do it more than once every 10
- * minutes (and answers with the current data's time instead), so calling this
- * on every visit costs nothing when the data is fresh.
+ * The summary's age. A job rebuilds it every 10 minutes (AR-M28, Mitra: "Add a 10-minute job"); the page never
+ * rebuilds it any more (that ran inside the request, under its 8-second timeout). Re-read every minute and when the
+ * list refetches, so "Data as of" moves on with the data.
  */
-export function useRefreshCustomers() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (): Promise<{ refreshed: boolean; refreshed_at: string; reason?: string }> => {
+export function useCustomerFreshness() {
+  return useQuery({
+    queryKey: ["customers", "freshness"],
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<CustomerFreshness> => {
       const { data, error } = await supabase.rpc("admin_customer_refresh");
       if (error) throw new Error(error.message);
-      return data as unknown as { refreshed: boolean; refreshed_at: string; reason?: string };
-    },
-    onSuccess: (r) => {
-      if (r.refreshed) void qc.invalidateQueries({ queryKey: ["customers"] });
+      const d = (data ?? {}) as Partial<CustomerFreshness>;
+      return {
+        refreshed_at: d.refreshed_at ?? null,
+        last_attempt_at: d.last_attempt_at ?? null,
+        last_error: d.last_error ?? null,
+        every_minutes: d.every_minutes ?? 10,
+      };
     },
   });
 }

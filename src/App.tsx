@@ -1,9 +1,9 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 
-import { AdminSessionProvider, useAdminSession } from "@/hooks/useAdminSession";
+import { ADMIN_REFUSED_EVENT, AdminSessionProvider, useAdminSession } from "@/hooks/useAdminSession";
 import { RequireAdmin, RequireSection } from "@/components/Guard";
 import Shell from "@/components/Shell";
 import { SkeletonList } from "@/components/ui";
@@ -65,8 +65,15 @@ import FeatureFlags from "@/pages/FeatureFlags";
 import MyVendors from "@/pages/MyVendors";
 import BillingEntity from "@/pages/BillingEntity";
 
+/** A refused read (42501, "not authorized") usually means the admin's role changed: re-read who they are (AR-M27). */
+const refusedEvent = () => window.dispatchEvent(new Event(ADMIN_REFUSED_EVENT));
+const isRefusal = (e: unknown) => {
+  const m = e instanceof Error ? e.message : String((e as { message?: unknown })?.message ?? "");
+  return /not authori[sz]ed|permission denied|requires the .* role|42501/i.test(m);
+};
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
+  queryCache: new QueryCache({ onError: (e) => { if (isRefusal(e)) refusedEvent(); } }),
 });
 
 /** Send each admin to the first section their role can actually see. */

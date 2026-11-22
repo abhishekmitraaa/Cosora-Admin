@@ -29,6 +29,7 @@ import {
   SkeletonList,
   cn,
 } from "@/components/ui";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 /**
  * NEW ARRIVALS CAROUSEL (2026-10-14). Real data: lib/heroSlides.ts and the admin_hero_slides* RPCs in
@@ -76,6 +77,8 @@ export default function HeroSlides() {
   const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => setRows(saved), [saved]);
   const dirty = !sameRows(rows, saved);
+  // Leaving with unsaved edits asks first (AR-M24).
+  useUnsavedChanges(dirty);
 
   const lastChange = useMemo(() => {
     const withTime = (slides.data ?? []).filter((s) => s.updated_at);

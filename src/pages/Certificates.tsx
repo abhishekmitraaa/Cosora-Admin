@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { canWrite, readOnlyReason } from "@/lib/roles";
@@ -9,7 +10,7 @@ import {
   COURIERS,
   cancelCertificate,
   dispatchCertificate,
-  fetchCertificateOrders,
+  fetchCertificatePage, fetchCertificateCounts, fetchOpenCertificateVendors, type CertCursor,
   markDelivered,
   markPrinted,
   markReturned,
@@ -39,6 +40,7 @@ import {
   Tabs,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { LoadMore } from "@/components/LoadMore";
 
 /**
  * C3 - CERTIFICATE FULFILMENT. REAL DATA.
@@ -76,14 +78,24 @@ export default function Certificates() {
   const writable = canWrite(role, "certificates");
   const [tab, setTab] = useUrlState<CertStatus>("tab", "processing", TABS.map((t) => t.id));
 
-  const { data: rows, isLoading, error } = useQuery({
-    queryKey: ["certificate_orders"],
-    queryFn: fetchCertificateOrders,
+  // The open tab a page at a time, and the tab counts as counts (AR-M36).
+  const page = useInfiniteQuery({
+    queryKey: ["certificate_orders", "page", tab],
+    initialPageParam: null as CertCursor,
+    queryFn: ({ pageParam }) => fetchCertificatePage(tab, pageParam),
+    getNextPageParam: (last) => last.next,
   });
+  const counts = useQuery({
+    queryKey: ["certificate_orders", "counts"],
+    queryFn: () => fetchCertificateCounts(TABS.map((t) => t.id)),
+  });
+  const openVendors = useQuery({ queryKey: ["certificate_orders", "open-vendors"], queryFn: fetchOpenCertificateVendors });
+  const isLoading = page.isLoading;
+  const error = page.error ?? counts.error ?? openVendors.error;
 
-  const all = rows ?? [];
-  const tabs = TABS.map((t) => ({ ...t, count: all.filter((r) => r.status === t.id).length }));
-  const visible = all.filter((r) => r.status === tab);
+  const tabs = TABS.map((t) => ({ ...t, count: counts.data?.[t.id] }));
+  const visible = page.data?.pages.flatMap((p) => p.rows) ?? [];
+  const total = counts.data ? Object.values(counts.data).reduce((a, b) => a + b, 0) : null;
 
   // A vendor with several open orders is almost always the per-product pricing
   // artefact, not a genuine request for several parcels: buying
@@ -92,12 +104,7 @@ export default function Certificates() {
   // certificate is about the VENDOR, so printing three identical ones is
   // nearly always wrong. Surfaced rather than auto-merged, because the fix is a
   // refund decision and that belongs to a person.
-  const openByVendor = new Map<string, number>();
-  for (const c of all) {
-    if (c.status === "processing" || c.status === "printed") {
-      openByVendor.set(c.vendorId, (openByVendor.get(c.vendorId) ?? 0) + 1);
-    }
-  }
+  const openByVendor = openVendors.data ?? new Map<string, number>();
   const duplicated = [...openByVendor.values()].filter((n) => n > 1).length;
 
   return (
@@ -134,7 +141,7 @@ export default function Certificates() {
         <SkeletonList rows={3} />
       ) : visible.length === 0 ? (
         <Empty>
-          {all.length === 0
+          {total === 0
             ? "No certificate orders yet. One is created automatically when a vendor buys the verification certificate."
             : `Nothing is ${CERT_STATUS_LABELS[tab].toLowerCase()} right now.`}
         </Empty>
@@ -143,6 +150,7 @@ export default function Certificates() {
           {visible.map((c) => (
             <CertificateCard key={c.id} order={c} writable={writable} />
           ))}
+          <LoadMore query={page} />
         </div>
       )}
     </Page>

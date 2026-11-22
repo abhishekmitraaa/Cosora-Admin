@@ -36,6 +36,7 @@ import { useSubscriptionWorklist, withAutopayOff, type WorklistRow, type Worklis
 import { announceRefund, canRefund, refundBlockedReason, refundState, type RefundResult } from "@/lib/refunds";
 import { CreditNotes } from "@/components/CreditNotes";
 import { useUrlState } from "@/hooks/useUrlState";
+import { refreshMoney } from "@/lib/moneyRefresh";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -150,6 +151,7 @@ interface PlanRow {
   name: string;
   monthly_price: number;
   yearly_price: number;
+  limits?: { product_cap?: number | null } | null;
 }
 
 const SUBTITLE = "Plans, prices, worklists, invoices, refunds and billing incidents.";
@@ -164,10 +166,10 @@ export default function Subscriptions() {
     queryFn: async (): Promise<PlanRow[]> => {
       const { data, error } = await supabase
         .from("subscription_plans")
-        .select("id, name, monthly_price, yearly_price")
+        .select("id, name, monthly_price, yearly_price, limits")
         .order("sort_order");
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return (data ?? []) as PlanRow[];
     },
   });
 
@@ -231,12 +233,8 @@ export default function Subscriptions() {
     getNextPageParam: (last) => (last.length === PAGE ? last[last.length - 1].created_at : undefined),
   });
 
-  const refreshLists = () => {
-    void qc.invalidateQueries({ queryKey: ["subscription-worklist"] });
-    void qc.invalidateQueries({ queryKey: ["subscription-kpis"] });
-    void qc.invalidateQueries({ queryKey: ["subscriptions"] });
-    void qc.invalidateQueries({ queryKey: ["reports"] });
-  };
+  // Every money and plan list at once (AR-M35).
+  const refreshLists = () => refreshMoney(qc);
 
   /**
    * Plan changes and cancels go through admin_subscription_change_plan() /
@@ -303,7 +301,7 @@ export default function Subscriptions() {
     },
     onSuccess: (d) => {
       announceRefund(d);
-      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      refreshMoney(qc);
     },
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
@@ -327,6 +325,11 @@ export default function Subscriptions() {
   const more = plainOnly ? subs : worklist;
   const invRows = invoices.data?.pages.flat() ?? [];
   const planName = (id: string | null) => (id ? (plans.data ?? []).find((p) => p.id === id)?.name ?? id : "none");
+  // A plan's listing limit (limits.product_cap); null when unlimited or unknown.
+  const listingCap = (id: string | null) => {
+    const cap = (plans.data ?? []).find((p) => p.id === id)?.limits?.product_cap;
+    return typeof cap === "number" && cap >= 0 ? cap : null;
+  };
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
 
   return (
@@ -635,6 +638,17 @@ export default function Subscriptions() {
                   a paid invoice from the Invoices list below.
                 </>
               )}{" "}
+              {/* AR-M34: a smaller plan pauses the listings over its limit (admin.apply_product_cap). */}
+              {(() => {
+                const cap = listingCap(pending.kind === "plan" ? pending.planId : "free");
+                return cap === null ? null : (
+                  <span className="mt-2 block">
+                    {pending.kind === "plan" ? planName(pending.planId) : "The Free plan"} allows {cap} live
+                    listings. Any over that are paused, not deleted: the seller's own picks are kept first, then the
+                    most viewed, and paused listings come back when the plan allows more.
+                  </span>
+                );
+              })()}{" "}
               The vendor is notified, and the reason goes into the Admin Log.
               {/* AR-H01: a running autopay is cancelled at Razorpay first, or its next charge would undo this. */}
               {pending.sub.mandate_status && ["active", "authenticated", "pending", "halted"].includes(pending.sub.mandate_status) && (

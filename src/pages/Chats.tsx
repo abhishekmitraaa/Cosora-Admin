@@ -17,8 +17,7 @@ import {
   ROW_HOVER,
   SkeletonList,
   Table,
-  Tabs,
-} from "@/components/ui";
+  Tabs, Explainer } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
 
 interface ConversationRow {
@@ -133,7 +132,7 @@ export default function Chats() {
     <Page width="wide">
       <PageHeader title="Chats" subtitle={SUBTITLE} />
 
-      <Note className="mb-4">
+      <Explainer className="mb-4">
         Admins can <span className="font-medium text-ink">read</span> conversations and messages.
         Nothing on this screen can send, edit or delete a message, and participants are not told an
         admin opened their chat. A chat marked{" "}
@@ -143,7 +142,7 @@ export default function Chats() {
           review queue
         </Link>{" "}
         resolves it.
-      </Note>
+      </Explainer>
 
       <div className="mb-4 max-w-sm">
         <Field

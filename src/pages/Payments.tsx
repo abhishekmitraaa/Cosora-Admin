@@ -49,6 +49,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useUrlFilters } from "@/hooks/useUrlState";
+import { refreshMoney } from "@/lib/moneyRefresh";
 
 /**
  * C2 - PAYMENTS LEDGER, from the database (admin completion Phase 5).
@@ -95,9 +96,7 @@ export default function Payments() {
   const [adAction, setAdAction] = useState<{ kind: "refund" | "resolve"; row: LedgerRow } | null>(null);
   const [adAmount, setAdAmount] = useState("");
   const [adNote, setAdNote] = useState("");
-  const refreshPayments = () => {
-    for (const key of ["payments-ledger", "payments-summary", "payments-latest", "reports"]) void qc.invalidateQueries({ queryKey: [key] });
-  };
+  const refreshPayments = () => refreshMoney(qc);
   const adRefund = useMutation({
     mutationFn: async () => {
       if (!adAction) return null;

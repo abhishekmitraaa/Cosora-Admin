@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Badge, Button, Empty, Modal, Note, Panel, SkeletonList, Table, Textarea } from "@/components/ui";
 import { announceRefund, canRefund, refundSettledOrUnderway, refundState, type RefundResult } from "@/lib/refunds";
 import { withAutopayOff } from "@/lib/subscriptionAdmin";
+import { refreshMoney } from "@/lib/moneyRefresh";
 
 interface GuaranteeInvoice {
   id: string;
@@ -82,8 +83,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
     },
     onSuccess: (d) => {
       announceRefund(d);
-      void qc.invalidateQueries({ queryKey: ["refund-guarantee-requests"] });
-      void qc.invalidateQueries({ queryKey: ["invoices"] });
+      refreshMoney(qc);
     },
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
@@ -98,8 +98,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
       toast.success(`Request closed. The plan has ended and the seller has been told.${r.autopayCancelled ? " Their autopay was turned off." : ""}`);
       setClosing(null);
       setNote("");
-      void qc.invalidateQueries({ queryKey: ["refund-guarantee-requests"] });
-      void qc.invalidateQueries({ queryKey: ["subscriptions"] });
+      refreshMoney(qc);
     },
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });

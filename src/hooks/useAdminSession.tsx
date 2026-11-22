@@ -4,6 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { AdminRole } from "@/lib/roles";
 
+/** Fired when the database refuses a read: the role may have changed (App.tsx's query cache). */
+export const ADMIN_REFUSED_EVENT = "cosora-admin:refused";
+
 export interface AdminIdentity {
   id: string;
   email: string | null;
@@ -43,6 +46,9 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const userIdRef = useRef<string | null>(null);
+  // Keep the same object when a re-read finds nothing new, so the minute re-read (AR-M27) re-renders nothing.
+  const setIdentityIfChanged = (next: AdminIdentity) =>
+    setIdentity((prev) => (prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
 
   async function loadIdentity(current: Session | null, { quiet = false }: { quiet?: boolean } = {}) {
     if (!current?.user) {
@@ -67,7 +73,7 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       setIdentity(null);
     } else if (!data) {
       // Authenticated but no profiles row — treat as a non-admin, not an error.
-      setIdentity({
+      setIdentityIfChanged({
         id: current.user.id,
         email: current.user.email ?? null,
         fullName: null,
@@ -76,7 +82,7 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       });
       setError(null);
     } else {
-      setIdentity({
+      setIdentityIfChanged({
         id: data.id,
         email: data.email,
         fullName: data.full_name,
@@ -120,9 +126,27 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       void loadIdentity(next, { quiet: sameUser });
     });
 
+    // A role changed or revoked by a super admin reaches this tab within a minute, and at once after a refused read
+    // (AR-M27): the database checks the role on every call, but the panel's sections and badges came from the identity
+    // read at sign-in or the hourly token refresh, and kept polling what the database now refuses.
+    let lastReread = 0;
+    const reread = () => {
+      if (!active || Date.now() - lastReread < 5_000) return;
+      lastReread = Date.now();
+      void supabase.auth.getSession().then(({ data }) => {
+        if (active && data.session) void loadIdentity(data.session, { quiet: true });
+      });
+    };
+    const timer = window.setInterval(reread, 60_000);
+    window.addEventListener(ADMIN_REFUSED_EVENT, reread);
+    window.addEventListener("focus", reread);
+
     return () => {
       active = false;
       sub.subscription.unsubscribe();
+      window.clearInterval(timer);
+      window.removeEventListener(ADMIN_REFUSED_EVENT, reread);
+      window.removeEventListener("focus", reread);
     };
   }, []);
 

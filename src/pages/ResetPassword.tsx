@@ -123,6 +123,9 @@ export default function ResetPassword() {
       setBusy(false);
       return;
     }
+    // Admin Log (AR-M30): an invite or recovery link signs the admin in, and the activity notice says sign-ins are
+    // recorded. Best effort, as on the sign-in page; the database records it only for an active admin.
+    await supabase.rpc("admin_audit_session", { p_action: "sign_in" }).then(() => undefined, () => undefined);
     // Re-read the admin identity (admin_whoami) now onboarding is done, so the shell renders
     // the right sections immediately, then drop them into the panel.
     await refresh();

@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -14,15 +14,15 @@ import {
   ErrorNote,
   Field,
   Input,
-  Note,
   Page,
   PageHeader,
   ReadOnlyBanner,
   ROW_HOVER,
   SkeletonList,
   Stack,
-  Table,
-} from "@/components/ui";
+  Table, Explainer } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
+import { useDebounced } from "@/hooks/useDebounced";
 
 interface AccountRow {
   id: string;
@@ -65,15 +65,20 @@ export default function Accounts() {
   const role = useRole();
   const writable = canWrite(role, "accounts");
   // ?q= opens the page already searched, e.g. from a Leads row's buyer link.
-  const [params] = useSearchParams();
-  const [term, setTerm] = useState(() => params.get("q") ?? "");
+  // The search lives in the address (AR-M04) and asks the database once typing pauses (AR-M25: four requests a
+  // keystroke). The last results stay on screen while the next ones load.
+  const [urlTerm, setUrlTerm] = useUrlState<string>("q", "");
+  const [term, setTerm] = useState(urlTerm);
+  const settled = useDebounced(term, 300);
+  useEffect(() => setUrlTerm(settled), [settled, setUrlTerm]);
   const [selected, setSelected] = useState<AccountRow | null>(null);
 
-  const trimmed = term.trim();
+  const trimmed = settled.trim();
 
   const results = useQuery({
     queryKey: ["accounts", trimmed],
     enabled: trimmed.length >= MIN_QUERY,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<AccountRow[]> => {
       // admin_profile_search(): name or email contains the term (two ilikes, no
       // text-search index: the table is small), the digits of a phone number match
@@ -130,14 +135,11 @@ export default function Accounts() {
 
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "accounts")} />}
 
-      <Note className="mb-4">
-        Suspension is <span className="font-mono text-2xs">profiles.account_status</span> and it
-        is account-level: the same person sells and buys, so there is one flag, not one per role.
-        Every change goes through <span className="font-mono text-2xs">set_account_status()</span>,
-        which is the only writer of the{" "}
-        <span className="font-mono text-2xs">account_suspensions</span> ledger. A direct UPDATE is
-        rejected by a trigger, for every role including super admin.
-      </Note>
+      <Explainer className="mb-4">
+        Suspension is for the whole account: the same person can sell and buy, so one suspension covers both. Every
+        suspension and reinstatement is recorded with its reason in the account's history, and can only be made here,
+        never edited afterwards.
+      </Explainer>
 
       <Card className="mb-4">
         <Field

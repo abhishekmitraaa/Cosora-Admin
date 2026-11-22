@@ -104,20 +104,57 @@ function mapOrder(r: RawCertificateOrder): CertificateOrder {
   };
 }
 
+export const CERT_PAGE = 50;
+export type CertCursor = { at: string; id: string } | null;
+/** Statuses still to act on: oldest first. Finished ones (delivered, returned, cancelled): newest first. */
+const OPEN_STATUSES: CertStatus[] = ["processing", "printed", "dispatched"];
+
 /**
- * Oldest first: the parcel that has been waiting longest is the one to action. Every order, in pages: a
- * single read stopped at 1,000 rows, which cut off the newest orders, the ones still to print.
+ * One tab, 50 at a time (AR-M36: every visit read every order of every status). The parcel that has waited longest
+ * comes first while there is work to do on it; finished orders newest first.
  */
-export async function fetchCertificateOrders(): Promise<CertificateOrder[]> {
+export async function fetchCertificatePage(status: CertStatus, after: CertCursor): Promise<{ rows: CertificateOrder[]; next: CertCursor }> {
+  const asc = OPEN_STATUSES.includes(status);
+  let q = supabase.from("certificate_orders").select("*").eq("status", status);
+  if (after) {
+    const op = asc ? "gt" : "lt";
+    q = q.or(`purchased_at.${op}.${after.at},and(purchased_at.eq.${after.at},id.${op}.${after.id})`);
+  }
+  const { data, error } = await q
+    .order("purchased_at", { ascending: asc })
+    .order("id", { ascending: asc })
+    .limit(CERT_PAGE);
+  if (error) throw new Error(error.message);
+  const rows = (data as unknown as RawCertificateOrder[]).map(mapOrder);
+  const last = rows[rows.length - 1];
+  return { rows, next: rows.length === CERT_PAGE && last ? { at: last.purchasedAt, id: last.id } : null };
+}
+
+/** How many orders each tab holds: one count per status, nothing downloaded. */
+export async function fetchCertificateCounts(statuses: CertStatus[]): Promise<Record<string, number>> {
+  const counts = await Promise.all(
+    statuses.map(async (st) => {
+      const { count, error } = await supabase.from("certificate_orders").select("id", { count: "exact", head: true }).eq("status", st);
+      if (error) throw new Error(error.message);
+      return [st, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(counts);
+}
+
+/** Open orders (processing or printed) per vendor, for the "several open orders for one vendor" notice. */
+export async function fetchOpenCertificateVendors(): Promise<Map<string, number>> {
   const rows = await readAllPages((from, to) =>
     supabase
       .from("certificate_orders")
-      .select("*")
-      .order("purchased_at", { ascending: true })
+      .select("id, vendor_id")
+      .in("status", ["processing", "printed"])
       .order("id", { ascending: true })
       .range(from, to),
   );
-  return (rows as unknown as RawCertificateOrder[]).map(mapOrder);
+  const byVendor = new Map<string, number>();
+  for (const r of rows as { vendor_id: string }[]) byVendor.set(r.vendor_id, (byVendor.get(r.vendor_id) ?? 0) + 1);
+  return byVendor;
 }
 
 /**
