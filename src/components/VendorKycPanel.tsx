@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { canWrite, readOnlyReason } from "@/lib/roles";
+import { readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import {
   Badge, Button, Empty, Modal, Notice, Panel, SkeletonList, Textarea,
@@ -168,12 +168,9 @@ function ViewDocButton({ doc }: { doc: KycDocRow }) {
 export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
   const role = useRole();
   const qc = useQueryClient();
-  // The DB gate on set_vendor_document_verified() is support/super_admin — the
-  // same predicate set_account_status() uses — so the UI gate is "accounts",
-  // NOT "vendors" (which is vendor_ops/super_admin). Matching the button to the
-  // function keeps a disabled control from being the only thing standing
-  // between a wrong role and a 42501.
-  const writable = canWrite(role, "accounts");
+  // The database decides (admin.vendor_document_decide): support, vendor_ops and super_admin since AR-L04 (Mitra,
+  // 2026-11-22: vendor_ops approves registrations, so it reviews their documents too). The buttons follow it.
+  const writable = role === "super_admin" || role === "support" || role === "vendor_ops";
 
   const docs = useVendorKycDocs(vendorId);
   const [rejecting, setRejecting] = useState<KycDocRow | null>(null);

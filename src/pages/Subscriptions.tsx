@@ -361,7 +361,7 @@ export default function Subscriptions() {
 
         <BillingIncidentsPanel writable={writable} />
 
-        <RefundGuaranteePanel writable={writable} />
+        <RefundGuaranteePanel writable={writable} planName={planName} />
 
         <Panel
           title="Subscriptions"
@@ -539,7 +539,7 @@ export default function Subscriptions() {
                       {inv.vendor?.brand_name ?? <span className="text-ink-faint">unknown</span>}
                     </td>
                     <td className="px-3 py-2 text-ink-muted">
-                      {inv.plan_id ?? <span className="text-ink-faint">none</span>}
+                      {inv.plan_id ? planName(inv.plan_id) : <span className="text-ink-faint">none</span>}
                     </td>
                     <td className="px-3 py-2 tabular-nums text-ink">
                       {inr(total)}
@@ -593,7 +593,12 @@ export default function Subscriptions() {
                           disabled={!writable || !refundable || refund.isPending}
                           title={refundBlockedReason(inv) ?? undefined}
                           onClick={() => {
-                            if (!confirm(`Refund ${inr(total)} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
+                            if (
+                              !confirm(
+                                `Refund ${inr(total)} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?\n\n` +
+                                  "Their plan stays active: a refund doesn't end it. To end it, cancel the subscription too.",
+                              )
+                            )
                               return;
                             refund.mutate(inv.id);
                           }}

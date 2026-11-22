@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Badge, Empty, ErrorNote, Panel, ROW_HOVER, SkeletonList, Table, type Tone } from "@/components/ui";
+import { Link } from "react-router-dom";
 
 /**
  * Confirmed fraud: the lasting record (Help & Support P6; textile-spark-net D-16, revised
@@ -91,7 +92,7 @@ export function FraudRecordsPanel() {
               </td>
               <td className="px-3 py-2 text-xs text-ink-muted">{f.account_status ?? "—"}</td>
               <td className="px-3 py-2 text-xs font-mono text-ink-muted">
-                {f.ticket_no}
+                <Link to={`/support/${f.ticket_no}`} className="underline-offset-2 hover:underline">{f.ticket_no}</Link>
                 <div className="font-sans text-ink-faint">
                   {f.report_purged_at ? `deleted ${format(new Date(f.report_purged_at), "d MMM yyyy")}` : "kept a year from filing"}
                 </div>

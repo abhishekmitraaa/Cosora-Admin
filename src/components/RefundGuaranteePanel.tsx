@@ -46,7 +46,14 @@ const inr = (n: number) => `₹${Number(n).toLocaleString("en-IN")}`;
  *
  * Shows nothing before that migration is applied (the reader doesn't exist yet).
  */
-export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
+export function RefundGuaranteePanel({
+  writable,
+  planName = (id: string) => id,
+}: {
+  writable: boolean;
+  /** A plan id as its name (AR-L15). */
+  planName?: (id: string) => string;
+}) {
   const qc = useQueryClient();
   const [closing, setClosing] = useState<GuaranteeRequest | null>(null);
   const [note, setNote] = useState("");
@@ -143,7 +150,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
                   {r.invoices.map((i) => (
                     <tr key={i.id}>
                       <td className="px-3 py-2 font-mono text-xs text-ink-muted">{i.invoice_number ?? i.id.slice(0, 8)}</td>
-                      <td className="px-3 py-2 text-ink-muted">{i.plan_id ?? "—"}</td>
+                      <td className="px-3 py-2 text-ink-muted">{i.plan_id ? planName(i.plan_id) : "—"}</td>
                       <td className="px-3 py-2 tabular-nums text-ink">{inr(i.total_rupees)}</td>
                       <td className="px-3 py-2">
                         {refundSettledOrUnderway(i) ? (

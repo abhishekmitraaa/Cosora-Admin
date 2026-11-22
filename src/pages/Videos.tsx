@@ -32,6 +32,7 @@ import {
 import { useUrlState } from "@/hooks/useUrlState";
 import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort } from "@/lib/queuePaging";
 import { QueueSortToggle } from "@/components/QueueSortToggle";
+import { siteVideoUrl } from "@/lib/site";
 
 type Status = "under_review" | "live" | "rejected";
 
@@ -545,6 +546,16 @@ function VideoCard({
               </>
             );
           })()}
+          {v.status === "live" && (
+            <a
+              href={siteVideoUrl(v.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[32px] items-center justify-center rounded-lg border border-line px-3 text-sm text-ink-muted hover:text-ink"
+            >
+              View on site
+            </a>
+          )}
           {v.status !== "rejected" && (
             <Button variant="danger" disabled={!writable || busy} onClick={onReject}>
               {v.status === "live" ? "Pull down" : "Reject"}

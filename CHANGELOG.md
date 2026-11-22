@@ -9,6 +9,15 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-23 (branch `fix/admin-review-low1-2026-11-22`; database in textile-spark-net migration `20261122140000`;
+  **built and tested on the local stack, NOT released**)
+  **Admin review: Low batch 1 (AR-L01–L20).** Approvals no longer refetch every loaded queue page; Paused is look-only;
+  overseas registrations wait for document review and vendor_ops reviews documents (Mitra); one-call reason moves;
+  View on site links (`lib/site.ts`); form question errors in words; a request's subject opens; India-time support and
+  blog times (`lib/ist.ts`); fraud record links; billing incidents page; Finished includes budget-used and archived
+  campaigns; plan names and a visible plan-price load error; refund and scheduled-publish wording; blog button links
+  checked; unused blog pictures removed; banner destinations checked against the app's routes (`lib/cosoraRoutes.ts`).
+
 - 2026-11-22 (branch `fix/admin-review-medium3-2026-11-22`; database in textile-spark-net migration `20261122130000`;
   **LIVE 2026-11-22** with Medium batches 1 and 2)
   **Admin review 2026-11-22: Medium batch 3 (AR-M42–M46).**

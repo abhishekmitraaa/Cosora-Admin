@@ -175,3 +175,16 @@ export function useSaveReason() {
     onError: (e: Error) => toast.error(e.message),
   });
 }
+
+/** Swap two reasons' places in one change (AR-L05: two saves could leave both on one position). */
+export function useSwapReasons() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ a, b }: { a: string; b: string }) => {
+      const { error } = await supabase.rpc("admin_product_reasons_swap" as never, { p_a: a, p_b: b } as never);
+      if (error) throw new Error((error as { message: string }).message);
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: REASONS_KEY }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}

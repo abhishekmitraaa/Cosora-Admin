@@ -418,3 +418,36 @@ export function useSaveBlogSettings() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["blogs"] }),
   });
 }
+
+/** A blog button link: https://…, a path on cosora.in, mailto: or tel: (AR-L18; the database's blog_href_ok()). */
+export function blogHrefOk(href: string): boolean {
+  return /^(https?:\/\/[^\s<>"]+|\/[^/\\\s][^\s<>"]*|\/|mailto:[^\s<>"]+|tel:\+?[0-9 ()-]+|#[A-Za-z0-9_-]*)$/i.test(href.trim());
+}
+export const BLOG_HREF_HINT = "Start with https://, / (a page on Cosora), mailto: or tel:.";
+
+/** Every picture path an article holds: hero, thumbnail, share image and image blocks. */
+export function blogImagePaths(a: {
+  hero_image?: string | null;
+  thumbnail?: string | null;
+  og_image?: string | null;
+  blocks?: { type: string; path?: string }[] | null;
+}): string[] {
+  const out = [a.hero_image, a.thumbnail, a.og_image, ...(a.blocks ?? []).filter((b) => b.type === "image").map((b) => b.path)];
+  return out.filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+
+/**
+ * Remove pictures this edit put aside: `candidates` minus `kept`, and only those no article and not the blog's hero
+ * uses (admin_blog_unused_images). Best effort, after the save (AR-L19: replaced and removed pictures stayed in
+ * Storage). Returns the first failure's message, or null.
+ */
+export async function cleanupBlogImages(candidates: string[], kept: string[]): Promise<string | null> {
+  const keep = new Set(kept);
+  const maybe = [...new Set(candidates)].filter((x) => !keep.has(x));
+  if (maybe.length === 0) return null;
+  const { data, error } = await supabase.rpc("admin_blog_unused_images" as never, { p_paths: maybe } as never);
+  if (error) return (error as { message: string }).message;
+  const unused = (data ?? []) as string[];
+  const failures = (await Promise.all(unused.map((x) => removeBlogImage(x)))).filter(Boolean) as string[];
+  return failures[0] ?? null;
+}

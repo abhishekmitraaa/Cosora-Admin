@@ -46,6 +46,7 @@ import {
   type SupportView,
 } from "@/lib/support";
 import { useUrlFilters } from "@/hooks/useUrlState";
+import { istClock } from "@/lib/ist";
 
 /**
  * THE SUPPORT QUEUE (Help & Support, 2026-09-30).
@@ -368,7 +369,7 @@ function QueueLine({ row: r, callbacks, priority }: { row: SupportListRow; callb
               {priority?.target_at && (
                 <span className={`block text-2xs ${new Date(priority.target_at).getTime() < Date.now() ? "font-semibold text-critical-fg" : "text-ink-faint"}`}
                   title={istTime(priority.target_at)} data-testid="support-reply-target">
-                  {`reply by ${format(new Date(priority.target_at), "HH:mm")}`}
+                  {`reply by ${istClock(priority.target_at)} IST`}
                 </span>
               )}
             </>

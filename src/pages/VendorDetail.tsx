@@ -27,6 +27,7 @@ import {
   SubHeading,
 } from "@/components/ui";
 import { BackLink } from "@/components/BackLink";
+import { siteVendorUrl } from "@/lib/site";
 
 interface VendorDetailRow {
   id: string;
@@ -145,6 +146,14 @@ export default function VendorDetail() {
   return (
     <Page>
 <BackLink fallback="/vendors" label="All vendors" />
+      <a
+        href={siteVendorUrl(id!)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mb-3 ml-3 inline-flex items-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+      >
+        View store on cosora.in
+      </a>
 
       <PageHeader
         title={v.brand_name || "Unnamed vendor"}

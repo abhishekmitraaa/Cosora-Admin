@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { describeWriteError, supabase } from "@/lib/supabase";
 import { Badge, Button, Empty, Field, Modal, Note, Panel, SkeletonList, Textarea } from "@/components/ui";
+import { LoadMore } from "@/components/LoadMore";
 
 interface Incident {
   id: string;
@@ -79,20 +80,34 @@ const rupees = (paise: unknown) =>
  *
  * Shows nothing before the billing-core migration is applied (the reader doesn't exist).
  */
+const INCIDENTS_PAGE = 50;
+
 export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
   const qc = useQueryClient();
   const [showResolved, setShowResolved] = useState(false);
   const [resolving, setResolving] = useState<Incident | null>(null);
   const [note, setNote] = useState("");
 
-  const incidents = useQuery({
+  // 50 at a time, newest first (AR-L12: the resolved view stopped at 200).
+  const incidents = useInfiniteQuery({
     queryKey: ["billing-incidents", showResolved],
-    queryFn: async (): Promise<Incident[] | null> => {
-      const { data, error } = await supabase.rpc("admin_billing_incidents", { p_open_only: !showResolved });
+    initialPageParam: null as { at: string; id: string } | null,
+    queryFn: async ({ pageParam }): Promise<Incident[] | null> => {
+      const { data, error } = await supabase.rpc("admin_billing_incidents" as never, {
+        p_open_only: !showResolved,
+        p_before_at: pageParam?.at ?? null,
+        p_before_id: pageParam?.id ?? null,
+        p_limit: INCIDENTS_PAGE,
+      } as never);
+      const err = error as { code?: string; message: string } | null;
       // Not applied yet (PGRST202), or a role that doesn't see billing (42501).
-      if (error?.code === "PGRST202" || error?.code === "42501") return null;
-      if (error) throw new Error(error.message);
+      if (err?.code === "PGRST202" || err?.code === "42501") return null;
+      if (err) throw new Error(err.message);
       return (data ?? []) as unknown as Incident[];
+    },
+    getNextPageParam: (last) => {
+      const r = last?.[last.length - 1];
+      return last && last.length === INCIDENTS_PAGE && r ? { at: r.created_at, id: r.id } : undefined;
     },
   });
 
@@ -111,9 +126,9 @@ export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
   });
 
   if (incidents.isPending) return <SkeletonList rows={1} height="h-24" />;
-  if (incidents.data === null) return null;
+  if (incidents.data?.pages[0] === null) return null;
   if (incidents.error) return <Note>{(incidents.error as Error).message}</Note>;
-  const rows = incidents.data ?? [];
+  const rows = (incidents.data?.pages ?? []).flatMap((p) => p ?? []);
 
   return (
     <Panel
@@ -184,6 +199,7 @@ export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
               </div>
             );
           })}
+          <LoadMore query={incidents} label="Load older incidents" />
         </div>
       )}
 

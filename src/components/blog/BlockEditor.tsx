@@ -3,6 +3,7 @@ import { Button, Field, Input, Select, SectionTitle } from "../ui";
 import { RichTextField } from "./RichTextField";
 import { BlogImageField } from "./BlogImageField";
 import type { BlogBlock } from "@/lib/blogs";
+import { blogHrefOk, BLOG_HREF_HINT } from "@/lib/blogs";
 
 /**
  * Builds an article out of ordered blocks.
@@ -370,7 +371,11 @@ function BlockBody({
               onChange={(e) => onChange({ ...block, label: e.target.value })}
             />
           </Field>
-          <Field label="Button link" hint="A path on cosora.in, such as /go/post-rfq.">
+          <Field
+            label="Button link"
+            hint="A path on cosora.in, such as /go/post-rfq."
+            error={block.href.trim() && !blogHrefOk(block.href) ? BLOG_HREF_HINT : undefined}
+          >
             <Input
               value={block.href}
               disabled={disabled}

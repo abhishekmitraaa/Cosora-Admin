@@ -81,3 +81,20 @@ export async function setAttributeActive(id: string, active: boolean): Promise<v
 export function parseOptions(text: string): string[] {
   return [...new Set(text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean))];
 }
+
+/** A save's refusal in words (AR-L07): constraint names and Postgres wording meant nothing to staff. */
+export function attributeErrorText(e: unknown): string {
+  const m = String((e as { message?: unknown })?.message ?? e ?? "");
+  const code = String((e as { code?: unknown })?.code ?? "");
+  if (code === "23505" || /duplicate key/i.test(m)) return "A question with this key already exists on this form. Choose another key.";
+  if (/key_check/.test(m)) return "The key must start with a letter and use only letters, digits and _ (at most 64).";
+  if (/match_key_check/.test(m)) return "The matching key must start with a letter and use only letters, digits and _.";
+  if (/match_weight_check/.test(m)) return "The matching weight must be between 0 and 10.";
+  if (/label(_hi|_gu)?_check/.test(m)) return "A label can be at most 200 characters.";
+  if (/placeholder_check/.test(m)) return "The placeholder can be at most 200 characters.";
+  if (/unit_check/.test(m)) return "The unit can be at most 40 characters.";
+  if (/options_check/.test(m)) return "A question can have at most 200 options.";
+  if (/_kind\b|attribute_definitions_kind/.test(m)) return "That answer type isn't available on this form.";
+  if (/_place\b|attribute_definitions_place/.test(m)) return "Choose where the question goes: the seller type, category and sub-category, or the section.";
+  return m || "The question wasn't saved.";
+}

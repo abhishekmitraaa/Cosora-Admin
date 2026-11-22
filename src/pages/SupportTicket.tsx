@@ -62,6 +62,8 @@ import {
 } from "@/lib/support";
 import { STATUS_TONE } from "./Support";
 import { BackLink } from "@/components/BackLink";
+import { istDate, istDateTime } from "@/lib/ist";
+import { siteProductUrl, siteVideoUrl } from "@/lib/site";
 
 /**
  * ONE SUPPORT REQUEST (Help & Support, 2026-09-30).
@@ -181,7 +183,7 @@ function MessageLine({ m, files }: { m: SupportMessage; files: SupportAttachment
     return (
       <div className="flex justify-center">
         <p className="max-w-[85%] rounded-full bg-surface-2 px-3 py-1 text-center text-2xs text-ink-muted ring-1 ring-inset ring-line">
-          {m.body} <span className="text-ink-faint">· {format(new Date(m.created_at), "d MMM, HH:mm")}</span>
+          {m.body} <span className="text-ink-faint">· {istDateTime(m.created_at)}</span>
         </p>
       </div>
     );
@@ -195,7 +197,7 @@ function MessageLine({ m, files }: { m: SupportMessage; files: SupportAttachment
           {staff ? (m.author_name ?? "Staff") : "Requester"}
           {internal && <span className="font-semibold text-caution-fg"> · internal note</span>}
           {" · "}
-          {format(new Date(m.created_at), "d MMM, HH:mm")}
+          {istDateTime(m.created_at)}
         </div>
         <div
           className={cn(
@@ -857,7 +859,7 @@ function RequesterPanel({ detail: d }: { detail: SupportTicketDetail }) {
     <Panel title="Requester">
       <dl className="grid grid-cols-2 gap-3">
         <DataField label="Name" value={<span data-no-translate>{r.name}</span>} />
-        <DataField label="Joined" value={format(new Date(r.joined_at), "d MMM yyyy")} />
+        <DataField label="Joined" value={istDate(r.joined_at)} />
         <DataField
           label="Email"
           value={r.email ? (
@@ -918,10 +920,33 @@ const ENTITY_LABEL: Record<string, string> = {
   ad: "Ad campaign", invoice: "Invoice", kyc: "KYC document", certificate_order: "Certificate order", review: "Review", account: "Their account",
 };
 
-function entityLink(type: string, id: string, role: ReturnType<typeof useRole>): string | null {
-  if (type === "conversation" && canSee(role, "chats")) return `/chats/${id}`;
-  if (type === "vendor" && canSee(role, "vendors")) return `/vendors/${id}`;
-  return null;
+/**
+ * Where a request's subject opens (review AR-L08, 2026-11-22): a page here when the role can see it, else the public
+ * page (listings and videos have no admin page of their own). `entity` is what the database gathered about it.
+ */
+function entityLink(
+  type: string,
+  id: string,
+  role: ReturnType<typeof useRole>,
+  entity: Record<string, unknown> | null,
+  vendorId: string | null,
+): { to: string; external?: boolean } | null {
+  const rfqId = typeof entity?.rfq_id === "string" ? entity.rfq_id : null;
+  switch (type) {
+    case "conversation": return canSee(role, "chats") ? { to: `/chats/${id}` } : null;
+    case "vendor": return canSee(role, "vendors") ? { to: `/vendors/${id}` } : null;
+    case "rfq": return canSee(role, "leads") ? { to: `/leads?open=${id}` } : null;
+    case "quote": return rfqId && canSee(role, "leads") ? { to: `/leads?open=${rfqId}` } : null;
+    case "product": return { to: siteProductUrl(id), external: true };
+    case "video": return { to: siteVideoUrl(id), external: true };
+    case "account": return canSee(role, "accounts") ? { to: `/accounts?q=${id}` } : null;
+    case "kyc": return vendorId && canSee(role, "vendors") ? { to: `/vendors/${vendorId}` } : null;
+    case "invoice": return canSee(role, "subscriptions") ? { to: "/subscriptions" } : null;
+    case "certificate_order": return canSee(role, "certificates") ? { to: "/certificates" } : null;
+    case "ad": return canSee(role, "ads") ? { to: "/ads?view=review" } : null;
+    case "review": return canSee(role, "review-reports") ? { to: "/review-reports" } : null;
+    default: return null;
+  }
 }
 
 function show(v: unknown): string {
@@ -937,7 +962,8 @@ function ContextPanel({ detail: d }: { detail: SupportTicketDetail }) {
   const entity = (ctx.entity ?? null) as Record<string, unknown> | null;
   const t = d.ticket;
   const role = useRole();
-  const link = t.entity_type && t.entity_id ? entityLink(t.entity_type, t.entity_id, role) : null;
+  const vendorId = typeof vendor?.id === "string" ? vendor.id : null;
+  const link = t.entity_type && t.entity_id ? entityLink(t.entity_type, t.entity_id, role, entity, vendorId) : null;
   return (
     <Panel title="What we know" description="Gathered by the database when the request was opened, not typed by the requester.">
       <dl className="grid grid-cols-2 gap-3">
@@ -964,7 +990,11 @@ function ContextPanel({ detail: d }: { detail: SupportTicketDetail }) {
           <p className="text-sm text-ink">
             {ENTITY_LABEL[t.entity_type] ?? t.entity_type}{" "}
             {link ? (
-              <Link to={link} className="text-xs underline">open</Link>
+              link.external ? (
+                <a href={link.to} target="_blank" rel="noopener noreferrer" className="text-xs underline">open on cosora.in</a>
+              ) : (
+                <Link to={link.to} className="text-xs underline">open</Link>
+              )
             ) : (
               <span className="font-mono text-2xs text-ink-faint">{t.entity_id}</span>
             )}
@@ -998,7 +1028,7 @@ function Timeline({ detail: d }: { detail: SupportTicketDetail }) {
         <ol className="mt-3 space-y-1.5">
           {d.events.map((e, i) => (
             <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-xs">
-              <span className="w-28 shrink-0 tabular-nums text-ink-faint">{format(new Date(e.at), "d MMM, HH:mm")}</span>
+              <span className="w-28 shrink-0 tabular-nums text-ink-faint">{istDateTime(e.at)}</span>
               <span className="font-medium text-ink">{EVENT_LABEL[e.event] ?? e.event}</span>
               {e.from_status && e.to_status && e.from_status !== e.to_status && (
                 <span className="text-ink-muted">{e.from_status} → {e.to_status}</span>

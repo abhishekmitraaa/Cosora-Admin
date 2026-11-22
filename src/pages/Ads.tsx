@@ -74,7 +74,8 @@ const TAB_STATUSES: Record<AdStatus, string[]> = {
   active: ["active"],
   paused: ["paused_by_admin", "paused_by_vendor", "paused"],
   rejected: ["rejected"],
-  expired: ["expired", "ended"],
+  // AR-L13: a campaign that used up its budget, or was archived, is finished too.
+  expired: ["expired", "ended", "budget_exhausted", "archived"],
 };
 
 /**

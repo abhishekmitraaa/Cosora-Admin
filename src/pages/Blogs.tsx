@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, ExternalLink, Trash2 } from "lucide-react";
 import {
@@ -57,9 +57,9 @@ import {
   useSetBlogPostStatus,
   type BlogBlock,
   type BlogPostFull,
-  type BlogStatus,
-} from "@/lib/blogs";
+  type BlogStatus, blogHrefOk, BLOG_HREF_HINT, blogImagePaths, cleanupBlogImages } from "@/lib/blogs";
 import { useUrlState } from "@/hooks/useUrlState";
+import { istDate } from "@/lib/ist";
 
 const BLOG_URL = "https://www.cosora.in/blogs";
 
@@ -208,7 +208,7 @@ function ArticlesTab({ writable }: { writable: boolean }) {
                 </Badge>
               </td>
               <td className="text-ink-muted">
-                {r.published_at ? new Date(r.published_at).toLocaleDateString("en-GB") : "Not set"}
+                {r.published_at ? istDate(r.published_at) : "Not set"}
               </td>
               <td className="text-right">
                 <div className="flex justify-end gap-1">
@@ -217,11 +217,22 @@ function ArticlesTab({ writable }: { writable: boolean }) {
                       size="sm"
                       variant="outline"
                       disabled={!writable || busy}
+                      // A scheduled article with a future date goes public at that time, not now (AR-L17).
+                      title={
+                        r.published_at && new Date(r.published_at).getTime() > Date.now()
+                          ? `Goes public at its publish date, ${istDate(r.published_at)}`
+                          : undefined
+                      }
                       onClick={() =>
                         setStatus.mutate(
                           { id: r.id, status: "published" },
                           {
-                            onSuccess: () => toast.success("Published"),
+                            onSuccess: () =>
+                              toast.success(
+                                r.published_at && new Date(r.published_at).getTime() > Date.now()
+                                  ? `Scheduled: it goes public on ${istDate(r.published_at)}`
+                                  : "Published",
+                              ),
                             onError: (e: Error) => toast.error(e.message),
                           },
                         )
@@ -392,6 +403,8 @@ function validate(d: Draft): Partial<Record<keyof Draft, string>> {
   }
   const badImage = d.blocks.find((b) => b.type === "image" && !b.alt.trim());
   if (badImage) e.blocks = "Every image needs alt text.";
+  const badLink = d.blocks.find((b) => b.type === "cta" && !blogHrefOk(b.href));
+  if (badLink) e.blocks = `A button's link isn't valid. ${BLOG_HREF_HINT}`;
   return e;
 }
 
@@ -419,6 +432,17 @@ function ArticleEditor({
   }, [id, existing.data, loaded]);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  // Every picture this editor has held, so a replaced or abandoned upload can be removed (AR-L19).
+  const seenImages = useRef(new Set<string>());
+  useEffect(() => {
+    for (const x of blogImagePaths(draft)) seenImages.current.add(x);
+  }, [draft]);
+  const savedImages = existing.data ? blogImagePaths(existing.data) : [];
+  const closeEditor = () => {
+    // Uploads that were never saved go; what the saved article holds stays.
+    void cleanupBlogImages([...seenImages.current], savedImages);
+    onClose();
+  };
   // A new post, or one saved before authors existed, starts on Cosora: the
   // organisation row, and what the old "Cosora Team" byline meant.
   const authorId =
@@ -698,7 +722,7 @@ function ArticleEditor({
         </p>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={closeEditor}>
             Cancel
           </Button>
           <Button
@@ -734,6 +758,11 @@ function ArticleEditor({
                 {
                   onSuccess: () => {
                     toast.success(id ? "Saved" : "Article created");
+                    // Pictures replaced or removed in this edit, and uploads that didn't make it in, go now.
+                    const kept = blogImagePaths(draft);
+                    void cleanupBlogImages([...seenImages.current, ...savedImages], kept).then((err) => {
+                      if (err) toast.warning(`Some old pictures couldn't be removed: ${err}`);
+                    });
                     onClose();
                   },
                   onError: (e: Error) => toast.error(e.message),
@@ -1053,7 +1082,11 @@ function LandingTab({ writable }: { writable: boolean }) {
               onChange={(e) => set({ hero_cta_label: e.target.value })}
             />
           </Field>
-          <Field label="Button link" hint="A path on cosora.in, such as /go/post-rfq.">
+          <Field
+            label="Button link"
+            hint="A path on cosora.in, such as /go/post-rfq."
+            error={draft.hero_cta_href.trim() && !blogHrefOk(draft.hero_cta_href) ? BLOG_HREF_HINT : undefined}
+          >
             <Input
               value={draft.hero_cta_href}
               disabled={!writable}

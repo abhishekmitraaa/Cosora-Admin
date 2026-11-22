@@ -8,8 +8,7 @@ import {
   useSaveReason,
   type ProductReason,
   type ReasonDraft,
-  type ReasonUse,
-} from "@/lib/productModeration";
+  type ReasonUse, useSwapReasons } from "@/lib/productModeration";
 import {
   Badge,
   Button,
@@ -50,6 +49,7 @@ export default function ModerationReasons() {
   // Switched-off rows are for the editors; a product moderator sees the active list.
   const reasons = useProductReasons(writable);
   const save = useSaveReason();
+  const swap = useSwapReasons();
   const [draft, setDraft] = useState<ReasonDraft | null>(null);
 
   if (reasons.isLoading) {
@@ -75,19 +75,12 @@ export default function ModerationReasons() {
     );
   }
 
-  // Swap two neighbours' sort values. Two saves: each is its own audited change.
-  async function move(i: number, dir: -1 | 1) {
+  // Swap two neighbours' places, in one change (AR-L05).
+  function move(i: number, dir: -1 | 1) {
     const a = rows[i];
     const b = rows[i + dir];
-    if (!a || !b) return;
-    const sa = a.sort === b.sort ? b.sort + dir : b.sort;
-    const sb = a.sort;
-    try {
-      await save.mutateAsync({ ...a, id: a.id, sort: sa });
-      await save.mutateAsync({ ...b, id: b.id, sort: sb });
-    } catch {
-      // useSaveReason already showed the database's message.
-    }
+    if (!a?.id || !b?.id) return;
+    swap.mutate({ a: a.id, b: b.id });
   }
 
   const valid =

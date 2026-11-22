@@ -1,3 +1,5 @@
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+
 /**
  * Paging and order for the moderation queues: Products, Video Closeups, Catalogues
  * (review AR-M12 / AR-M13, 2026-11-22). 50 at a time, keyset on (created_at, id) so rows
@@ -36,4 +38,11 @@ export function mergeQueuePages<R, V, E>(pages: { rows: R[]; vendors: Map<string
     for (const [k, v] of p.edits) edits.set(k, v);
   }
   return { rows: pages.flatMap((p) => p.rows), vendors, edits };
+}
+
+/** Take one decided row out of a loaded queue without refetching its pages (AR-L01). */
+export function dropFromQueue(qc: QueryClient, key: readonly unknown[], id: string) {
+  qc.setQueryData<InfiniteData<{ rows: { id: string }[] }>>(key, (old) =>
+    old ? { ...old, pages: old.pages.map((p) => ({ ...p, rows: p.rows.filter((r) => r.id !== id) })) } : old,
+  );
 }

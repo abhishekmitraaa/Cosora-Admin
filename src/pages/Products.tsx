@@ -39,8 +39,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
-import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort } from "@/lib/queuePaging";
+import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort, dropFromQueue } from "@/lib/queuePaging";
 import { QueueSortToggle } from "@/components/QueueSortToggle";
+import { siteProductUrl } from "@/lib/site";
 
 // "paused" (subscriptions P4): over the vendor's plan limit, hidden from buyers until the
 // plan allows it again. The plan pauses and resumes it, so the tab is for looking only.
@@ -161,8 +162,11 @@ export default function Products() {
     }) => {
       await moderateFrom("products", id, from, { status, rejection_reason }, `set product to ${status}`, rev);
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["products"] });
+    // The decided listing leaves this tab in place; the other tabs are marked stale and reload when opened
+    // (AR-L01: invalidating refetched every loaded page of a deep queue after each decision).
+    onSuccess: (_d, v) => {
+      dropFromQueue(qc, ["products", tab, sort], v.id);
+      void qc.invalidateQueries({ queryKey: ["products"], refetchType: "none" });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
     onError: (e: Error) => {
@@ -527,17 +531,28 @@ function ProductCard({
               Approve
             </Button>
           )}
-          {!removed && p.status !== "rejected" && p.status !== "live" && (
+          {/* A paused listing is held by the plan, not waiting for a decision (AR-L02). */}
+          {!removed && p.status !== "rejected" && p.status !== "live" && p.status !== "paused" && (
             <Button disabled={!writable || busy} onClick={onReject}>
               Reject
             </Button>
+          )}
+          {p.status === "live" && (
+            <a
+              href={siteProductUrl(p.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[32px] items-center justify-center rounded-lg border border-line px-3 text-sm text-ink-muted hover:text-ink"
+            >
+              View on site
+            </a>
           )}
           {p.status === "live" && (
             <Button disabled={!writable || busy} onClick={onFlag}>
               Flag
             </Button>
           )}
-          {!removed && (
+          {!removed && p.status !== "paused" && (
             <Button variant="danger" disabled={!writable || busy} onClick={onRemove}>
               Remove
             </Button>

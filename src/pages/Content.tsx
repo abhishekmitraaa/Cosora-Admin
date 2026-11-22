@@ -47,6 +47,7 @@ import {
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { isKnownCosoraRoute } from "@/lib/cosoraRoutes";
 
 /**
  * SITE CONTENT (admin completion Phase 9). Real data: lib/siteContent.ts and the
@@ -356,7 +357,18 @@ function BannerModal({ banner, onClose }: { banner: SiteBanner | null; onClose: 
           <Field label="Button label" htmlFor="banner-cta" hint="Leave blank for no button." error={errors.cta_label}>
             <Input id="banner-cta" value={draft.cta_label} placeholder="Claim this banner" onChange={(e) => set({ cta_label: e.target.value })} />
           </Field>
-          <Field label="Destination" htmlFor="banner-link" hint="A path on cosora.in." error={errors.link_path}>
+          <Field
+            label="Destination"
+            htmlFor="banner-link"
+            // A path the app doesn't serve opens Not Found (AR-L20). A warning, not a refusal: a page added after this
+            // list was copied is still right.
+            hint={
+              draft.link_path.trim() && isInternalPath(draft.link_path.trim()) && !isKnownCosoraRoute(draft.link_path.trim())
+                ? "Check this path: it isn't one of Cosora's pages, so the button may open Not Found."
+                : "A path on cosora.in."
+            }
+            error={errors.link_path}
+          >
             <Input
               id="banner-link"
               value={draft.link_path}

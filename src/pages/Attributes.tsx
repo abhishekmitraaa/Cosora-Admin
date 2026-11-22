@@ -12,6 +12,7 @@ import {
   ROW_HOVER, Select, SkeletonList, Table, Tabs, Textarea,
 } from "@/components/ui";
 import { useUrlState } from "@/hooks/useUrlState";
+import { attributeErrorText } from "@/lib/attributes";
 
 /**
  * Form questions (Ranking F3, 2026-10-31): the category questions sellers answer on a listing and buyers on a
@@ -104,7 +105,7 @@ export default function Attributes() {
       return saveAttribute(null, { form, key: draft.key.trim(), kind: draft.kind, ...common, ...place });
     },
     onSuccess: () => done(editing ? "Question saved" : "Question added"),
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(attributeErrorText(e)),
   });
 
   const toggle = useMutation({
@@ -113,7 +114,7 @@ export default function Attributes() {
       toast.success(r.active ? "Question turned off" : "Question turned on");
       void qc.invalidateQueries({ queryKey: ["attribute-definitions"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(attributeErrorText(e)),
   });
 
   const openEdit = (r: AttributeRow) => { setDraft(draftOf(r)); setAdding(false); setEditing(r); };
@@ -213,7 +214,7 @@ export default function Attributes() {
         <div className="space-y-3">
           {adding ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Key" htmlFor="attr-key" hint="Letters and digits, starting with a letter. It can't change later.">
+              <Field label="Key" htmlFor="attr-key" hint="Letters, digits and _, starting with a letter (at most 64). It can't change later.">
                 <Input id="attr-key" value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} />
               </Field>
               <Field label="Kind" htmlFor="attr-kind">

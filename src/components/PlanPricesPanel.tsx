@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Badge, Button, Field, Input, Modal, Note, Panel, ROW_HOVER, Table, Textarea } from "@/components/ui";
+import { Badge, Button, Field, Input, Modal, Note, Panel, ROW_HOVER, Table, Textarea, ErrorNote } from "@/components/ui";
 import {
   cancelPlanPrice, rupees, setPlanPrice, todayIST, usePlanPrices, type PlanPriceRow, type PlanWithPrice,
 } from "@/lib/subscriptionAdmin";
@@ -23,6 +23,15 @@ export function PlanPricesPanel({ writable }: { writable: boolean }) {
   const [cancelling, setCancelling] = useState<PlanPriceRow | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const data = prices.data;
+  // A failed read says so, with Try again (AR-L15): the panel used to vanish, as if prices weren't set up.
+  if (prices.error) {
+    return (
+      <Panel title="Plan prices">
+        <ErrorNote message={`Plan prices couldn't load: ${(prices.error as Error).message}`} />
+        <Button className="mt-2" size="sm" onClick={() => void prices.refetch()}>Try again</Button>
+      </Panel>
+    );
+  }
   if (!data) return null;
 
   const paid = data.plans.filter((p) => p.id !== "free");
