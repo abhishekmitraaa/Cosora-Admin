@@ -5,7 +5,8 @@
  * registered staff member sees. It must say exactly what is recorded, no more:
  *   - sign-ins and sign-outs (admin_audit_session, Login.tsx / useAdminSession);
  *   - every insert, update and delete on the tables the panel writes (trg_admin_audit);
- *   - invites, refunds and staff registrations (admin_audit_record, from the edge functions);
+ *   - invites, refunds (plan invoices and ad orders), staff registrations and, since 2026-11-22, a seller's autopay
+ *     turned off by finance (admin_audit_record, from the edge functions; "the changes you make" below covers it);
  *   - phone numbers revealed in Support (admin_support_reveal_contact);
  *   - since 2026-10-13, every page of the panel an admin opens and every record they open
  *     (a vendor, a support request, a chat): admin_activity_record(), lib/activity.ts.

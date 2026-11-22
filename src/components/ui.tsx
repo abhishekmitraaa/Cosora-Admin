@@ -3,6 +3,9 @@ import { twMerge } from "tailwind-merge";
 import {
   forwardRef,
   useEffect,
+  useId,
+  useRef,
+  useState,
 } from "react";
 import { Inbox, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import { setTheme, useTheme, type ThemeChoice } from "@/lib/theme";
@@ -621,41 +624,129 @@ export function Modal({
   children: ReactNode;
   width?: "md" | "lg";
 }) {
+  // Typed work is never thrown away by accident (Cosora-Admin review 2026-11-22, AR-H16). Once anything in the dialog
+  // is edited, a backdrop click, Esc, the close button or the browser's Back asks first; the dialog's own Cancel
+  // buttons call onClose themselves and stay a deliberate discard. Back closes a dialog instead of leaving the page
+  // (AR-M05), and the browser warns before the tab is closed with unsaved changes.
+  const titleId = useId();
+  const boxRef = useRef<HTMLDivElement>(null);
+  const dirtyRef = useRef(false);
+  const [confirming, setConfirming] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const attemptClose = () => {
+    if (dirtyRef.current) setConfirming(true);
+    else onCloseRef.current();
+  };
+  const attemptRef = useRef(attemptClose);
+  attemptRef.current = attemptClose;
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    dirtyRef.current = false;
+    setConfirming(false);
+    const before = document.activeElement as HTMLElement | null;
+    const marker = `modal-${Math.random().toString(36).slice(2)}`;
+    // Back closes the dialog: an entry of its own over the page's (the router's index is kept, so it sees the page).
+    window.history.pushState({ ...(window.history.state ?? {}), cosoraModal: marker }, "");
+    const onPop = () => {
+      if (window.history.state?.cosoraModal === marker) return;
+      if (dirtyRef.current) {
+        // Stay open and put the entry back; the dialog asks what to do.
+        window.history.pushState({ ...(window.history.state ?? {}), cosoraModal: marker }, "");
+        setConfirming(true);
+      } else {
+        onCloseRef.current();
+      }
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") attemptRef.current();
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    // The page behind stays where it is (AR-M06), and focus moves into the dialog.
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const box = boxRef.current;
+    const first = box?.querySelector<HTMLElement>("input, textarea, select, [autofocus]") ?? box;
+    first?.focus({ preventScroll: true });
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.body.style.overflow = overflow;
+      // Closed by the page (saved, cancelled): take the dialog's entry off, unless the page has navigated since or
+      // the dialog opened again at once (React StrictMode runs effects twice in development), hence the next tick.
+      window.setTimeout(() => {
+        if (window.history.state?.cosoraModal === marker) window.history.back();
+      }, 0);
+      before?.focus?.({ preventScroll: true });
+    };
+  }, [open]);
 
   if (!open) return null;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-canvas/70 p-4 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+      onClick={attemptClose}
     >
       <div
+        ref={boxRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
-          "max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-pop animate-scale-in",
+          "max-h-[90vh] w-full overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-pop animate-scale-in focus:outline-none",
           width === "lg" ? "max-w-2xl" : "max-w-lg",
         )}
         onClick={(e) => e.stopPropagation()}
+        onInput={() => {
+          dirtyRef.current = true;
+        }}
+        onChange={() => {
+          dirtyRef.current = true;
+        }}
       >
         <div className="mb-3 flex items-start justify-between gap-4">
-          <h2 className="font-display text-base font-bold tracking-tight text-ink">{title}</h2>
+          <h2 id={titleId} className="font-display text-base font-bold tracking-tight text-ink">{title}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={attemptClose}
             aria-label="Close"
             className="-mr-1 -mt-1 rounded-md p-1 text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
           >
             <X size={16} />
           </button>
         </div>
+        {confirming && (
+          <div role="alertdialog" aria-label="Discard changes?" className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-caution-line bg-caution-bg px-3 py-2 text-sm text-caution-fg">
+            <span>You have unsaved changes. Discard them?</span>
+            <span className="flex gap-2">
+              <Button size="sm" onClick={() => setConfirming(false)} autoFocus>
+                Keep editing
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() => {
+                  dirtyRef.current = false;
+                  setConfirming(false);
+                  onCloseRef.current();
+                }}
+              >
+                Discard
+              </Button>
+            </span>
+          </div>
+        )}
         {children}
       </div>
     </div>

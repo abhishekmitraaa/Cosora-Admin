@@ -135,7 +135,7 @@ export default function HeroSlides() {
       ) : slides.error ? (
         <ErrorNote message={(slides.error as Error).message} />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Panel
             title={`In the carousel (${rows.length}/${HERO_SLIDES_MAX})`}
             description={

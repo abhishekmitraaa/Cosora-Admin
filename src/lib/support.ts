@@ -364,7 +364,19 @@ export function useSupportRealtime(enabled = true) {
   const topic = useRef(`support:${Math.random().toString(36).slice(2)}`);
   useEffect(() => {
     if (!enabled) return;
-    const refresh = () => void qc.invalidateQueries({ queryKey: ["support"] });
+    // Every staff tab hears every change, so a refresh is coalesced (one per 2 s however many rows changed) and
+    // reloads only what a change can move: the lists, the counts, the open request and its priorities. Settings,
+    // assignees and fraud findings stay as they are (Cosora-Admin review 2026-11-22, AR-H12).
+    let timer: number | null = null;
+    const refresh = () => {
+      if (timer !== null) return;
+      timer = window.setTimeout(() => {
+        timer = null;
+        for (const part of ["list", "counts", "ticket", "priorities"]) {
+          void qc.invalidateQueries({ queryKey: ["support", part] });
+        }
+      }, 2000);
+    };
     const channel = supabase
       .channel(topic.current)
       .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, refresh)
@@ -372,6 +384,7 @@ export function useSupportRealtime(enabled = true) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_messages" }, refresh)
       .subscribe();
     return () => {
+      if (timer !== null) window.clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
   }, [enabled, qc]);
@@ -382,9 +395,13 @@ function fail(error: { message: string; code?: string } | null): void {
   if (error) throw new Error(describeWriteError(error));
 }
 
-export async function claimTicket(ticketId: string): Promise<void> {
-  const { error } = await supabase.rpc("admin_support_claim", { p_ticket_id: ticketId });
-  fail(error);
+/**
+ * Take a request. One a colleague holds moves only with `takeOver` (AR-H05, 2026-11-22): the database refuses
+ * otherwise with "Another staff member has this request."
+ */
+export async function claimTicket(ticketId: string, takeOver = false): Promise<void> {
+  const { error } = await supabase.rpc("admin_support_claim" as never, { p_ticket_id: ticketId, p_take_over: takeOver } as never);
+  fail(error as { message: string; code?: string } | null);
 }
 
 /** `assigneeId` null unassigns. */

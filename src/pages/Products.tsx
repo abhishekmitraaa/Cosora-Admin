@@ -3,7 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { ListingChangedError, moderateFrom } from "@/lib/moderation";
+import { fetchListingRevs, ListingChangedError, ListingEditedError, moderateFrom } from "@/lib/moderation";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import { fetchVendorsByIds, type VendorSummary } from "@/lib/vendors";
@@ -63,6 +63,8 @@ interface ProductRow {
   created_at: string;
   category: { name: string } | null;
   images: { url: string; position: number }[];
+  /** The listing's revision when this page loaded (AR-H10). */
+  rev?: number;
 }
 
 const SUBTITLE =
@@ -101,10 +103,13 @@ async function fetchPage(tab: Tab, cursor: Cursor) {
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as ProductRow[];
   // A listing its seller changed after a decision carries an open edit record: shown on its card.
-  const [vendors, edits] = await Promise.all([
+  const [vendors, edits, revs] = await Promise.all([
     fetchVendorsByIds(rows.map((r) => r.vendor_id)),
     fetchListingEdits("product", rows.map((r) => r.id)),
+    // What the moderator sees now: a decision applies only to this content (AR-H10).
+    fetchListingRevs("products", rows.map((r) => r.id)),
   ]);
+  for (const r of rows) r.rev = revs.get(r.id) ?? 0;
   const last = rows[rows.length - 1];
   return { rows, vendors, edits, next: rows.length === PAGE && last ? { at: last.created_at, id: last.id } : null };
 }
@@ -144,33 +149,42 @@ export default function Products() {
       from,
       status,
       rejection_reason,
+      rev,
     }: {
       id: string;
       /** The status the moderator was shown; the update applies only if it still holds. */
       from: string;
       status: Status;
       rejection_reason: string | null;
+      /** The content the moderator was shown (AR-H10). */
+      rev?: number;
     }) => {
-      await moderateFrom("products", id, from, { status, rejection_reason }, `set product to ${status}`);
+      await moderateFrom("products", id, from, { status, rejection_reason }, `set product to ${status}`, rev);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["products"] });
       void qc.invalidateQueries({ queryKey: ["reports"] });
     },
     onError: (e: Error) => {
-      toast.error(e.message);
-      if (e instanceof ListingChangedError) void qc.invalidateQueries({ queryKey: ["products"] });
+      toast.error(e.message, { duration: 8000 });
+      if (e instanceof ListingChangedError || e instanceof ListingEditedError) void qc.invalidateQueries({ queryKey: ["products"] });
     },
   });
+  // Approve on the Rejected tab overturns a rejection: confirmed first, and the seller is told (AR-H11).
+  const [overturn, setOverturn] = useState<ProductRow | null>(null);
 
   function open(kind: NonNullable<Dialog>["kind"], product: ProductRow) {
     setText("");
     setDialog({ kind, product });
   }
 
-  function approve(p: ProductRow) {
+  function approve(p: ProductRow, confirmed = false) {
+    if (p.status === "rejected" && !confirmed) {
+      setOverturn(p);
+      return;
+    }
     moderate.mutate(
-      { id: p.id, from: p.status, status: "live", rejection_reason: null },
+      { id: p.id, from: p.status, status: "live", rejection_reason: null, rev: p.rev },
       { onSuccess: () => toast.success(`"${p.name}" is now live`) },
     );
   }
@@ -303,6 +317,26 @@ export default function Products() {
         }}
       />
 
+      <Modal open={overturn !== null} title={`Approve "${overturn?.name ?? ""}"?`} onClose={() => setOverturn(null)}>
+        <p className="mb-3 text-sm text-ink-muted">
+          This listing was rejected. Approving it now puts it live as it is, without the seller sending it again, and tells
+          them it passed review.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setOverturn(null)}>Keep it rejected</Button>
+          <Button
+            variant="primary"
+            disabled={moderate.isPending}
+            onClick={() => {
+              if (overturn) approve(overturn, true);
+              setOverturn(null);
+            }}
+          >
+            Approve and publish
+          </Button>
+        </div>
+      </Modal>
+
       <Modal open={dialog?.kind === "reject"} title={`Reject "${target?.name ?? ""}"`} onClose={() => setDialog(null)}>
         <p className="mb-2 text-sm text-ink-muted">
           A reason is required. The vendor can fix the listing and submit it again. To take it down for good, use
@@ -323,7 +357,7 @@ export default function Products() {
             onClick={() =>
               target &&
               moderate.mutate(
-                { id: target.id, from: target.status, status: "rejected", rejection_reason: text.trim() },
+                { id: target.id, from: target.status, status: "rejected", rejection_reason: text.trim(), rev: target.rev },
                 {
                   onSuccess: () => {
                     toast.success(`"${target.name}" rejected`);

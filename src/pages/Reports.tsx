@@ -305,13 +305,13 @@ export default function Reports() {
             </div>
           )}
 
+          {/* AR-H13: the figures above are live money only; test-key and demo payments moved none and are said here. */}
           {d.unverified > 0 && (
             <Note className="mt-4">
               <span className="font-medium text-ink">
-                ₹{d.unverified.toLocaleString("en-IN")} of this (GST included) has no gateway payment id.
+                Not counted above: ₹{d.unverified.toLocaleString("en-IN")} (GST included) of payments that moved no money.
               </span>{" "}
-              Those invoices came from demo-mode activations while Razorpay was not configured, so no money
-              was received for them.
+              They were made with Razorpay's test keys or in demo checkouts. Payments shows each one, with the Money filter.
             </Note>
           )}
 

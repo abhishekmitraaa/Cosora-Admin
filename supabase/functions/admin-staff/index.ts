@@ -60,13 +60,20 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function callerIdFromJwt(req: Request): string | null {
-  const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const part = token.split(".")[1];
-  if (!part) return null;
+/**
+ * The caller as Supabase Auth confirms it, and whether it is still on a temporary password (Cosora-Admin review
+ * 2026-11-22, AR-H06). Decoding the token's `sub` trusted a token that had been signed out, and said nothing about the
+ * temporary password: an account on one could reset other staff's passwords.
+ */
+async function verifiedCaller(req: Request, url: string, apikey: string): Promise<{ id: string; mustChangePassword: boolean } | null> {
+  const authorization = req.headers.get("Authorization") ?? "";
+  if (!/^Bearer\s+\S+$/i.test(authorization.trim())) return null;
   try {
-    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof payload.sub === "string" ? payload.sub : null;
+    const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey, authorization } });
+    if (!r.ok) return null;
+    const user = await r.json();
+    if (typeof user?.id !== "string" || !user.id) return null;
+    return { id: user.id, mustChangePassword: user?.app_metadata?.must_change_password === true };
   } catch {
     return null;
   }
@@ -238,8 +245,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!url || !serviceKey || !anonKey) return json({ error: "server_misconfigured" }, 500);
 
-  const callerId = callerIdFromJwt(req);
-  if (!callerId) return json({ error: "unauthenticated" }, 401);
+  const verified = await verifiedCaller(req, url, anonKey);
+  if (!verified) return json({ error: "unauthenticated" }, 401);
+  const callerId = verified.id;
   const callerAuth = req.headers.get("Authorization") ?? "";
 
   let payload: Record<string, unknown>;
@@ -326,6 +334,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (action !== "register" && action !== "reset_password") return json({ error: "unknown_action" }, 400);
 
   // ── register / reset_password: super_admin, or a manager for team roles ──────
+  // A temporary password opens nothing but its own change (AR-H06), however long ago it was issued.
+  if (verified.mustChangePassword) {
+    return json({ error: "forbidden", detail: "Choose your own password first." }, 403);
+  }
   const caller = await adminStatus(callerId);
   const isManager = caller?.is_admin === true && caller.admin_role === "manager";
   if (!caller?.is_admin || (caller.admin_role !== "super_admin" && !isManager)) {

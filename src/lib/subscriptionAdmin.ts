@@ -1,5 +1,34 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { describeWriteError, supabase } from "@/lib/supabase";
+
+/**
+ * Run an admin action on a seller's plan with their autopay off first (AR-H01, Mitra 2026-11-22: "Cancel autopay too").
+ * The database refuses a cancel, plan change or 7-day close while autopay runs (hint `autopay_active`), because the
+ * next charge would undo it. On that refusal this turns the autopay off through subscription-autopay (admin_cancel:
+ * Razorpay first, then the mandate, in the Admin Log) and runs the action once more. If Razorpay won't cancel, the
+ * action stops and says so.
+ */
+export async function withAutopayOff(
+  vendorId: string,
+  action: () => Promise<{ error: { message: string; code?: string; hint?: string | null } | null }>,
+): Promise<{ autopayCancelled: boolean }> {
+  let { error } = await action();
+  if (!error) return { autopayCancelled: false };
+  if (error.hint !== "autopay_active") throw new Error(describeWriteError(error));
+  const off = await supabase.functions.invoke("subscription-autopay", { body: { action: "admin_cancel", vendorId } });
+  const answer = off.data as { ok?: boolean; error?: string } | null;
+  if (off.error || !answer?.ok) {
+    const why = answer?.error === "cancel_failed"
+      ? "Razorpay didn't cancel the seller's autopay, so nothing was changed. A billing incident was opened; try again in a minute."
+      : answer?.error === "not_configured"
+        ? "Autopay can't be turned off here: Razorpay isn't set up on this project. Nothing was changed."
+        : "The seller's autopay couldn't be turned off, so nothing was changed.";
+    throw new Error(why);
+  }
+  ({ error } = await action());
+  if (error) throw new Error(describeWriteError(error));
+  return { autopayCancelled: true };
+}
 
 // ─────────────────────────────────────────────────────────────
 // Subscriptions admin tooling (subscriptions P12, 2026-10-09; textile-spark-net's
@@ -88,6 +117,8 @@ export const WORKLIST_PAGE = 50;
 export function useSubscriptionWorklist(view: WorklistView, days: number, plan: string | null, search: string) {
   return useInfiniteQuery({
     queryKey: ["subscription-worklist", view, days, plan, search],
+    // The last list stays on screen while the next one loads, so the page doesn't blank on every search (AR-H17).
+    placeholderData: keepPreviousData,
     initialPageParam: null as { at: string; vendor: string } | null,
     queryFn: async ({ pageParam }): Promise<WorklistRow[] | null> => {
       const { data, error } = await supabase.rpc("admin_subscription_worklist", {

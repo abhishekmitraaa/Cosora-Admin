@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useDebounced } from "@/hooks/useDebounced";
 import { Link, useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -56,10 +57,13 @@ export default function Chats() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Filter>("all");
-  const term = safeTerm(search);
+  // Debounced, and the last results stay on screen while the next load (AR-H17): the query key changed on every
+  // keystroke, the page swapped itself for a skeleton, and the search box lost focus after one letter.
+  const term = safeTerm(useDebounced(search, 300));
 
   const chats = useQuery({
     queryKey: ["chats", term, tab],
+    placeholderData: keepPreviousData,
     // conversations IS in the realtime publication now, but this repo has no
     // realtime subscriptions anywhere and building that for one list would be a
     // new pattern for its own sake. A focus refetch covers the actual need

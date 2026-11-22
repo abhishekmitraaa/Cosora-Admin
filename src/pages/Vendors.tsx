@@ -1,22 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { fetchAccountStatuses } from "@/lib/accounts";
-import { readAllPages } from "@/lib/readAllPages";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
+import { useDebounced } from "@/hooks/useDebounced";
 import { sealSources } from "@/lib/trustSeal";
 import { AccountStatusBadge } from "@/components/AccountStatus";
 import {
   Badge,
+  Button,
   Empty,
   ErrorNote,
+  Field,
+  Input,
   Note,
   Page,
   PageHeader,
   ReadOnlyBanner,
   ROW_HOVER,
+  Select,
   SkeletonList,
   Table,
 } from "@/components/ui";
@@ -38,7 +42,12 @@ interface VendorListRow {
   plan_id: string | null;
   plan_expires_at: string | null;
   ad_verified_until: string | null;
+  /** The keyset the next page starts after (lower-cased brand name, then id). */
+  sort_key: string;
 }
+
+type Onboarding = "all" | "complete" | "incomplete";
+const PAGE = 50;
 
 const SUBTITLE = "Accounts, verification and suspension. Open a vendor to review business documents.";
 
@@ -49,32 +58,52 @@ export default function Vendors() {
   const role = useRole();
   const writable = canWrite(role, "vendors");
 
-  const vendors = useQuery({
-    queryKey: ["vendors"],
-    queryFn: async (): Promise<VendorListRow[]> => {
-      // Every vendor, in pages: one read stopped at 1,000 rows, so brands late in the
-      // alphabet were missing with no error (2026-10-20 audit).
-      const vendors = await readAllPages((from, to) =>
-        supabase
-          .from("vendor_profiles")
-          .select(
-            "id, brand_name, city, business_type, onboarding_complete, is_verified, plan_id, plan_expires_at, ad_verified_until",
-          )
-          .order("brand_name", { ascending: true })
-          .order("id", { ascending: true })
-          .range(from, to),
-      );
+  // The search and the filter live in the address (replaced, not pushed), so Back from a vendor, a refresh or a shared
+  // link brings the same list back (AR-M04).
+  const [params, setParams] = useSearchParams();
+  const onboarding = (["complete", "incomplete"].includes(params.get("onboarding") ?? "") ? params.get("onboarding") : "all") as Onboarding;
+  const [typed, setTyped] = useState(params.get("q") ?? "");
+  const search = useDebounced(typed.trim(), 300);
+  useEffect(() => {
+    if ((params.get("q") ?? "") === search) return;
+    const next = new URLSearchParams(params);
+    if (search) next.set("q", search);
+    else next.delete("q");
+    setParams(next, { replace: true });
+  }, [search, params, setParams]);
+  const setOnboarding = (v: Onboarding) => {
+    const next = new URLSearchParams(params);
+    if (v === "all") next.delete("onboarding");
+    else next.set("onboarding", v);
+    setParams(next, { replace: true });
+  };
 
-      // Suspension lives on `profiles`, keyed by the same uuid
-      // (vendor_profiles.id FKs profiles.id). Two FKs from vendor_profiles to
-      // profiles would make a PostgREST embed ambiguous, so this merges
-      // client-side, the same approach lib/vendors.ts already takes.
-      const statuses = await fetchAccountStatuses(vendors.map((v) => v.id));
-      return vendors.map((v) => ({ ...v, account_status: statuses.get(v.id) ?? "active" }));
+  // Pages of 50 from the database, with the account's status in the same call (AR-H09). It used to read every vendor
+  // into the browser, 1,000 at a time, and then ask for statuses 100 at a time: 82 requests for 6,779 vendors, a
+  // 272,708 px page, and all of it again on every Back.
+  const vendors = useInfiniteQuery({
+    queryKey: ["vendors", search, onboarding],
+    initialPageParam: null as { key: string; id: string } | null,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    queryFn: async ({ pageParam }): Promise<VendorListRow[]> => {
+      const { data, error } = await supabase.rpc("admin_vendor_list" as never, {
+        p_search: search || null,
+        p_onboarding: onboarding,
+        p_after_brand: pageParam?.key ?? null,
+        p_after_id: pageParam?.id ?? null,
+        p_limit: PAGE,
+      } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      return (data ?? []) as unknown as VendorListRow[];
+    },
+    getNextPageParam: (last) => {
+      const row = last[last.length - 1];
+      return last.length === PAGE && row ? { key: row.sort_key, id: row.id } : undefined;
     },
   });
 
-  if (vendors.isLoading) {
+  if (vendors.isPending && !vendors.data) {
     return (
       <Page width="wide">
         <PageHeader title="Vendors" subtitle={SUBTITLE} />
@@ -82,9 +111,7 @@ export default function Vendors() {
       </Page>
     );
   }
-  if (vendors.error) return <ErrorNote message={(vendors.error as Error).message} />;
-
-  const rows = vendors.data ?? [];
+  const rows = vendors.data?.pages.flat() ?? [];
 
   return (
     <Page width="wide">
@@ -107,8 +134,30 @@ export default function Vendors() {
         independent, so clearing the admin flag will not remove a seal the other two are granting.
       </Note>
 
-      {rows.length === 0 ? (
-        <Empty>No vendors.</Empty>
+      <div className="mb-3 flex flex-wrap items-end gap-3">
+        <Field label="Search" htmlFor="vendor-search" className="w-72 max-w-full">
+          <Input
+            id="vendor-search"
+            type="search"
+            maxLength={100}
+            placeholder="Brand, city or GSTIN"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+          />
+        </Field>
+        <Field label="Onboarding" htmlFor="vendor-onboarding" className="w-44">
+          <Select id="vendor-onboarding" value={onboarding} onChange={(e) => setOnboarding(e.target.value as Onboarding)}>
+            <option value="all">All</option>
+            <option value="complete">Complete</option>
+            <option value="incomplete">Incomplete</option>
+          </Select>
+        </Field>
+      </div>
+
+      {vendors.error ? (
+        <ErrorNote message={(vendors.error as Error).message} />
+      ) : rows.length === 0 ? (
+        <Empty>{search || onboarding !== "all" ? "No vendor matches." : "No vendors."}</Empty>
       ) : (
         <Table
           head={[
@@ -188,6 +237,13 @@ export default function Vendors() {
             );
           })}
         </Table>
+      )}
+      {vendors.hasNextPage && (
+        <div className="mt-3 flex justify-center">
+          <Button size="sm" disabled={vendors.isFetchingNextPage} onClick={() => void vendors.fetchNextPage()}>
+            {vendors.isFetchingNextPage ? "Loading…" : "Load more vendors"}
+          </Button>
+        </div>
       )}
     </Page>
   );

@@ -1,4 +1,4 @@
-import { ListingChangedError, moderateFrom } from "@/lib/moderation";
+import { fetchListingRevs, ListingChangedError, ListingEditedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -41,6 +41,8 @@ interface CatalogueRow {
   rejection_reason: string | null;
   vendor_id: string;
   created_at: string;
+  /** The catalogue's revision when this list loaded (AR-H10). */
+  rev?: number;
 }
 
 const SUBTITLE =
@@ -102,10 +104,12 @@ export default function Catalogues() {
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as CatalogueRow[];
-      const [vendors, edits] = await Promise.all([
+      const [vendors, edits, revs] = await Promise.all([
         fetchVendorsByIds(rows.map((r) => r.vendor_id)),
         fetchListingEdits("catalogue", rows.map((r) => r.id)),
+        fetchListingRevs("catalogues", rows.map((r) => r.id)),
       ]);
+      for (const r of rows) r.rev = revs.get(r.id) ?? 0;
       return { rows, vendors, edits };
     },
   });
@@ -116,22 +120,29 @@ export default function Catalogues() {
       from,
       status,
       rejection_reason,
-    }: { id: string; from: string; status: Status; rejection_reason: string | null }) => {
-      // `from`: the status the moderator was shown; the update applies only if it still holds.
-      await moderateFrom("catalogues", id, from, { status, rejection_reason }, `set catalogue to ${status}`);
+      rev,
+    }: { id: string; from: string; status: Status; rejection_reason: string | null; rev?: number }) => {
+      // `from` and `rev`: the status and content the moderator was shown; the decision applies only if both still hold.
+      await moderateFrom("catalogues", id, from, { status, rejection_reason }, `set catalogue to ${status}`, rev);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["catalogues"] });
     },
     onError: (e: Error) => {
-      toast.error(e.message);
-      if (e instanceof ListingChangedError) void qc.invalidateQueries({ queryKey: ["catalogues"] });
+      toast.error(e.message, { duration: 8000 });
+      if (e instanceof ListingChangedError || e instanceof ListingEditedError) void qc.invalidateQueries({ queryKey: ["catalogues"] });
     },
   });
+  // Approve on the Rejected tab overturns a rejection: confirmed first, and the seller is told (AR-H11).
+  const [overturn, setOverturn] = useState<CatalogueRow | null>(null);
 
-  function approve(c: CatalogueRow) {
+  function approve(c: CatalogueRow, confirmed = false) {
+    if (c.status === "rejected" && !confirmed) {
+      setOverturn(c);
+      return;
+    }
     moderate.mutate(
-      { id: c.id, from: c.status, status: "live", rejection_reason: null },
+      { id: c.id, from: c.status, status: "live", rejection_reason: null, rev: c.rev },
       { onSuccess: () => toast.success(`"${c.title}" is now live`) },
     );
   }
@@ -139,7 +150,7 @@ export default function Catalogues() {
   function submitRejection() {
     if (!rejecting || !reason.trim()) return;
     moderate.mutate(
-      { id: rejecting.id, from: rejecting.status, status: "rejected", rejection_reason: reason.trim() },
+      { id: rejecting.id, from: rejecting.status, status: "rejected", rejection_reason: reason.trim(), rev: rejecting.rev },
       {
         onSuccess: () => {
           toast.success(`"${rejecting.title}" rejected`);
@@ -193,6 +204,19 @@ export default function Catalogues() {
           ))}
         </div>
       )}
+
+      <Modal open={overturn !== null} title={`Approve "${overturn?.title ?? ""}"?`} onClose={() => setOverturn(null)}>
+        <p className="mb-3 text-sm text-ink-muted">
+          This catalogue was rejected. Approving it now puts it live as it is, without the seller sending it again, and
+          tells them it passed review.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button onClick={() => setOverturn(null)}>Keep it rejected</Button>
+          <Button variant="primary" disabled={moderate.isPending} onClick={() => { if (overturn) approve(overturn, true); setOverturn(null); }}>
+            Approve and publish
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={rejecting !== null} title={`Reject "${rejecting?.title ?? ""}"`} onClose={() => setRejecting(null)}>
         <p className="mb-2 text-sm text-ink-muted">

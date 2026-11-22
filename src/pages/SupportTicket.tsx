@@ -123,7 +123,9 @@ export default function SupportTicket() {
         </Notice>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      {/* grid-cols-1 below lg: without a column the implicit one grew to its widest content and the cards ran off a phone
+          screen, hidden by the shell's overflow-x (AR-H18). */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Stack>
           <Thread detail={d} />
           {t.status === "closed" ? (
@@ -329,6 +331,9 @@ function Composer({ detail: d }: { detail: SupportTicketDetail }) {
   const [internal, setInternal] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [confirmOthers, setConfirmOthers] = useState(false);
+  const me = useAdminSession().identity?.id;
+  const othersRequest = Boolean(d.staff.assignee_id) && d.staff.assignee_id !== me;
   const input = useRef<HTMLInputElement>(null);
   // Files already uploaded and checked, so Send after a failure reuses them instead of
   // uploading again (each upload reserves a row, and a request holds at most 30).
@@ -427,10 +432,31 @@ function Composer({ detail: d }: { detail: SupportTicketDetail }) {
             Internal note
           </label>
         </div>
-        <Button variant="primary" disabled={Boolean(busy) || (!body.trim() && files.length === 0)} onClick={() => void send()}>
+        <Button
+          variant="primary"
+          disabled={Boolean(busy) || (!body.trim() && files.length === 0)}
+          onClick={() => (othersRequest && !internal && !confirmOthers ? setConfirmOthers(true) : void send())}
+        >
           {busy ?? (internal ? "Save note" : "Send reply")}
         </Button>
       </div>
+      {/* A colleague holds this request: say so, and ask before answering the requester for them (AR-H05). */}
+      {othersRequest && !internal && (
+        <p className="mt-2 text-xs text-ink-muted">
+          {d.staff.assignee_name ?? "A colleague"} has this request. Internal notes are fine; a reply goes to the requester.
+        </p>
+      )}
+      {confirmOthers && (
+        <div className="mt-2 rounded-lg border border-caution-line bg-caution-bg p-3 text-sm text-caution-fg">
+          <p>Send this reply on {d.staff.assignee_name ?? "your colleague"}'s request? They may be answering it too.</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="primary" disabled={Boolean(busy)} onClick={() => { setConfirmOthers(false); void send(); }}>
+              Send anyway
+            </Button>
+            <Button size="sm" onClick={() => setConfirmOthers(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
       <p className="mt-2 text-2xs text-ink-faint">JPEG photos (.jpg) and audio up to 5 MB, PDFs up to 10 MB. Every file is checked before anyone can open it.</p>
     </Panel>
   );
@@ -444,6 +470,7 @@ function TicketActions({ detail: d }: { detail: SupportTicketDetail }) {
   const [pending, setPending] = useState<"open" | "resolved" | "closed" | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmTakeOver, setConfirmTakeOver] = useState(false);
   const t = d.ticket;
   const closed = t.status === "closed";
 
@@ -477,10 +504,31 @@ function TicketActions({ detail: d }: { detail: SupportTicketDetail }) {
 
       {d.can_write && !closed && (
         <div className="mt-4 space-y-3 border-t border-line pt-4">
-          {d.staff.assignee_id !== me && (
+          {d.staff.assignee_id !== me && !d.staff.assignee_id && (
             <Button className="w-full" disabled={busy} onClick={() => void run(() => claimTicket(t.id), "It's yours.")}>
               Take this request
             </Button>
+          )}
+          {/* A colleague holds it: taking it over is said out loud and confirmed (AR-H05). */}
+          {d.staff.assignee_id && d.staff.assignee_id !== me && !confirmTakeOver && (
+            <Button className="w-full" disabled={busy} onClick={() => setConfirmTakeOver(true)}>
+              Take over from {d.staff.assignee_name ?? "a colleague"}
+            </Button>
+          )}
+          {confirmTakeOver && (
+            <div className="rounded-lg border border-caution-line bg-caution-bg p-3 text-sm text-caution-fg">
+              <p>
+                {d.staff.assignee_name ?? "A colleague"} has this request. Take it over? They stop being its owner, and
+                the timeline records the change.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="primary" disabled={busy}
+                  onClick={() => void run(() => claimTicket(t.id, true), "It's yours now.").then(() => setConfirmTakeOver(false))}>
+                  Take it over
+                </Button>
+                <Button size="sm" disabled={busy} onClick={() => setConfirmTakeOver(false)}>Cancel</Button>
+              </div>
+            </div>
           )}
           <Field label="Assign to" htmlFor="support-assign">
             <Select

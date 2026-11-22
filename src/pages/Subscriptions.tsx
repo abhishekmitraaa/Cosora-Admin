@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { describeWriteError, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
 import {
@@ -32,8 +32,9 @@ import { BillingIncidentsPanel } from "@/components/BillingIncidentsPanel";
 import { SubscriptionKpis } from "@/components/SubscriptionKpis";
 import { PlanPricesPanel } from "@/components/PlanPricesPanel";
 import { GrantPlanModal } from "@/components/GrantPlanModal";
-import { useSubscriptionWorklist, type WorklistRow, type WorklistView } from "@/lib/subscriptionAdmin";
-import { announceRefund, canRefund, refundState, type RefundResult } from "@/lib/refunds";
+import { useSubscriptionWorklist, withAutopayOff, type WorklistRow, type WorklistView } from "@/lib/subscriptionAdmin";
+import { announceRefund, canRefund, refundBlockedReason, refundState, type RefundResult } from "@/lib/refunds";
+import { CreditNotes } from "@/components/CreditNotes";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -111,6 +112,8 @@ interface InvoiceRow {
   document_type?: "tax_invoice" | "receipt" | "test" | "demo" | null;
   payment_mode?: "live" | "test" | "demo" | "free" | null;
   total_paise?: number | null;
+  /** Set when an upgrade took this invoice's unused value off a later plan (AR-H07). */
+  superseded_at?: string | null;
 }
 
 /** What each kind of document is, as the list shows it. */
@@ -218,7 +221,7 @@ export default function Subscriptions() {
         if (pageParam) q = q.lt("created_at", pageParam);
         return q;
       };
-      let { data, error } = await read(`${base}, document_type, payment_mode, total_paise`);
+      let { data, error } = await read(`${base}, document_type, payment_mode, total_paise, superseded_at`);
       // Before the billing-core migration (2026-10-08) there are no such columns (42703).
       if (error?.code === "42703") ({ data, error } = await read(base));
       if (error) throw new Error(error.message);
@@ -249,21 +252,18 @@ export default function Subscriptions() {
   const decide = useMutation({
     mutationFn: async ({ action, why }: { action: Pending; why: string }) => {
       if (!action.sub.id) throw new Error("This vendor has no subscription yet.");
-      const { error } =
+      const subId = action.sub.id;
+      // AR-H01: the seller's autopay is turned off first when it runs, or its next charge would undo this.
+      return await withAutopayOff(action.sub.vendor_id, async () =>
         action.kind === "plan"
-          ? await supabase.rpc("admin_subscription_change_plan", {
-              p_subscription_id: action.sub.id,
-              p_plan_id: action.planId,
-              p_reason: why,
-            })
-          : await supabase.rpc("admin_subscription_cancel", {
-              p_subscription_id: action.sub.id,
-              p_reason: why,
-            });
-      if (error) throw new Error(describeWriteError(error));
+          ? await supabase.rpc("admin_subscription_change_plan", { p_subscription_id: subId, p_plan_id: action.planId, p_reason: why })
+          : await supabase.rpc("admin_subscription_cancel", { p_subscription_id: subId, p_reason: why }),
+      );
     },
-    onSuccess: (_d, { action }) => {
-      toast.success(action.kind === "plan" ? "Plan changed" : "Subscription canceled");
+    onSuccess: (r, { action }) => {
+      toast.success(
+        `${action.kind === "plan" ? "Plan changed" : "Subscription canceled"}${r.autopayCancelled ? ". Their autopay was turned off." : ""}`,
+      );
       setPending(null);
       setReason("");
       refreshLists();
@@ -307,7 +307,9 @@ export default function Subscriptions() {
     onError: (e: Error) => toast.error(e.message, { duration: 8000 }),
   });
 
-  if (worklist.isPending || invoices.isPending || (plainOnly && subs.isLoading)) {
+  // Only the first load blanks the page. A new search keeps the last list on screen (AR-H17), and a failed one is shown
+  // inside the Subscriptions panel, where the search can be changed again.
+  if ((worklist.isPending && !worklist.data) || invoices.isPending || (plainOnly && subs.isLoading)) {
     return (
       <Page width="wide">
         <PageHeader title="Subscriptions & billing" subtitle={SUBTITLE} />
@@ -315,7 +317,6 @@ export default function Subscriptions() {
       </Page>
     );
   }
-  if (worklist.error) return <ErrorNote message={(worklist.error as Error).message} />;
   if (subs.error) return <ErrorNote message={(subs.error as Error).message} />;
   if (invoices.error) return <ErrorNote message={(invoices.error as Error).message} />;
 
@@ -355,7 +356,7 @@ export default function Subscriptions() {
               <Tabs tabs={VIEWS.map((v) => ({ id: v.id, label: v.label }))} active={view} onChange={setView} />
               <div className="mb-3 flex flex-wrap items-end gap-3">
                 <Field label="Vendor" htmlFor="sub-search" className="w-56">
-                  <Input id="sub-search" placeholder="Part of the brand name" value={typed} onChange={(e) => setTyped(e.target.value)} />
+                  <Input id="sub-search" placeholder="Part of the brand name" maxLength={100} value={typed} onChange={(e) => setTyped(e.target.value)} />
                 </Field>
                 <Field label="Plan" htmlFor="sub-plan" className="w-40">
                   <Select id="sub-plan" value={planFilter ?? ""} onChange={(e) => setPlanFilter(e.target.value || null)}>
@@ -373,7 +374,9 @@ export default function Subscriptions() {
               </div>
             </>
           )}
-          {subRows.length === 0 ? (
+          {worklist.error ? (
+            <ErrorNote message={(worklist.error as Error).message} />
+          ) : subRows.length === 0 ? (
             <Empty>{search || planFilter ? "No subscription matches." : current.empty}</Empty>
           ) : (
             <Table head={["Vendor", "Plan", "Cycle", "Status", "Current period", "Autopay", "Actions"]}>
@@ -548,9 +551,14 @@ export default function Subscriptions() {
                             </span>
                           )}
                         </span>
+                      ) : inv.superseded_at ? (
+                        // AR-H07: this invoice's value went into a later plan as credit.
+                        <span className="text-2xs text-ink-muted">credited into a later plan</span>
                       ) : (
                         <span className="text-ink-ghost">none</span>
                       )}
+                      {/* AR-H14: the credit notes a processed refund issued, with their PDFs. */}
+                      {refundState(inv) === "processed" && <CreditNotes invoiceId={inv.id} />}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex gap-1.5">
@@ -561,11 +569,7 @@ export default function Subscriptions() {
                           variant="danger"
                           size="sm"
                           disabled={!writable || !refundable || refund.isPending}
-                          title={
-                            !inv.razorpay_payment_id
-                              ? "No gateway payment on this invoice, so there is nothing to refund"
-                              : undefined
-                          }
+                          title={refundBlockedReason(inv) ?? undefined}
                           onClick={() => {
                             if (!confirm(`Refund ${inr(total)} to ${inv.vendor?.brand_name ?? "this vendor"} via Razorpay?`))
                               return;
@@ -631,6 +635,12 @@ export default function Subscriptions() {
                 </>
               )}{" "}
               The vendor is notified, and the reason goes into the Admin Log.
+              {/* AR-H01: a running autopay is cancelled at Razorpay first, or its next charge would undo this. */}
+              {pending.sub.mandate_status && ["active", "authenticated", "pending", "halted"].includes(pending.sub.mandate_status) && (
+                <span className="mt-2 block font-medium text-ink">
+                  This seller has autopay on. It will be turned off at Razorpay first, so they aren't charged again.
+                </span>
+              )}
             </Note>
             <Field label="Reason" htmlFor="sub-reason" hint="Required. Recorded in the Admin Log, not shown to the vendor.">
               <Textarea

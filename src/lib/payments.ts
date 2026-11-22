@@ -42,6 +42,17 @@ export type LedgerRow = Omit<
   gateway_ref: string | null;
   discount_paise: number | null;
   discount_code: string | null;
+  /** Which money it was (AR-H13): live, test (Razorpay test keys), demo (no gateway) or free (a ₹0 order). */
+  payment_mode?: MoneyMode | null;
+};
+
+export type MoneyMode = "live" | "test" | "demo" | "free";
+
+export const MODE_LABELS: Record<MoneyMode, string> = {
+  live: "Live money",
+  test: "Test (no money moved)",
+  demo: "Demo (no gateway)",
+  free: "Free (₹0 order)",
 };
 
 export type LedgerKind = "subscription" | "ad_purchase" | "certificate" | "refund";
@@ -60,20 +71,22 @@ export const STATUS_HELP: Record<LedgerStatus, string> = {
   pending: "a checkout under 24 hours old, or a refund the gateway hasn't settled",
   abandoned: "a checkout left unpaid for 24 hours",
   failed: "a payment or refund that failed",
-  review: "an ad order paid but not fulfilled: refund it by hand",
+  review: "a paid ad order waiting for a refund decision: refund it, or mark that no refund is needed",
   refunded: "money returned to the vendor",
 };
 
 export interface LedgerFilters {
   kind: LedgerKind | "all";
   status: LedgerStatus | "all";
+  /** Which money (AR-H13). "all" shows every row; the totals count live money whatever this says. */
+  mode?: MoneyMode | "all";
   /** yyyy-mm-dd, an IST day, inclusive. Empty means no bound. */
   from: string;
   to: string;
   search: string;
 }
 
-export const NO_FILTERS: LedgerFilters = { kind: "all", status: "all", from: "", to: "", search: "" };
+export const NO_FILTERS: LedgerFilters = { kind: "all", status: "all", mode: "all", from: "", to: "", search: "" };
 
 /** What admin_payments_summary() returns. Money is in paise. */
 export interface PaymentsSummary {
@@ -93,6 +106,11 @@ export interface PaymentsSummary {
   review_paise: number;
   unverified_paise: number;
   unverified: number;
+  /** Paid in test mode and in demo checkouts: no money moved, so outside the totals (AR-H13). */
+  test_paise: number;
+  test: number;
+  demo_paise: number;
+  demo: number;
   /** What discount codes took off paid rows, and how many paid rows used one. */
   discounts_paise: number;
   discounted: number;
@@ -129,14 +147,15 @@ export function useLedger(filters: LedgerFilters) {
     queryKey: ["payments-ledger", filters],
     initialPageParam: null as Cursor | null,
     queryFn: async ({ pageParam }): Promise<LedgerRow[]> => {
-      const { data, error } = await supabase.rpc("admin_payments_ledger", {
+      const { data, error } = await supabase.rpc("admin_payments_ledger" as never, {
         ...rpcArgs(filters),
+        p_modes: filters.mode && filters.mode !== "all" ? [filters.mode] : undefined,
         p_cursor_at: pageParam?.at,
         p_cursor_key: pageParam?.key,
         p_limit: LEDGER_PAGE,
-      });
-      if (error) throw new Error(error.message);
-      return (data ?? []) as LedgerRow[];
+      } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      return (data ?? []) as unknown as LedgerRow[];
     },
     getNextPageParam: (last): Cursor | undefined =>
       last.length === LEDGER_PAGE
@@ -155,6 +174,35 @@ export function usePaymentsSummary(filters: LedgerFilters) {
       return data as unknown as PaymentsSummary;
     },
   });
+}
+
+/**
+ * Refund a paid ad order through Razorpay (AR-H15, Mitra 2026-11-22): admin-refund-payment claims the order, finds the
+ * captured payment, refunds it and records what Razorpay answered. `amountPaise` defaults to the whole order.
+ */
+export async function refundAdOrder(orderId: string, amountPaise?: number, note?: string): Promise<{ refundId: string; refundStatus: string; recorded?: boolean }> {
+  const { data, error } = await supabase.functions.invoke("admin-refund-payment", { body: { adOrderId: orderId, amountPaise, note } });
+  if (error) {
+    let detail = error.message;
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") {
+      try {
+        const body = await ctx.json();
+        detail = body.detail || body.error || detail;
+      } catch {
+        /* keep the original message */
+      }
+    }
+    throw new Error(detail);
+  }
+  if (data?.error) throw new Error(data.detail || data.error);
+  return data as { refundId: string; refundStatus: string; recorded?: boolean };
+}
+
+/** A paid ad order flagged for refund needs none (the campaign was fixed, or Cosora keeps the money). In the Admin Log. */
+export async function resolveAdOrder(orderId: string, note: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_ad_order_resolve" as never, { p_order_id: orderId, p_note: note } as never);
+  if (error) throw new Error((error as { message: string }).message);
 }
 
 /** How many rows the Latest strip holds, and how often it asks again. */

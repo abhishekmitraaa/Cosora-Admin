@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { describeWriteError, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Badge, Button, Empty, Modal, Note, Panel, SkeletonList, Table, Textarea } from "@/components/ui";
 import { announceRefund, canRefund, refundSettledOrUnderway, refundState, type RefundResult } from "@/lib/refunds";
+import { withAutopayOff } from "@/lib/subscriptionAdmin";
 
 interface GuaranteeInvoice {
   id: string;
@@ -88,12 +89,13 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
   });
 
   const close = useMutation({
-    mutationFn: async ({ id, why }: { id: string; why: string }) => {
-      const { error } = await supabase.rpc("admin_refund_guarantee_close", { p_request_id: id, p_note: why || undefined });
-      if (error) throw new Error(describeWriteError(error));
-    },
-    onSuccess: () => {
-      toast.success("Request closed. The plan has ended and the seller has been told.");
+    mutationFn: async ({ id, vendorId, why }: { id: string; vendorId: string; why: string }) =>
+      // AR-H01: a refunded seller's autopay is turned off first, so it can't charge them again.
+      await withAutopayOff(vendorId, async () =>
+        await supabase.rpc("admin_refund_guarantee_close", { p_request_id: id, p_note: why || undefined }),
+      ),
+    onSuccess: (r) => {
+      toast.success(`Request closed. The plan has ended and the seller has been told.${r.autopayCancelled ? " Their autopay was turned off." : ""}`);
       setClosing(null);
       setNote("");
       void qc.invalidateQueries({ queryKey: ["refund-guarantee-requests"] });
@@ -181,7 +183,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
         <Textarea rows={3} value={note} placeholder="Refunded under the 7-day guarantee." onChange={(e) => setNote(e.target.value)} />
         <div className="mt-3 flex justify-end gap-2">
           <Button onClick={() => setClosing(null)}>Cancel</Button>
-          <Button variant="primary" disabled={close.isPending} onClick={() => closing && close.mutate({ id: closing.id, why: note.trim() })}>
+          <Button variant="primary" disabled={close.isPending} onClick={() => closing && close.mutate({ id: closing.id, vendorId: closing.vendor_id, why: note.trim() })}>
             Close and end the plan
           </Button>
         </div>

@@ -114,6 +114,8 @@ const ACTIONS: Record<string, { label: string; tone: Tone }> = {
   refund: { label: "Refund", tone: "caution" },
   // admin_support_reveal_contact(): a staff member saw a full phone number (D-08).
   reveal_contact: { label: "Revealed a phone number", tone: "caution" },
+  // subscription-autopay admin_cancel: finance turned a seller's autopay off before changing their plan (AR-H01).
+  autopay_cancel: { label: "Turned off autopay", tone: "caution" },
 };
 
 // Fields worth naming first when a whole row was created or deleted.

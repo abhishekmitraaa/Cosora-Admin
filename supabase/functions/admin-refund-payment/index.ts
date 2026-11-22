@@ -1,8 +1,8 @@
 // Supabase Edge Function: admin-refund-payment
 //
-// Refunds a subscription invoice through Razorpay's real refund API, server-side.
-// Follows the same secret/auth pattern as the existing razorpay-* and
-// subscription-* functions in textile-spark-net.
+// Refunds a subscription invoice, or a paid ad order (AR-H15, 2026-11-22), through Razorpay's real refund API,
+// server-side. Follows the same secret/auth pattern as the existing razorpay-* and subscription-* functions in
+// textile-spark-net. POST { invoiceId } or { adOrderId, amountPaise?, note? }.
 //
 // Deliberate differences from those functions:
 //
@@ -12,17 +12,20 @@
 //     Razorpay call fails, this returns an error and writes NOTHING — an invoice
 //     is never marked refunded without a refund id from Razorpay.
 //
-//  2. It authorizes the CALLER server-side. verify_jwt=true means the platform has
-//     already validated the token signature, so `sub` is trustworthy; we then ask
-//     admin_status_of() for that user (service role, reads admin.admin_users) and
-//     require is_admin + admin_role in (super_admin, finance_admin). The admin panel's
-//     hidden buttons are irrelevant here — this is the real check for this path,
-//     since the service role bypasses RLS by design.
+//  2. It authorizes the CALLER server-side. Supabase Auth confirms the token (the user behind it, not just a
+//     decodable `sub`: AR-L11, 2026-11-22), an account still on a temporary password is refused (AR-H06), and
+//     admin_status_of() (service role, reads admin.admin_users) must say super_admin or finance_admin. The admin
+//     panel's hidden buttons are irrelevant here — this is the real check for this path, since the service role
+//     bypasses RLS by design.
 //
 //  3. It claims the refund in the DB BEFORE calling the gateway (refund_status
 //     null|failed -> 'pending'), mirroring the 'created' -> 'paid' claim used by
 //     razorpay-verify-payment. Two admins double-clicking cannot double-refund:
 //     the second claim matches zero rows and stops.
+//
+//  4. An invoice whose value was credited into a later plan (superseded_at: the upgrade charged only the
+//     difference) is not refunded on its own (AR-H07, Mitra 2026-11-22): the money lives in the later plan's
+//     invoice, and refunding both would pay the credit back twice.
 //
 // Secrets required: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY.
@@ -40,13 +43,18 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function callerIdFromJwt(req: Request): string | null {
-  const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const part = token.split(".")[1];
-  if (!part) return null;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The caller as Supabase Auth confirms it, and whether it is still on a temporary password. */
+async function verifiedCaller(req: Request, url: string, apikey: string): Promise<{ id: string; mustChangePassword: boolean } | null> {
+  const authorization = req.headers.get("Authorization") ?? "";
+  if (!/^Bearer\s+\S+$/i.test(authorization.trim())) return null;
   try {
-    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof payload.sub === "string" ? payload.sub : null;
+    const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey, authorization } });
+    if (!r.ok) return null;
+    const user = await r.json();
+    if (typeof user?.id !== "string" || !user.id) return null;
+    return { id: user.id, mustChangePassword: user?.app_metadata?.must_change_password === true };
   } catch {
     return null;
   }
@@ -62,7 +70,8 @@ interface InvoiceRow {
   razorpay_payment_id: string | null;
   refund_status: string | null;
   razorpay_refund_id: string | null;
-  /** Subscriptions P1 (2026-10-08); absent on a database without that migration. */
+  superseded_at: string | null;
+  /** Subscriptions P1 (2026-10-08). */
   total_paise?: number | null;
 }
 
@@ -71,6 +80,8 @@ const REST = (key: string) => ({
   authorization: `Bearer ${key}`,
   "content-type": "application/json",
 });
+
+const RAZORPAY = () => Deno.env.get("RAZORPAY_API_URL") || "https://api.razorpay.com";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -81,8 +92,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!url || !serviceKey) return json({ error: "server_misconfigured" }, 500);
 
   // ── Authorize the caller (finance_admin / super_admin only) ────────────────
-  const callerId = callerIdFromJwt(req);
-  if (!callerId) return json({ error: "unauthenticated" }, 401);
+  const verified = await verifiedCaller(req, url, serviceKey);
+  if (!verified) return json({ error: "unauthenticated" }, 401);
+  if (verified.mustChangePassword) {
+    return json({ error: "forbidden", detail: "Choose your own password before refunding anything." }, 403);
+  }
+  const callerId = verified.id;
 
   // admin_status_of() reads admin.admin_users, the source of truth since
   // admin-schema separation Phase 5 (service_role only). Any failure leaves
@@ -112,26 +127,121 @@ Deno.serve(async (req: Request): Promise<Response> => {
       503,
     );
   }
+  const gatewayAuth = `Basic ${btoa(`${keyId}:${keySecret}`)}`;
 
-  let payload: { invoiceId?: string };
+  let payload: { invoiceId?: string; adOrderId?: string; amountPaise?: number; note?: string };
   try {
     payload = await req.json();
   } catch {
     return json({ error: "bad_json" }, 400);
   }
+
+  // Admin Log (MPF-26). Rows are written with the service-role key, so the audit trigger can't tell who asked;
+  // record each attempt from here on, success or failure, for the admin whose token was checked above. Best effort:
+  // a failed record is logged, and never changes the refund's outcome.
+  const recordRefund = async (table: string, id: string, changes: Record<string, unknown>): Promise<void> => {
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/admin_audit_record`, {
+        method: "POST",
+        headers: REST(serviceKey),
+        body: JSON.stringify({
+          p_actor: callerId, p_action: "refund", p_target_table: table, p_target_id: id,
+          p_changes: changes, p_source: "edge:admin-refund-payment",
+        }),
+      });
+      if (!r.ok) console.error("admin-refund-payment: Admin Log record failed", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("admin-refund-payment: Admin Log record failed", String(e));
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // An ad order (AR-H15)
+  // ════════════════════════════════════════════════════════════════════════════
+  if (payload.adOrderId !== undefined) {
+    const orderId = typeof payload.adOrderId === "string" && /^order_[A-Za-z0-9]{6,40}$/.test(payload.adOrderId)
+      ? payload.adOrderId : null;
+    if (!orderId) {
+      return json({ error: "no_payment_id", detail: "Only an order paid through Razorpay can be refunded here." }, 400);
+    }
+    const rpc = (fn: string, args: Record<string, unknown>) =>
+      fetch(`${url}/rest/v1/rpc/${fn}`, { method: "POST", headers: REST(serviceKey), body: JSON.stringify(args) });
+
+    // What the order charged, to cap the refund: read before the claim, which checks it again under a lock.
+    const orderResp = await fetch(`${url}/rest/v1/ad_orders?order_id=eq.${encodeURIComponent(orderId)}&select=amount,vendor_id`, { headers: REST(serviceKey) });
+    const orderRows = orderResp.ok ? await orderResp.json() : [];
+    const order = Array.isArray(orderRows) && orderRows.length ? orderRows[0] as { amount: number; vendor_id: string } : null;
+    if (!order) return json({ error: "order_not_found" }, 404);
+    const amountPaise = Number.isInteger(payload.amountPaise) ? payload.amountPaise as number : order.amount;
+
+    const claimResp = await rpc("ad_order_refund_claim", { p_order_id: orderId, p_amount_paise: amountPaise, p_note: payload.note ?? null });
+    const claim = claimResp.ok ? await claimResp.json() : null;
+    if (!claim?.ok) {
+      const reason = claim?.reason ?? "claim_failed";
+      const detail = reason === "already" ? "This order has a refund already, or one is with Razorpay."
+        : reason === "not_paid" ? "Only a paid order can be refunded."
+        : reason === "bad_amount" ? "The refund must be more than ₹0 and no more than the order charged."
+        : "The order couldn't be claimed for a refund.";
+      return json({ error: reason, detail }, 409);
+    }
+    const fail = async (detail: string, status: number) => {
+      await rpc("ad_order_refund_record", { p_order_id: orderId, p_payment_ref: null, p_refund_ref: null, p_status: "failed", p_amount_paise: null });
+      await recordRefund("public.ad_orders", orderId, { vendor_id: order.vendor_id, amount_paise: amountPaise, refund_status: "failed", error: detail.slice(0, 200) });
+      return json({ error: "refund_failed", detail }, status);
+    };
+
+    // The captured payment behind the order. Ad orders didn't store it, so Razorpay is asked.
+    let paymentId: string | null = claim.razorpay_payment_id ?? null;
+    if (!paymentId) {
+      try {
+        const pr = await fetch(`${RAZORPAY()}/v1/orders/${encodeURIComponent(orderId)}/payments`, { headers: { authorization: gatewayAuth } });
+        if (!pr.ok) return await fail(`Razorpay didn't list the order's payments: ${(await pr.text()).slice(0, 200)}`, 502);
+        const list = await pr.json() as { items?: { id: string; status: string }[] };
+        paymentId = list.items?.find((p) => p.status === "captured")?.id ?? null;
+      } catch (e) {
+        return await fail(String(e), 502);
+      }
+      if (!paymentId) return await fail("Razorpay has no captured payment for this order.", 409);
+    }
+
+    let refund: { id?: string; status?: string; amount?: number };
+    try {
+      const resp = await fetch(`${RAZORPAY()}/v1/payments/${encodeURIComponent(paymentId)}/refund`, {
+        method: "POST",
+        headers: { authorization: gatewayAuth, "content-type": "application/json" },
+        body: JSON.stringify({ amount: amountPaise, speed: "normal", notes: { ad_order_id: orderId, refunded_by: callerId } }),
+      });
+      const text = await resp.text();
+      if (!resp.ok) return await fail(text.slice(0, 400), 502);
+      refund = JSON.parse(text);
+    } catch (e) {
+      return await fail(String(e), 502);
+    }
+    if (!refund.id) return await fail("Razorpay returned no refund id", 502);
+
+    const status = refund.status === "processed" ? "processed" : refund.status === "failed" ? "failed" : "pending";
+    const saved = await rpc("ad_order_refund_record", {
+      p_order_id: orderId, p_payment_ref: paymentId, p_refund_ref: refund.id, p_status: status, p_amount_paise: refund.amount ?? amountPaise,
+    });
+    await recordRefund("public.ad_orders", orderId, {
+      vendor_id: order.vendor_id, amount_paise: refund.amount ?? amountPaise, refund_status: status, razorpay_refund_id: refund.id,
+      ...(saved.ok ? {} : { order_not_updated: saved.status }),
+    });
+    return json({ ok: true, recorded: saved.ok, refundId: refund.id, refundStatus: status, amountPaise: refund.amount ?? amountPaise });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // A plan invoice
+  // ════════════════════════════════════════════════════════════════════════════
   const invoiceId = payload.invoiceId;
   if (!invoiceId) return json({ error: "missing_invoice_id" }, 400);
+  // It goes into a query string below.
+  if (!UUID.test(invoiceId)) return json({ error: "invoice_not_found" }, 404);
 
-  // ── Load the invoice ──────────────────────────────────────────────────────
-  const readInvoice = (extra: string) =>
-    fetch(
-      `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&select=id,vendor_id,amount,gst_amount,currency,status,razorpay_payment_id,refund_status,razorpay_refund_id${extra}`,
-      { headers: REST(serviceKey) },
-    );
-  // total_paise (subscriptions P1, 2026-10-08) is what was charged, to the paisa. A
-  // database without that migration answers 400 for the column: read without it.
-  let invResp = await readInvoice(",total_paise");
-  if (invResp.status === 400) invResp = await readInvoice("");
+  const invResp = await fetch(
+    `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&select=id,vendor_id,amount,gst_amount,currency,status,razorpay_payment_id,refund_status,razorpay_refund_id,superseded_at,total_paise`,
+    { headers: REST(serviceKey) },
+  );
   const invRows = invResp.ok ? await invResp.json() : [];
   const invoice: InvoiceRow | null = Array.isArray(invRows) && invRows.length ? invRows[0] : null;
   if (!invoice) return json({ error: "invoice_not_found" }, 404);
@@ -146,6 +256,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   if (invoice.status !== "paid") {
     return json({ error: "not_refundable", detail: `Invoice status is '${invoice.status}', expected 'paid'` }, 409);
+  }
+  if (invoice.superseded_at) {
+    return json({
+      error: "credited_into_later_plan",
+      detail: "This invoice's value was taken off a later plan as credit, so it isn't refunded on its own. Refund the newest invoice instead.",
+    }, 409);
   }
   if (!invoice.razorpay_payment_id) {
     // Seeded/simulated invoices have no payment id. There is no gateway
@@ -170,8 +286,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (amountPaise <= 0) return json({ error: "zero_amount" }, 400);
 
   // ── Claim it, so a double-click can't double-refund ───────────────────────
+  // superseded_at=is.null: an upgrade that credits this invoice between the read above and here wins.
   const claim = await fetch(
-    `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&status=eq.paid&or=(refund_status.is.null,refund_status.eq.failed)`,
+    `${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}&status=eq.paid&superseded_at=is.null&or=(refund_status.is.null,refund_status.eq.failed)`,
     {
       method: "PATCH",
       headers: { ...REST(serviceKey), prefer: "return=representation" },
@@ -185,40 +302,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "refund_in_progress", detail: "Another refund attempt is already in flight." }, 409);
   }
 
-  // Admin Log (MPF-26). The invoice is written with the service-role key, so the
-  // audit trigger can't tell who asked; record each attempt from here on, success
-  // or failure, for the admin whose token was checked above. Best effort: a failed
-  // record is logged, and never changes the refund's outcome.
-  const recordRefund = async (outcome: Record<string, unknown>): Promise<void> => {
-    try {
-      const r = await fetch(`${url}/rest/v1/rpc/admin_audit_record`, {
-        method: "POST",
-        headers: REST(serviceKey),
-        body: JSON.stringify({
-          p_actor: callerId, p_action: "refund", p_target_table: "public.subscription_invoices",
-          p_target_id: invoice.id,
-          p_changes: { vendor_id: invoice.vendor_id, amount_paise: amountPaise, ...outcome },
-          p_source: "edge:admin-refund-payment",
-        }),
-      });
-      if (!r.ok) console.error("admin-refund-payment: Admin Log record failed", r.status, (await r.text()).slice(0, 200));
-    } catch (e) {
-      console.error("admin-refund-payment: Admin Log record failed", String(e));
-    }
-  };
+  const record = (outcome: Record<string, unknown>) =>
+    recordRefund("public.subscription_invoices", invoice.id, { vendor_id: invoice.vendor_id, amount_paise: amountPaise, ...outcome });
+  const releaseAsFailed = () =>
+    fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
+      method: "PATCH",
+      headers: { ...REST(serviceKey), prefer: "return=minimal" },
+      body: JSON.stringify({ refund_status: "failed" }),
+    });
 
   // ── The real Razorpay call ────────────────────────────────────────────────
   let refund: { id?: string; status?: string; amount?: number };
   try {
     const resp = await fetch(
       // RAZORPAY_API_URL names a local or staging mock; unset (production), it is Razorpay itself.
-      `${Deno.env.get("RAZORPAY_API_URL") || "https://api.razorpay.com"}/v1/payments/${encodeURIComponent(invoice.razorpay_payment_id)}/refund`,
+      `${RAZORPAY()}/v1/payments/${encodeURIComponent(invoice.razorpay_payment_id)}/refund`,
       {
         method: "POST",
-        headers: {
-          authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
-          "content-type": "application/json",
-        },
+        headers: { authorization: gatewayAuth, "content-type": "application/json" },
         body: JSON.stringify({
           amount: amountPaise,
           speed: "normal",
@@ -230,32 +331,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const bodyText = await resp.text();
     if (!resp.ok) {
       // Release the claim so the refund can be retried once the cause is fixed.
-      await fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
-        method: "PATCH",
-        headers: { ...REST(serviceKey), prefer: "return=minimal" },
-        body: JSON.stringify({ refund_status: "failed" }),
-      });
-      await recordRefund({ refund_status: "failed", error: bodyText.slice(0, 200) });
+      await releaseAsFailed();
+      await record({ refund_status: "failed", error: bodyText.slice(0, 200) });
       return json({ error: "refund_failed", detail: bodyText.slice(0, 400) }, 502);
     }
     refund = JSON.parse(bodyText);
   } catch (e) {
-    await fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
-      method: "PATCH",
-      headers: { ...REST(serviceKey), prefer: "return=minimal" },
-      body: JSON.stringify({ refund_status: "failed" }),
-    });
-    await recordRefund({ refund_status: "failed", error: String(e).slice(0, 200) });
+    await releaseAsFailed();
+    await record({ refund_status: "failed", error: String(e).slice(0, 200) });
     return json({ error: "request_failed", detail: String(e) }, 502);
   }
 
   if (!refund.id) {
-    await fetch(`${url}/rest/v1/subscription_invoices?id=eq.${invoiceId}`, {
-      method: "PATCH",
-      headers: { ...REST(serviceKey), prefer: "return=minimal" },
-      body: JSON.stringify({ refund_status: "failed" }),
-    });
-    await recordRefund({ refund_status: "failed", error: "Razorpay returned no refund id" });
+    await releaseAsFailed();
+    await record({ refund_status: "failed", error: "Razorpay returned no refund id" });
     return json({ error: "refund_failed", detail: "Razorpay returned no refund id" }, 502);
   }
 
@@ -295,7 +384,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     recordError = String(e).slice(0, 200);
   }
   if (!recorded) console.error("admin-refund-payment: refund issued but not recorded on the invoice", invoiceId, refund.id, recordError);
-  await recordRefund({
+  await record({
     refund_status: gatewayStatus, razorpay_refund_id: refund.id, refunded_amount: patch.refunded_amount,
     ...(recorded ? {} : { invoice_not_updated: recordError ?? "unknown" }),
   });

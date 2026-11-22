@@ -9,6 +9,24 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-22 (branch `fix/admin-review-high-2026-11-22`; database in textile-spark-net migrations `20261122100000`,
+  `100100`, `100200`; plan `textile-spark-net/documentation/admin-review-high-fixes-plan-2026-11-22.md`; **built and
+  tested on the local stack, NOT released**)
+  **Admin review 2026-11-22: the 18 High items (AR-H01–AR-H18).**
+  - Subscriptions: cancel, plan change and the 7-day close turn the seller's autopay off first when it runs
+    (`withAutopayOff`, `subscription-autopay` admin_cancel); Refund is refused on an invoice credited into a later plan;
+    refunded invoices list their credit notes with PDFs (`CreditNotes`); the search keeps the list on screen.
+  - Payments and Reports: live money in the totals, test and demo money on their own line, a Money filter; paid ad orders
+    are refunded through Razorpay or marked "no refund needed" (`admin-refund-payment` adOrderId).
+  - Products, Videos, Catalogues: decisions carry the listing revision the moderator saw (`fetchListingRevs`,
+    `admin_listing_decide`); Approve on a rejected item asks first.
+  - Vendors: pages of 50 from `admin_vendor_list`, search and onboarding filter in the address.
+  - Support: a colleague's request is taken over explicitly, a reply on it asks first; realtime refreshes coalesced.
+  - Dialogs (`Modal`): typed work asks before Esc, backdrop or Back closes it; Back closes a dialog; named, take focus,
+    lock the page's scroll. Blog publish time in IST both ways. Chats search debounced. Phone: ticket and carousel fit.
+  - Edge functions: `admin-refund-payment`, `admin-staff`, `admin-invite` confirm the caller with Supabase Auth and refuse
+    an account on a temporary password; the refund function refuses a credited invoice and refunds ad orders.
+
 - 2026-11-18 (branch `product-moderation/release`, merge `468c8e2` of `product-moderation/removal` into main `37ecb85`, with
   textile-spark-net's merge, which holds migration `20261118190000_product_moderation.sql`; **LIVE 2026-11-19**: migration
   applied, main `1f0d7f7`, bundle `index-DxG0TmSY.js`) **Products: Remove, Flag and Reinstate, with a reason picked in the dialog;

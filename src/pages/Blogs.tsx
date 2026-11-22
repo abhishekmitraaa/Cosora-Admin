@@ -40,6 +40,8 @@ import {
 } from "@/lib/blogSeo";
 import {
   authorLabel,
+  isoFromIstInput,
+  istInputFromIso,
   removeBlogImage,
   useBlogAuthors,
   useBlogCategories,
@@ -371,7 +373,7 @@ function draftFrom(p: BlogPostFull): Draft {
     category_id: p.category_id,
     is_featured: p.is_featured,
     status: p.status,
-    published_at: p.published_at ? p.published_at.slice(0, 16) : "",
+    published_at: istInputFromIso(p.published_at),
     seo_title: p.seo_title ?? "",
     seo_description: p.seo_description ?? "",
     tags: (p.tags ?? []).join(", "),
@@ -542,8 +544,8 @@ function ArticleEditor({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
-            label="Publish date"
-            hint="Leave blank to publish now. A future date holds it back until then."
+            label="Publish date (IST)"
+            hint="India time. Leave blank to publish now. A future date holds it back until then."
             error={errors.published_at}
           >
             <Input
@@ -717,9 +719,7 @@ function ArticleEditor({
                   category_id: draft.category_id,
                   is_featured: draft.is_featured,
                   status: draft.status,
-                  published_at: draft.published_at
-                    ? new Date(draft.published_at).toISOString()
-                    : null,
+                  published_at: isoFromIstInput(draft.published_at),
                   seo_title: draft.seo_title.trim(),
                   seo_description: draft.seo_description.trim(),
                   og_image: draft.og_image,

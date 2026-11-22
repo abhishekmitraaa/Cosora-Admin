@@ -20,9 +20,22 @@ export function refundSettledOrUnderway(inv: { refund_status: string | null }): 
   return s === "processed" || s === "pending";
 }
 
-/** A paid gateway invoice with no refund done or in flight; a failed one may be tried again. */
-export function canRefund(inv: { refund_status: string | null; razorpay_payment_id: string | null; status: string }): boolean {
-  return Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !refundSettledOrUnderway(inv);
+/**
+ * A paid gateway invoice with no refund done or in flight; a failed one may be tried again. Not one whose value was
+ * credited into a later plan (`superseded_at`): the upgrade charged only the difference, so the money is in the later
+ * invoice, and refunding this one too would pay the credit back twice (AR-H07, Mitra 2026-11-22).
+ */
+export function canRefund(inv: {
+  refund_status: string | null; razorpay_payment_id: string | null; status: string; superseded_at?: string | null;
+}): boolean {
+  return Boolean(inv.razorpay_payment_id) && inv.status === "paid" && !inv.superseded_at && !refundSettledOrUnderway(inv);
+}
+
+/** Why Refund is off for an invoice, when there's something to say. */
+export function refundBlockedReason(inv: { superseded_at?: string | null; razorpay_payment_id: string | null }): string | null {
+  if (inv.superseded_at) return "Credited into a later plan: refund the newest invoice instead.";
+  if (!inv.razorpay_payment_id) return "Not paid through Razorpay: nothing to refund.";
+  return null;
 }
 
 export interface RefundResult {

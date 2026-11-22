@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
@@ -7,8 +9,11 @@ import {
   KIND_LABELS,
   LATEST_COUNT,
   LATEST_REFRESH_MS,
+  MODE_LABELS,
   NO_FILTERS,
   STATUS_HELP,
+  refundAdOrder,
+  resolveAdOrder,
   useLatestPayments,
   useLedger,
   usePaymentsSummary,
@@ -16,6 +21,7 @@ import {
   type LedgerKind,
   type LedgerRow,
   type LedgerStatus,
+  type MoneyMode,
 } from "@/lib/payments";
 import {
   Badge,
@@ -25,6 +31,7 @@ import {
   ErrorNote,
   Field,
   Input,
+  Modal,
   Note,
   Notice,
   Page,
@@ -39,6 +46,7 @@ import {
   StatusBadge,
   SubHeading,
   Table,
+  Textarea,
 } from "@/components/ui";
 
 /**
@@ -50,7 +58,7 @@ import {
  * describe exactly the rows the filters select.
  *
  * roles.ts, section "payments": read super_admin/finance_admin/support, write
- * super_admin/finance_admin. Nothing on this page writes: refunds are on
+ * super_admin/finance_admin. Its only writes are ad-order refunds and "no refund needed" (AR-H15); plan refunds are on
  * Subscriptions, through admin-refund-payment.
  */
 
@@ -76,8 +84,48 @@ export default function Payments() {
   const s = summary.data;
 
   const filtersActive =
-    Boolean(filters.search.trim()) || filters.kind !== "all" || filters.status !== "all" || Boolean(filters.from || filters.to);
+    Boolean(filters.search.trim()) || filters.kind !== "all" || filters.status !== "all" || (filters.mode ?? "all") !== "all" ||
+    Boolean(filters.from || filters.to);
   const scope = filtersActive ? "the filtered rows" : "all time";
+
+  // A paid ad order: refund it through Razorpay, or (when flagged) mark that no refund is needed (AR-H15).
+  const qc = useQueryClient();
+  const [adAction, setAdAction] = useState<{ kind: "refund" | "resolve"; row: LedgerRow } | null>(null);
+  const [adAmount, setAdAmount] = useState("");
+  const [adNote, setAdNote] = useState("");
+  const refreshPayments = () => {
+    for (const key of ["payments-ledger", "payments-summary", "payments-latest", "reports"]) void qc.invalidateQueries({ queryKey: [key] });
+  };
+  const adRefund = useMutation({
+    mutationFn: async () => {
+      if (!adAction) return null;
+      if (adAction.kind === "resolve") {
+        await resolveAdOrder(adAction.row.source_id, adNote.trim());
+        return null;
+      }
+      const rupees = Number(adAmount);
+      const paise = adAmount.trim() === "" ? undefined : Math.round(rupees * 100);
+      if (paise !== undefined && (!Number.isFinite(rupees) || paise <= 0)) throw new Error("Enter an amount in rupees, or leave it blank for the whole order.");
+      return await refundAdOrder(adAction.row.source_id, paise, adNote.trim() || undefined);
+    },
+    onSuccess: (r) => {
+      if (r) {
+        if (r.refundStatus === "failed") toast.error(`Razorpay refused the refund (${r.refundId}). Nothing was refunded; you can try again.`);
+        else if (r.recorded === false) toast.warning(`Razorpay took the refund (${r.refundId}) but the order wasn't updated. Don't refund it again: Razorpay's confirmation will finish it.`, { duration: 15000 });
+        else toast.success(`Refund ${r.refundStatus === "processed" ? "processed" : "accepted"} by Razorpay (${r.refundId})`);
+      } else {
+        toast.success("Marked: no refund needed. Recorded in the Admin Log.");
+      }
+      setAdAction(null);
+      refreshPayments();
+    },
+    onError: (e: Error) => toast.error(e.message, { duration: 10000 }),
+  });
+  const openAdAction = (kind: "refund" | "resolve", row: LedgerRow) => {
+    setAdAmount("");
+    setAdNote("");
+    setAdAction({ kind, row });
+  };
 
   return (
     <Page width="wide">
@@ -98,7 +146,7 @@ export default function Payments() {
             <Stat
               label="Paid in"
               value={s ? inrFromPaise(s.paid_paise) : "…"}
-              sub={s ? `${s.paid} payments, GST included · ${scope}` : undefined}
+              sub={s ? `${s.paid} live payments, GST included · ${scope}` : undefined}
             />
             <Stat
               label="Refunded"
@@ -115,7 +163,7 @@ export default function Payments() {
               label="Needs attention"
               value={s ? String(s.failed + s.review) : "…"}
               tone={s && s.failed + s.review > 0 ? "critical" : undefined}
-              sub={s ? `${s.failed} failed, ${s.review} paid but not fulfilled` : undefined}
+              sub={s ? `${s.failed} failed, ${s.review} waiting for a refund decision` : undefined}
             />
           </div>
         )}
@@ -127,10 +175,14 @@ export default function Payments() {
           </Note>
         )}
 
-        {s && s.unverified > 0 && (
-          <Notice tone="caution" title={`${inrFromPaise(s.unverified_paise)} of "paid" has no gateway payment`}>
-            {s.unverified} paid row{s.unverified === 1 ? " has" : "s have"} no Razorpay payment id: activations
-            made in demo mode, not money received. Reports flags the same amount.
+        {/* AR-H13 (Mitra: "Exclude, show separately"): test-key and demo payments moved no money, so they are outside
+            the totals and said here once. Reports does the same. */}
+        {s && (s.test > 0 || s.demo > 0) && (
+          <Notice tone="info" title="Not counted: payments that moved no money">
+            {s.test > 0 && `${inrFromPaise(s.test_paise)} in ${s.test} Razorpay test payment${s.test === 1 ? "" : "s"}`}
+            {s.test > 0 && s.demo > 0 && " and "}
+            {s.demo > 0 && `${inrFromPaise(s.demo_paise)} in ${s.demo} demo checkout${s.demo === 1 ? "" : "s"}`} ({scope}). Use the
+            Money filter to see them.
           </Notice>
         )}
 
@@ -145,7 +197,7 @@ export default function Payments() {
             )
           }
         >
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Field label="Search" htmlFor="txn-search" className="lg:col-span-2">
               <Input
                 id="txn-search"
@@ -182,6 +234,18 @@ export default function Payments() {
                 ))}
               </Select>
             </Field>
+            <Field label="Money" htmlFor="txn-mode">
+              <Select
+                id="txn-mode"
+                value={draft.mode ?? "all"}
+                onChange={(e) => setDraft({ ...draft, mode: e.target.value as MoneyMode | "all" })}
+              >
+                <option value="all">All money</option>
+                {(Object.keys(MODE_LABELS) as MoneyMode[]).map((m) => (
+                  <option key={m} value={m}>{MODE_LABELS[m]}</option>
+                ))}
+              </Select>
+            </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label="From" htmlFor="txn-from">
                 <Input id="txn-from" type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
@@ -200,9 +264,9 @@ export default function Payments() {
             <Empty>{filtersActive ? "No payment matches these filters." : "No payments yet."}</Empty>
           ) : (
             <>
-              <Table head={["Reference", "Vendor", "Type", "Amount", "GST", "Status", "Gateway id", "When"]}>
+              <Table head={["Reference", "Vendor", "Type", "Amount", "GST", "Status", "Gateway id", "When", ""]}>
                 {rows.map((t) => (
-                  <LedgerLine key={t.entry_key} row={t} />
+                  <LedgerLine key={t.entry_key} row={t} writable={writable} onAdAction={openAdAction} />
                 ))}
               </Table>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -231,12 +295,59 @@ export default function Payments() {
           </details>
         </Panel>
       </Stack>
+
+      <Modal
+        open={adAction !== null}
+        title={adAction?.kind === "resolve" ? "No refund needed" : `Refund ad order ${adAction?.row.reference ?? ""}`}
+        onClose={() => setAdAction(null)}
+      >
+        {adAction && (
+          <>
+            <Note className="mb-3">
+              {adAction.kind === "resolve"
+                ? "The order goes back to paid and leaves Needs attention. Say why: it goes into the Admin Log."
+                : `${adAction.row.vendor_name ?? "The seller"} paid ${inrFromPaise(adAction.row.total_paise)}. Razorpay refunds it to the card or account they paid with; the seller is told, and the Admin Log records it.`}
+            </Note>
+            {adAction.kind === "refund" && (
+              <Field label="Amount (₹)" htmlFor="ad-refund-amount" hint="Leave blank to refund the whole order.">
+                <Input id="ad-refund-amount" inputMode="decimal" value={adAmount} onChange={(e) => setAdAmount(e.target.value)}
+                  placeholder={(adAction.row.total_paise / 100).toFixed(2)} />
+              </Field>
+            )}
+            <Field label={adAction.kind === "resolve" ? "Why no refund is needed" : "Note (optional)"} htmlFor="ad-refund-note" className="mt-3">
+              <Textarea id="ad-refund-note" rows={3} value={adNote} onChange={(e) => setAdNote(e.target.value)} />
+            </Field>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button onClick={() => setAdAction(null)}>Cancel</Button>
+              <Button
+                variant={adAction.kind === "refund" ? "danger" : "primary"}
+                disabled={adRefund.isPending || (adAction.kind === "resolve" && adNote.trim().length < 3)}
+                onClick={() => adRefund.mutate()}
+              >
+                {adRefund.isPending ? "Working…" : adAction.kind === "refund" ? "Refund through Razorpay" : "Mark no refund needed"}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </Page>
   );
 }
 
-function LedgerLine({ row: t }: { row: LedgerRow }) {
+function LedgerLine({
+  row: t,
+  writable,
+  onAdAction,
+}: {
+  row: LedgerRow;
+  writable: boolean;
+  onAdAction: (kind: "refund" | "resolve", row: LedgerRow) => void;
+}) {
   const kind = t.kind as LedgerKind;
+  // A paid ad order, through Razorpay (not a ₹0 or demo one): refundable here (AR-H15).
+  const adOrder = t.source_table === "ad_orders" && kind !== "refund" && /^order_/.test(t.source_id);
+  const canAct = writable && adOrder && (t.status === "paid" || t.status === "review") && t.payment_mode !== "demo";
+  const mode = t.payment_mode;
   return (
     <tr className={ROW_HOVER}>
       <td className="px-3 py-2">
@@ -268,16 +379,31 @@ function LedgerLine({ row: t }: { row: LedgerRow }) {
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={t.status} />
+        {mode && mode !== "live" && (
+          <span className="mt-1 block">
+            <Badge tone={mode === "test" ? "info" : "caution"}>{mode}</Badge>
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 font-mono text-2xs text-ink-faint">
         {t.gateway_ref ?? (
           <span className="font-sans text-ink-ghost">
-            {t.status === "paid" ? "no gateway payment (demo mode)" : "none"}
+            {t.status === "paid" && t.payment_mode === "demo" ? "no gateway payment (demo mode)" : "none"}
           </span>
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-2xs tabular-nums text-ink-faint">
         {format(new Date(t.occurred_at), "d MMM yyyy, HH:mm")}
+      </td>
+      <td className="px-3 py-2">
+        {canAct && (
+          <div className="flex flex-col gap-1">
+            <Button size="sm" variant="danger" onClick={() => onAdAction("refund", t)}>Refund</Button>
+            {t.status === "review" && (
+              <Button size="sm" onClick={() => onAdAction("resolve", t)}>No refund needed</Button>
+            )}
+          </div>
+        )}
       </td>
     </tr>
   );

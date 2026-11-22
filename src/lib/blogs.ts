@@ -17,6 +17,30 @@ export const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 export type BlogStatus = "draft" | "published" | "scheduled";
 
+/**
+ * A publish time in the editor's datetime-local field, in India time (Cosora-Admin review 2026-11-22, AR-H04).
+ * The database answers in UTC; the field used to show that UTC clock as if it were local and save it back as local,
+ * so every save moved the article 5 h 30 min earlier. Both directions are pinned to IST, whatever the browser's zone.
+ */
+export function istInputFromIso(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(d).map((x) => [x.type, x.value]),
+  );
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+/** The datetime-local value, read as India time, as an ISO instant; null when empty or unreadable. */
+export function isoFromIstInput(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(`${value.length === 16 ? `${value}:00` : value}+05:30`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export type BlogBlock =
   | { type: "heading"; level: 2 | 3; text: string }
   | { type: "rich_text"; html: string }

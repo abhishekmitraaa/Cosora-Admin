@@ -50,13 +50,19 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function callerIdFromJwt(req: Request): string | null {
-  const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const part = token.split(".")[1];
-  if (!part) return null;
+/**
+ * The caller as Supabase Auth confirms it, and whether it is still on a temporary password (Cosora-Admin review
+ * 2026-11-22, AR-H06): an account on one may change its password and nothing else.
+ */
+async function verifiedCaller(req: Request, url: string, apikey: string): Promise<{ id: string; mustChangePassword: boolean } | null> {
+  const authorization = req.headers.get("Authorization") ?? "";
+  if (!/^Bearer\s+\S+$/i.test(authorization.trim())) return null;
   try {
-    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
-    return typeof payload.sub === "string" ? payload.sub : null;
+    const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey, authorization } });
+    if (!r.ok) return null;
+    const user = await r.json();
+    if (typeof user?.id !== "string" || !user.id) return null;
+    return { id: user.id, mustChangePassword: user?.app_metadata?.must_change_password === true };
   } catch {
     return null;
   }
@@ -107,8 +113,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!url || !serviceKey || !anonKey) return json({ error: "server_misconfigured" }, 500);
 
   // 1. Authorize: super_admin, or a manager for the team roles
-  const callerId = callerIdFromJwt(req);
-  if (!callerId) return json({ error: "unauthenticated" }, 401);
+  const verified = await verifiedCaller(req, url, anonKey);
+  if (!verified) return json({ error: "unauthenticated" }, 401);
+  if (verified.mustChangePassword) {
+    return json({ error: "forbidden", detail: "Choose your own password before inviting anyone." }, 403);
+  }
+  const callerId = verified.id;
   const callerAuth = req.headers.get("Authorization") ?? "";
 
   // admin_status_of() reads admin.admin_users, the source of truth since
