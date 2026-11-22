@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ import {
   StatusBadge,
   Tabs,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
+import type { Database } from "@/lib/database.types";
 
 interface ReviewRow {
   id: string;
@@ -61,31 +63,43 @@ const TABS: { id: ReviewStatus; label: string }[] = [
   { id: "kept_locked", label: "Kept locked" },
 ];
 
+const REVIEW_PAGE = 100;
+
 export default function ChatReview() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "chat-review");
-  const [tab, setTab] = useState<ReviewStatus>("pending");
+  const [tab, setTab] = useUrlState<ReviewStatus>("tab", "pending", TABS.map((t) => t.id));
   const [blocking, setBlocking] = useState<{ review: ReviewRow; side: Side; profileId: string; name: string } | null>(
     null,
   );
 
-  const queue = useQuery({
+  const queue = useInfiniteQuery({
     // `tab` is part of the key, so switching tabs refetches rather than
     // rendering the previous tab's rows under the new heading.
     queryKey: ["chat-review", tab],
     refetchOnWindowFocus: true,
-    queryFn: async () => {
+    initialPageParam: null as { at: string; id: string } | null,
+    // 100 at a time (AR-M19): the closed tabs returned every review ever.
+    getNextPageParam: (last: { next: { at: string; id: string } | null }) => last.next,
+    queryFn: async ({ pageParam }) => {
       // Ordered by created_at (pending) or reviewed_at (closed tabs), newest
       // first. The RPC returns the four embeds flattened; they are folded back
       // into the shape this page renders. Each marker column is NOT NULL in its
       // own table, so null means "no joined row", which is what a null embed meant.
-      const { data, error } = await supabase.rpc("admin_conversation_review_list", {
+      const { data: raw, error } = await supabase.rpc("admin_conversation_review_page" as never, {
         p_status: tab,
-      });
-      if (error) throw new Error(error.message);
+        p_before_at: pageParam?.at ?? null,
+        p_before_id: pageParam?.id ?? null,
+        p_limit: REVIEW_PAGE,
+      } as never);
+      if (error) throw new Error((error as { message: string }).message);
+      type PageRow = Database["public"]["Functions"]["admin_conversation_review_list"]["Returns"][number] & { sort_at: string };
+      const data = (raw ?? []) as unknown as PageRow[];
+      const lastRaw = data[data.length - 1];
+      const next = data.length === REVIEW_PAGE && lastRaw ? { at: lastRaw.sort_at, id: lastRaw.id } : null;
 
-      const rows: ReviewRow[] = (data ?? []).map((r) => ({
+      const rows: ReviewRow[] = data.map((r) => ({
         id: r.id,
         source: r.source,
         reported_reason: r.reported_reason,
@@ -126,7 +140,7 @@ export default function ChatReview() {
           ...(r.reviewed_by ? [r.reviewed_by] : []),
         ]),
       );
-      return { rows, people: people as Map<string, Participant> };
+      return { rows, people: people as Map<string, Participant>, next };
     },
   });
 
@@ -217,7 +231,10 @@ export default function ChatReview() {
   }
   if (queue.error) return <ErrorNote message={(queue.error as Error).message} />;
 
-  const { rows, people } = queue.data!;
+  const pages = queue.data?.pages ?? [];
+  const rows = pages.flatMap((p) => p.rows);
+  const people = new Map<string, Participant>();
+  for (const p of pages) for (const [k, v] of p.people) people.set(k, v);
   const busy = resolve.isPending || block.isPending;
   // Closed tabs are an audit view. The RPC would refuse a second verdict anyway
   // (`and status = 'pending'` -> P0002), so hiding the buttons here is honesty
@@ -443,6 +460,13 @@ export default function ChatReview() {
               </Card>
             );
           })}
+          {queue.hasNextPage && (
+            <div className="flex justify-center pt-1">
+              <Button disabled={queue.isFetchingNextPage} onClick={() => void queue.fetchNextPage()}>
+                {queue.isFetchingNextPage ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

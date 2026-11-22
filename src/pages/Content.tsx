@@ -45,6 +45,7 @@ import {
   Tabs,
   type Tone,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * SITE CONTENT (admin completion Phase 9). Real data: lib/siteContent.ts and the
@@ -70,7 +71,7 @@ const TABS: { id: Tab; label: string }[] = [
 export default function Content() {
   const role = useRole();
   const writable = canWrite(role, "content");
-  const [tab, setTab] = useState<Tab>("banners");
+  const [tab, setTab] = useUrlState<Tab>("tab", "banners", TABS.map((t) => t.id));
 
   return (
     <Page>

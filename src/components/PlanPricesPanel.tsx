@@ -64,7 +64,7 @@ export function PlanPricesPanel({ writable }: { writable: boolean }) {
                     )}
                   </span>
                 ) : (
-                  <span className="text-ink-ghost">none</span>
+                  <span className="text-ink-faint">none</span>
                 )}
               </td>
               <td className="px-3 py-2 text-right">

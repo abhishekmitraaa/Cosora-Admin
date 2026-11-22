@@ -133,7 +133,7 @@ export default function ChatKeywords() {
               <td className="px-3 py-2 font-mono text-xs text-ink">{k.term}</td>
               <td className="px-3 py-2 text-ink-muted">
                 {k.adder_full_name || k.adder_email || (
-                  <span className="text-ink-ghost">unknown</span>
+                  <span className="text-ink-faint">unknown</span>
                 )}
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">

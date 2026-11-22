@@ -38,6 +38,7 @@ import {
   StatusBadge,
   Tabs,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * C3 - CERTIFICATE FULFILMENT. REAL DATA.
@@ -73,7 +74,7 @@ const TABS: { id: CertStatus; label: string }[] = [
 export default function Certificates() {
   const role = useRole();
   const writable = canWrite(role, "certificates");
-  const [tab, setTab] = useState<CertStatus>("processing");
+  const [tab, setTab] = useUrlState<CertStatus>("tab", "processing", TABS.map((t) => t.id));
 
   const { data: rows, isLoading, error } = useQuery({
     queryKey: ["certificate_orders"],

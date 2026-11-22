@@ -77,7 +77,15 @@ export async function decideRegistration(vendorId: string, submissionId: string,
   if (error) throw new Error(DECIDE_ERRORS[error.message] ?? error.message);
 }
 
-export interface PhotoQueueRow { id: string; vendor_id: string; brand_name: string | null; url: string; created_at: string }
+export interface PhotoQueueRow {
+  id: string;
+  vendor_id: string;
+  brand_name: string | null;
+  url: string;
+  created_at: string;
+  /** The paging key when it isn't `created_at`: the approved list's `reviewed_at`, "" for a photo never stamped. */
+  cursorAt?: string;
+}
 
 export async function fetchPhotoQueue(after: Cursor | null): Promise<PhotoQueueRow[]> {
   const { data, error } = await supabase.rpc("admin_premises_photo_queue", {
@@ -101,7 +109,10 @@ export async function fetchApprovedPhotos(after: Cursor | null): Promise<PhotoQu
     .order("reviewed_at", { ascending: false, nullsFirst: false })
     .order("id", { ascending: false })
     .limit(QUEUE_PAGE);
-  if (after) q = q.or(`reviewed_at.lt.${after.at},and(reviewed_at.eq.${after.at},id.lt.${after.id})`);
+  // Photos approved before reviewed_at was stamped have none and sort last; the old keyset (`reviewed_at.lt`) never
+  // matched them, so "Load more" stopped early (AR-M14: 26 of 28). Past the stamped ones, page the rest by id.
+  if (after && after.at === "") q = q.is("reviewed_at", null).lt("id", after.id);
+  else if (after) q = q.or(`reviewed_at.lt.${after.at},and(reviewed_at.eq.${after.at},id.lt.${after.id}),reviewed_at.is.null`);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as { id: string; vendor_id: string; url: string; created_at: string; reviewed_at: string | null }[];
@@ -114,19 +125,27 @@ export async function fetchApprovedPhotos(after: Cursor | null): Promise<PhotoQu
   }
   return rows.map((r) => ({
     id: r.id, vendor_id: r.vendor_id, url: r.url, brand_name: names.get(r.vendor_id) ?? null,
-    // The cursor field for this list: when it was approved.
+    // Shown as "approved …": when it was approved, or added for a photo never stamped.
     created_at: r.reviewed_at ?? r.created_at,
+    cursorAt: r.reviewed_at ?? "",
   }));
 }
 
 /** Approve a premises photo (it reaches the store) or reject it with a reason the seller sees. */
-export async function reviewPhoto(photoId: string, approve: boolean, reason: string | null): Promise<void> {
-  const { error } = await supabase.rpc("admin_premises_photo_review", {
+export async function reviewPhoto(
+  photoId: string,
+  approve: boolean,
+  reason: string | null,
+  /** The photo's status as the moderator saw it: refused if a colleague decided it since (AR-M15). */
+  from: "under_review" | "live",
+): Promise<void> {
+  const { error } = await supabase.rpc("admin_premises_photo_review" as never, {
     p_photo: photoId,
     p_approve: approve,
     p_reason: reason?.trim() ?? "",
-  });
-  if (error) throw new Error(error.message);
+    p_from: from,
+  } as never);
+  if (error) throw new Error((error as { message: string }).message);
 }
 
 export interface VendorRegistration {

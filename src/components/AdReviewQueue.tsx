@@ -11,6 +11,7 @@ import {
   Attr, AttrGrid, Badge, Button, Card, Empty, ErrorNote, Field, Modal, Note,
   Notice, ReadOnlyBanner, Select, SkeletonList, Stat, StatusBadge, Tabs, Textarea,
 } from "./ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * Phase 4 — the ad-campaign review surface.
@@ -116,7 +117,7 @@ export default function AdReviewQueue() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "ads");
-  const [tab, setTab] = useState<QueueTab>("pending_review");
+  const [tab, setTab] = useUrlState<QueueTab>("queue", "pending_review", TABS.map((t) => t.id));
   const [action, setAction] = useState<{ ad: QueueAd; kind: ActionKind } | null>(null);
   const [reasonCode, setReasonCode] = useState("");
   const [note, setNote] = useState("");

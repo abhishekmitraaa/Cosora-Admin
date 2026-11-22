@@ -409,7 +409,7 @@ export default function Faqs() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-faint">
                       {format(new Date(r.updated_at), "d MMM yyyy")}
-                      <div className="text-ink-ghost">{r.creator_full_name || r.creator_email || "seeded"}</div>
+                      <div className="text-ink-faint">{r.creator_full_name || r.creator_email || "seeded"}</div>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1.5">

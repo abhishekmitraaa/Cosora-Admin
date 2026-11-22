@@ -181,7 +181,7 @@ export default function AdsMonitoring() {
                   </td>
                   <td className="px-3 py-2 tabular-nums">
                     {v.ctr === null ? (
-                      <span className="text-ink-ghost">no data</span>
+                      <span className="text-ink-faint">no data</span>
                     ) : (
                       <span className="font-medium text-ink">{formatCtr(v.ctr)}</span>
                     )}
@@ -192,7 +192,7 @@ export default function AdsMonitoring() {
                         {v.flagged} campaign{v.flagged === 1 ? "" : "s"}
                       </Badge>
                     ) : (
-                      <span className="text-2xs text-ink-ghost">nothing flagged</span>
+                      <span className="text-2xs text-ink-faint">nothing flagged</span>
                     )}
                   </td>
                 </tr>

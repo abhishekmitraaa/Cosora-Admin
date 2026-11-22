@@ -179,10 +179,10 @@ export default function Accounts() {
             {rows.map((r) => (
               <tr key={r.id} className={selected?.id === r.id ? "bg-surface-2" : ROW_HOVER}>
                 <td className="px-3 py-2 font-medium text-ink">
-                  {r.brand_name || r.full_name || <span className="text-ink-ghost">no name</span>}
+                  {r.brand_name || r.full_name || <span className="text-ink-faint">no name</span>}
                 </td>
                 <td className="px-3 py-2 text-ink-muted">
-                  {r.email ?? <span className="text-ink-ghost">no email</span>}
+                  {r.email ?? <span className="text-ink-faint">no email</span>}
                   {r.email && r.emailVerified === false && (
                     <span className="ml-1.5 text-2xs text-caution-fg" title="Typed on the account; nobody confirmed this address">
                       not verified

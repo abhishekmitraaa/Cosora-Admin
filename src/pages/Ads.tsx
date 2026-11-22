@@ -35,6 +35,7 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 type AdStatus = "active" | "paused" | "rejected" | "expired";
 
@@ -98,8 +99,8 @@ export default function Ads() {
   const writable = canWrite(role, "ads");
   // Review is the default landing view: it is the one that has campaigns
   // waiting on a person, and a paid vendor is waiting on each of them.
-  const [view, setView] = useState<View>("review");
-  const [tab, setTab] = useState<AdStatus>("active");
+  const [view, setView] = useUrlState<View>("view", "review");
+  const [tab, setTab] = useUrlState<AdStatus>("tab", "active", TABS.map((t) => t.id));
   const [action, setAction] = useState<{ ad: AdRow; next: "paused" | "rejected" } | null>(null);
   // A takedown carries a listed reason code and an optional note for the vendor,
   // the same vocabulary as the review queue (admin completion, Phase 3a).

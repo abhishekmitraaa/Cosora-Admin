@@ -152,7 +152,7 @@ export function RefundGuaranteePanel({ writable }: { writable: boolean }) {
                         ) : refundState(i) === "failed" ? (
                           <Badge tone="critical">failed</Badge>
                         ) : (
-                          <span className="text-2xs text-ink-ghost">not yet</span>
+                          <span className="text-2xs text-ink-faint">not yet</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">

@@ -18,6 +18,7 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 type Tab = "queue" | "live";
 
@@ -62,7 +63,7 @@ export default function PremisesPhotos() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "premises-photos");
-  const [tab, setTab] = useState<Tab>("queue");
+  const [tab, setTab] = useUrlState<Tab>("tab", "queue");
   const [rejecting, setRejecting] = useState<PhotoQueueRow | null>(null);
   const [reason, setReason] = useState("");
 
@@ -73,13 +74,13 @@ export default function PremisesPhotos() {
     getNextPageParam: (last) => {
       if (last.length < QUEUE_PAGE) return undefined;
       const r = last[last.length - 1];
-      return { at: r.created_at, id: r.id };
+      return { at: r.cursorAt ?? r.created_at, id: r.id };
     },
   });
 
   const decide = useMutation({
     mutationFn: ({ row, approve, why }: { row: PhotoQueueRow; approve: boolean; why: string | null }) =>
-      reviewPhoto(row.id, approve, why),
+      reviewPhoto(row.id, approve, why, tab === "queue" ? "under_review" : "live"),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["premises-photos"] });
       void qc.invalidateQueries({ queryKey: ["registrations", "counts"] });

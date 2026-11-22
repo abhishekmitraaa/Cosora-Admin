@@ -11,6 +11,7 @@ import {
   Badge, Button, Card, Checkbox, Empty, ErrorNote, Field, Input, Modal, Note, Page, PageHeader, ReadOnlyBanner,
   ROW_HOVER, Select, SkeletonList, Table, Tabs, Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * Form questions (Ranking F3, 2026-10-31): the category questions sellers answer on a listing and buyers on a
@@ -46,10 +47,10 @@ export default function Attributes() {
   const writable = canWrite(role, "attributes");
   const qc = useQueryClient();
   const [form, setForm] = useState<AttributeForm>("product");
-  const [category, setCategory] = useState("apparel-home");
+  const [category, setCategory] = useUrlState<string>("category", "apparel-home");
   const [sub, setSub] = useState(COMMON);
   const [schema, setSchema] = useState("womens");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlState<string>("q", "");
   const [editing, setEditing] = useState<AttributeRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);

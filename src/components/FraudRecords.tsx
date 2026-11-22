@@ -67,10 +67,10 @@ export function FraudRecordsPanel() {
             <tr key={f.id} className={f.withdrawn_at ? `opacity-60 ${ROW_HOVER}` : ROW_HOVER}>
               <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-muted">
                 {format(new Date(f.decided_at), "d MMM yyyy")}
-                <div className="text-ink-ghost">{f.decided_by_name ?? "—"}</div>
+                <div className="text-ink-faint">{f.decided_by_name ?? "—"}</div>
               </td>
               <td className="px-3 py-2">
-                <div className="text-ink">{f.subject_name ?? <span className="text-ink-ghost">not named</span>}</div>
+                <div className="text-ink">{f.subject_name ?? <span className="text-ink-faint">not named</span>}</div>
                 <div className="text-xs text-ink-faint">
                   {f.subject_kind === "vendor" ? "Vendor" : f.subject_kind === "buyer" ? "Buyer" : "Not linked to an account"}
                 </div>

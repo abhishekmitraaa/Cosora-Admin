@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
@@ -20,6 +20,7 @@ import {
   Textarea,
   type Tone,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * Reported reviews (2026-10-13; buyer repo migration 20261013100200_review_reports).
@@ -75,27 +76,40 @@ const IST = new Intl.DateTimeFormat("en-IN", {
 });
 const when = (at: string | null | undefined) => (at ? `${IST.format(new Date(at))} IST` : "");
 
+const REPORTS_PAGE = 100;
+
 export default function ReviewReports() {
   const role = useAdminSession().identity?.role ?? null;
   const mayDecide = canWrite(role, "review-reports");
   const qc = useQueryClient();
-  const [status, setStatus] = useState<Status>("open");
+  const [status, setStatus] = useUrlState<Status>("status", "open");
   const [removing, setRemoving] = useState<Group | null>(null);
   const [reason, setReason] = useState("");
 
-  const list = useQuery({
+  // 100 reports at a time, newest first (AR-M16: the list stopped at 500 without saying so).
+  const list = useInfiniteQuery({
     queryKey: ["review-reports", status],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("admin_review_reports_list", { p_status: status });
-      if (error) throw new Error(error.message);
+    initialPageParam: null as { at: string; id: string } | null,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await supabase.rpc("admin_review_reports_list" as never, {
+        p_status: status,
+        p_before_at: pageParam?.at ?? null,
+        p_before_id: pageParam?.id ?? null,
+        p_limit: REPORTS_PAGE,
+      } as never);
+      if (error) throw new Error((error as { message: string }).message);
       return (data ?? []) as unknown as Report[];
+    },
+    getNextPageParam: (last) => {
+      const r = last[last.length - 1];
+      return last.length === REPORTS_PAGE && r ? { at: r.created_at, id: r.id } : undefined;
     },
   });
 
-  // One card per review: several people can report the same one.
+  // One card per review: several people can report the same one (across loaded pages too).
   const groups = useMemo<Group[]>(() => {
     const byReview = new Map<string, Group>();
-    for (const r of list.data ?? []) {
+    for (const r of list.data?.pages.flat() ?? []) {
       const key = `${r.review_kind}:${r.review_id}`;
       const g = byReview.get(key) ?? { key, kind: r.review_kind, reviewId: r.review_id, reports: [] };
       g.reports.push(r);
@@ -106,13 +120,15 @@ export default function ReviewReports() {
 
   const decide = useMutation({
     mutationFn: async (v: { group: Group; action: "remove" | "dismiss"; note?: string }) => {
-      const { error } = await supabase.rpc("admin_review_report_decide", {
+      // Only the reports on screen are decided (AR-M16): one filed since stays open for its own look.
+      const { error } = await supabase.rpc("admin_review_report_decide" as never, {
         p_kind: v.group.kind,
         p_review_id: v.group.reviewId,
         p_action: v.action,
-        p_note: v.note,
-      });
-      if (error) throw new Error(error.message);
+        p_note: v.note ?? null,
+        p_report_ids: v.group.reports.filter((r) => r.status === "open").map((r) => r.id),
+      } as never);
+      if (error) throw new Error((error as { message: string }).message);
       return v.action;
     },
     onSuccess: (action) => {
@@ -121,7 +137,10 @@ export default function ReviewReports() {
       setReason("");
       void qc.invalidateQueries({ queryKey: ["review-reports"] });
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => {
+      toast.error((e as Error).message);
+      void qc.invalidateQueries({ queryKey: ["review-reports"] });
+    },
   });
 
   return (
@@ -226,6 +245,13 @@ export default function ReviewReports() {
               </div>
             );
           })}
+          {list.hasNextPage && (
+            <div className="flex justify-center pt-1">
+              <Button disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
+                {list.isFetchingNextPage ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

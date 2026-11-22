@@ -38,6 +38,9 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
+import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort } from "@/lib/queuePaging";
+import { QueueSortToggle } from "@/components/QueueSortToggle";
 
 // "paused" (subscriptions P4): over the vendor's plan limit, hidden from buyers until the
 // plan allows it again. The plan pauses and resumes it, so the tab is for looking only.
@@ -78,28 +81,25 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "paused", label: "Paused (plan limit)" },
 ];
 
-const PAGE = 50;
 
 const COLUMNS = `id, name, price_value, currency, moq, fabric, gsm, colour, status, rejection_reason,
   removed_at, removed_reason, flagged_at, flag_reason, vendor_id, created_at,
   category:categories(name),
   images:product_images(url, position)`;
 
-type Cursor = { at: string; id: string } | null;
+type Cursor = QueueCursor;
 
-async function fetchPage(tab: Tab, cursor: Cursor) {
+async function fetchPage(tab: Tab, cursor: Cursor, sort: QueueSort) {
   let q = supabase.from("products").select(COLUMNS);
   // A removal is status 'rejected' plus removed_at, so the two tabs split one status.
   if (tab === "removed") q = q.eq("status", "rejected").not("removed_at", "is", null);
   else if (tab === "rejected") q = q.eq("status", "rejected").is("removed_at", null);
   else q = q.eq("status", tab);
-  if (cursor) {
-    q = q.or(`created_at.lt.${cursor.at},and(created_at.eq.${cursor.at},id.lt.${cursor.id})`);
-  }
+  if (cursor) q = q.or(afterCursor(cursor, sort));
   const { data, error } = await q
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(PAGE);
+    .order("created_at", { ascending: sort === "oldest" })
+    .order("id", { ascending: sort === "oldest" })
+    .limit(QUEUE_PAGE);
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as ProductRow[];
   // A listing its seller changed after a decision carries an open edit record: shown on its card.
@@ -110,8 +110,7 @@ async function fetchPage(tab: Tab, cursor: Cursor) {
     fetchListingRevs("products", rows.map((r) => r.id)),
   ]);
   for (const r of rows) r.rev = revs.get(r.id) ?? 0;
-  const last = rows[rows.length - 1];
-  return { rows, vendors, edits, next: rows.length === PAGE && last ? { at: last.created_at, id: last.id } : null };
+  return { rows, vendors, edits, next: nextCursor(rows) };
 }
 
 type Dialog = { kind: "remove" | "flag" | "reinstate" | "reject"; product: ProductRow } | null;
@@ -120,16 +119,17 @@ export default function Products() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "products");
-  const [tab, setTab] = useState<Tab>("under_review");
+  const [tab, setTab] = useUrlState<Tab>("tab", "under_review", TABS.map((t) => t.id));
   const [dialog, setDialog] = useState<Dialog>(null);
   const [text, setText] = useState("");
   // "Review details": everything the vendor entered (2026-10-17).
   const [viewing, setViewing] = useState<ProductRow | null>(null);
 
+  const [sort, setSort] = useUrlState<QueueSort>("sort", defaultQueueSort(tab), QUEUE_SORTS);
   const products = useInfiniteQuery({
-    queryKey: ["products", tab],
+    queryKey: ["products", tab, sort],
     initialPageParam: null as Cursor,
-    queryFn: ({ pageParam }) => fetchPage(tab, pageParam),
+    queryFn: ({ pageParam }) => fetchPage(tab, pageParam, sort),
     getNextPageParam: (last) => last.next,
   });
 
@@ -201,14 +201,7 @@ export default function Products() {
   }
   if (products.error) return <ErrorNote message={(products.error as Error).message} />;
 
-  const pages = products.data?.pages ?? [];
-  const rows = pages.flatMap((p) => p.rows);
-  const vendors = new Map<string, VendorSummary>();
-  const edits = new Map<string, ListingEdit>();
-  for (const p of pages) {
-    for (const [k, v] of p.vendors) vendors.set(k, v);
-    for (const [k, v] of p.edits) edits.set(k, v);
-  }
+  const { rows, vendors, edits } = mergeQueuePages(products.data?.pages ?? []);
   const target = dialog?.product;
 
   return (
@@ -218,6 +211,7 @@ export default function Products() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "products")} />}
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      <QueueSortToggle value={sort} onChange={setSort} />
 
       {rows.length === 0 ? (
         <Empty>

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -31,6 +30,7 @@ import {
   Stat,
   Table,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * Part 7 - reporting, from real rows only, computed in the database.
@@ -138,7 +138,7 @@ const rupees = (paise: number) => Math.round(paise / 100);
 export default function Reports() {
   const ink = useChartInk();
 
-  const [range, setRange] = useState<RangeId>("all");
+  const [range, setRange] = useUrlState<RangeId>("range", "all");
 
   const report = useQuery({
     queryKey: ["reports", range],

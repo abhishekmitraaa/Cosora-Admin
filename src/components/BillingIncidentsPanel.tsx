@@ -7,7 +7,14 @@ import { Badge, Button, Empty, Field, Modal, Note, Panel, SkeletonList, Textarea
 
 interface Incident {
   id: string;
-  kind: "activation_failed" | "invoice_incomplete" | "dispute" | "reconcile_mismatch";
+  kind:
+    | "activation_failed"
+    | "invoice_incomplete"
+    | "dispute"
+    | "reconcile_mismatch"
+    | "autopay_cancel_failed"
+    | "autopay_amount_mismatch"
+    | "refund_failed";
   vendor_id: string | null;
   vendor_name: string | null;
   order_ref: string | null;
@@ -39,6 +46,23 @@ const KIND: Record<Incident["kind"], { label: string; tone: "critical" | "cautio
     label: "Needs reconciling",
     tone: "caution",
     help: "Razorpay and Cosora disagree about this payment.",
+  },
+  autopay_cancel_failed: {
+    label: "Old autopay not cancelled",
+    tone: "critical",
+    help: "A seller's new autopay started but Razorpay didn't confirm the old one was cancelled, so it may charge again. Cancel it in the Razorpay dashboard, then resolve this.",
+  },
+  autopay_amount_mismatch: {
+    label: "Autopay charged a different amount",
+    tone: "caution",
+    help: "Razorpay charged an amount that doesn't match the plan's price for this period. Check the charge in the Razorpay dashboard and refund the difference if needed.",
+  },
+  // AR-M21: a refund Razorpay gave up on. When its 7-day guarantee was already closed, the plan has ended and the
+  // seller was told the money is on its way.
+  refund_failed: {
+    label: "Refund failed",
+    tone: "critical",
+    help: "Razorpay couldn't complete this refund. Refund the invoice again from the Invoices list (or in the Razorpay dashboard), then resolve this with what you did.",
   },
 };
 
@@ -122,6 +146,9 @@ export function BillingIncidentsPanel({ writable }: { writable: boolean }) {
                       <span className="text-sm font-medium text-ink">{r.vendor_name ?? "Unknown vendor"}</span>
                       {amount && <span className="text-sm tabular-nums text-ink-muted">{amount}</span>}
                       {disputeStep && <Badge tone="neutral">{`Razorpay: ${disputeStep}`}</Badge>}
+                      {r.kind === "refund_failed" && r.detail?.guarantee_closed === true && (
+                        <Badge tone="critical">7-day guarantee already closed</Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-2xs text-ink-faint">
                       {format(new Date(r.created_at), "d MMM yyyy, HH:mm")}

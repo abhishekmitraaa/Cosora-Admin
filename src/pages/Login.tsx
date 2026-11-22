@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAdminSession } from "@/hooks/useAdminSession";
 import { AuthLayout, Button, Card, ErrorNote, Input, Note, Spinner } from "@/components/ui";
@@ -7,13 +7,15 @@ import { ACTIVITY_NOTICE } from "@/lib/activityNotice";
 
 export default function Login() {
   const { session, loading } = useAdminSession();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (loading) return <Spinner label="Loading…" />;
-  if (session) return <Navigate to="/" replace />;
+  // Back to the page asked for before sign-in (review AR-M03), only ever a path on this site.
+  if (session) return <Navigate to={safeReturnPath((location.state as { from?: unknown } | null)?.from)} replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -65,4 +67,11 @@ export default function Login() {
       </Card>
     </AuthLayout>
   );
+}
+
+/** A same-site path to return to after sign-in: "/x…", never "//host", a scheme or the sign-in pages. */
+export function safeReturnPath(from: unknown): string {
+  if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//") || from.startsWith("/\\")) return "/";
+  if (/^\/(login|reset-password)(\/|\?|#|$)/.test(from)) return "/";
+  return from;
 }

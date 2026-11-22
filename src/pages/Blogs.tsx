@@ -59,6 +59,7 @@ import {
   type BlogPostFull,
   type BlogStatus,
 } from "@/lib/blogs";
+import { useUrlState } from "@/hooks/useUrlState";
 
 const BLOG_URL = "https://www.cosora.in/blogs";
 
@@ -67,7 +68,7 @@ type TabId = "articles" | "categories" | "landing";
 export default function Blogs() {
   const role = useRole();
   const writable = canWrite(role, "blogs");
-  const [tab, setTab] = useState<TabId>("articles");
+  const [tab, setTab] = useUrlState<TabId>("tab", "articles");
 
   const posts = useBlogPosts();
   const categories = useBlogCategories();

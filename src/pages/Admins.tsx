@@ -220,7 +220,7 @@ export default function Admins() {
             return (
               <tr key={a.id} className={ROW_HOVER}>
                 <td className="px-3 py-2 text-ink">
-                  {a.full_name || <span className="text-ink-ghost">no name</span>}
+                  {a.full_name || <span className="text-ink-faint">no name</span>}
                   {isSelf && (
                     <span className="ml-1.5">
                       <Badge tone="info">you</Badge>
@@ -399,7 +399,7 @@ export default function Admins() {
               {(candidates.data ?? []).map((c) => (
                 <tr key={c.id} className={ROW_HOVER}>
                   <td className="px-3 py-2 text-ink">
-                    {c.full_name || <span className="text-ink-ghost">no name</span>}
+                    {c.full_name || <span className="text-ink-faint">no name</span>}
                   </td>
                   <td className="px-3 py-2 text-ink-muted">{c.email}</td>
                   <td className="px-3 py-2 text-right">

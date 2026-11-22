@@ -35,6 +35,7 @@ import { GrantPlanModal } from "@/components/GrantPlanModal";
 import { useSubscriptionWorklist, withAutopayOff, type WorklistRow, type WorklistView } from "@/lib/subscriptionAdmin";
 import { announceRefund, canRefund, refundBlockedReason, refundState, type RefundResult } from "@/lib/refunds";
 import { CreditNotes } from "@/components/CreditNotes";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /** Rows per page. Both lists grow with the vendor base; neither loads it whole. */
 const PAGE = 50;
@@ -171,11 +172,11 @@ export default function Subscriptions() {
   });
 
   // The worklists (subscriptions P12): one row per vendor, filtered on the server.
-  const [view, setView] = useState<WorklistView>("all");
+  const [view, setView] = useUrlState<WorklistView>("view", "all");
   const [days, setDays] = useState(7);
   const [planFilter, setPlanFilter] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [typed, setTyped] = useState(search);
   useEffect(() => {
     const t = setTimeout(() => setSearch(typed), 300);
     return () => clearTimeout(t);
@@ -408,7 +409,7 @@ export default function Subscriptions() {
                         ))}
                       </Select>
                     ) : (
-                      <span className="text-xs text-ink-ghost">no subscription yet</span>
+                      <span className="text-xs text-ink-faint">no subscription yet</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-ink-muted">{s.billing_cycle ?? ""}</td>
@@ -439,7 +440,7 @@ export default function Subscriptions() {
                         )}
                       </>
                     ) : (
-                      <span className="text-ink-ghost">not set</span>
+                      <span className="text-ink-faint">not set</span>
                     )}
                   </td>
                   {/* auto_renew means autopay since subscriptions P3: a Razorpay mandate renews the plan. */}
@@ -514,10 +515,10 @@ export default function Subscriptions() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-ink">
-                      {inv.vendor?.brand_name ?? <span className="text-ink-ghost">unknown</span>}
+                      {inv.vendor?.brand_name ?? <span className="text-ink-faint">unknown</span>}
                     </td>
                     <td className="px-3 py-2 text-ink-muted">
-                      {inv.plan_id ?? <span className="text-ink-ghost">none</span>}
+                      {inv.plan_id ?? <span className="text-ink-faint">none</span>}
                     </td>
                     <td className="px-3 py-2 tabular-nums text-ink">
                       {inr(total)}
@@ -555,7 +556,7 @@ export default function Subscriptions() {
                         // AR-H07: this invoice's value went into a later plan as credit.
                         <span className="text-2xs text-ink-muted">credited into a later plan</span>
                       ) : (
-                        <span className="text-ink-ghost">none</span>
+                        <span className="text-ink-faint">none</span>
                       )}
                       {/* AR-H14: the credit notes a processed refund issued, with their PDFs. */}
                       {refundState(inv) === "processed" && <CreditNotes invoiceId={inv.id} />}

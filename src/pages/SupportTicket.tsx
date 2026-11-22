@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useRecordView } from "@/lib/activity";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, Download, FileText, Lock, Paperclip, Phone, X } from "lucide-react";
+import { Download, FileText, Lock, Paperclip, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 import AccountStatus, { AccountStatusBadge } from "@/components/AccountStatus";
 import FlagLog from "@/components/FlagLog";
@@ -61,6 +61,7 @@ import {
   type SupportTicketDetail,
 } from "@/lib/support";
 import { STATUS_TONE } from "./Support";
+import { BackLink } from "@/components/BackLink";
 
 /**
  * ONE SUPPORT REQUEST (Help & Support, 2026-09-30).
@@ -99,9 +100,7 @@ export default function SupportTicket() {
 
   return (
     <Page width="wide">
-      <Link to={board.to} className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink">
-        <ArrowLeft size={14} /> {board.label}
-      </Link>
+<BackLink fallback={board.to} label={board.label} />
       <PageHeader
         title={`${t.ticket_no} · ${CHANNEL_LABELS[t.channel]}`}
         subtitle={`${labelText(t.category_label)} · from ${d.requester?.name ?? "a removed account"} (${t.requester_side}) · opened ${istTime(t.created_at)}`}

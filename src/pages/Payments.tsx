@@ -48,6 +48,7 @@ import {
   Table,
   Textarea,
 } from "@/components/ui";
+import { useUrlFilters } from "@/hooks/useUrlState";
 
 /**
  * C2 - PAYMENTS LEDGER, from the database (admin completion Phase 5).
@@ -70,9 +71,10 @@ export default function Payments() {
   const role = useRole();
   const writable = canWrite(role, "payments");
 
-  const [draft, setDraft] = useState<LedgerFilters>(NO_FILTERS);
+  // The applied filters live in the address (AR-M04); the box shows the draft while typing.
+  const [filters, setFilters] = useUrlFilters<LedgerFilters>(NO_FILTERS);
   // The search box asks the database once typing pauses, not on every key.
-  const [filters, setFilters] = useState<LedgerFilters>(NO_FILTERS);
+  const [draft, setDraft] = useState<LedgerFilters>(filters);
   useEffect(() => {
     const t = setTimeout(() => setFilters(draft), draft.search === filters.search ? 0 : SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -375,7 +377,7 @@ function LedgerLine({
         )}
       </td>
       <td className="px-3 py-2 tabular-nums text-ink-muted">
-        {t.gst_paise === null ? <span className="text-ink-ghost">—</span> : inrFromPaise(t.gst_paise)}
+        {t.gst_paise === null ? <span className="text-ink-faint">—</span> : inrFromPaise(t.gst_paise)}
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={t.status} />
@@ -387,7 +389,7 @@ function LedgerLine({
       </td>
       <td className="px-3 py-2 font-mono text-2xs text-ink-faint">
         {t.gateway_ref ?? (
-          <span className="font-sans text-ink-ghost">
+          <span className="font-sans text-ink-faint">
             {t.status === "paid" && t.payment_mode === "demo" ? "no gateway payment (demo mode)" : "none"}
           </span>
         )}

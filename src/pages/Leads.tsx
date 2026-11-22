@@ -44,6 +44,7 @@ import {
   type Tone,
 } from "@/components/ui";
 import { LeadAlertsPanel } from "@/components/LeadAlertsPanel";
+import { useUrlFilters } from "@/hooks/useUrlState";
 
 /**
  * LEADS: THE RFQ PIPELINE (admin completion Phase 7).
@@ -87,8 +88,9 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 export default function Leads() {
   const [days, setDays] = useState<number | null>(30);
-  const [draft, setDraft] = useState<LeadFilters>(NO_FILTERS);
-  const [filters, setFilters] = useState<LeadFilters>(NO_FILTERS);
+  // The applied filters live in the address (AR-M04); the box shows the draft while typing.
+  const [filters, setFilters] = useUrlFilters<LeadFilters>(NO_FILTERS);
+  const [draft, setDraft] = useState<LeadFilters>(filters);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setFilters(draft), draft.search === filters.search ? 0 : SEARCH_DEBOUNCE_MS);

@@ -19,7 +19,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   if (loading) return <Spinner label="Checking admin access…" />;
-  if (!session) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (!session) return <Navigate to="/login" state={{ from: location.pathname + location.search + location.hash }} replace />;
 
   // A registered staff member still on their temporary password chooses their own
   // first (admin-staff edge function; lib/staff.ts).

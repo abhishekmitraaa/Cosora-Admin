@@ -45,6 +45,7 @@ import {
   type SupportStatus,
   type SupportView,
 } from "@/lib/support";
+import { useUrlFilters } from "@/hooks/useUrlState";
 
 /**
  * THE SUPPORT QUEUE (Help & Support, 2026-09-30).
@@ -91,7 +92,9 @@ export function SupportQueue({ channel, title, subtitle, footer }: QueueProps) {
   const counts = useSupportCounts();
   const settings = useSupportSettings();
 
-  const [draft, setDraft] = useState<SupportFilters>({
+  // The applied filters live in the address (AR-M04); the box shows the draft while typing.
+  // The board's channel is fixed by the route, never by the address.
+  const [urlFilters, setFilters] = useUrlFilters<SupportFilters>({
     view: "awaiting",
     channel: channel ?? "",
     category: "",
@@ -100,8 +103,9 @@ export function SupportQueue({ channel, title, subtitle, footer }: QueueProps) {
     search: "",
     includeTest: true,
   });
+  const filters = useMemo<SupportFilters>(() => ({ ...urlFilters, channel: channel ?? "" }), [urlFilters, channel]);
+  const [draft, setDraft] = useState<SupportFilters>(filters);
   // Search waits for a pause in typing; every other filter applies at once.
-  const [filters, setFilters] = useState(draft);
   useEffect(() => {
     const t = setTimeout(() => setFilters(draft), draft.search === filters.search ? 0 : 300);
     return () => clearTimeout(t);

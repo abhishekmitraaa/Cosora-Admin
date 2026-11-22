@@ -1,6 +1,6 @@
 import { fetchListingRevs, ListingChangedError, ListingEditedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Play } from "lucide-react";
@@ -29,6 +29,9 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
+import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort } from "@/lib/queuePaging";
+import { QueueSortToggle } from "@/components/QueueSortToggle";
 
 type Status = "under_review" | "live" | "rejected";
 
@@ -98,7 +101,7 @@ export default function Videos() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "videos");
-  const [tab, setTab] = useState<Status>("under_review");
+  const [tab, setTab] = useUrlState<Status>("tab", "under_review", TABS.map((t) => t.id));
   const [rejecting, setRejecting] = useState<VideoRow | null>(null);
   const [reason, setReason] = useState("");
   const [playing, setPlaying] = useState<VideoRow | null>(null);
@@ -106,10 +109,13 @@ export default function Videos() {
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [bulkFor, setBulkFor] = useState<{ vendorId: string; label: string } | null>(null);
 
-  const videos = useQuery({
-    queryKey: ["videos", tab],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const [sort, setSort] = useUrlState<QueueSort>("sort", defaultQueueSort(tab), QUEUE_SORTS);
+  // 50 at a time in the moderator's order (AR-M12, AR-M13): the tab used to stop silently at 1,000.
+  const videos = useInfiniteQuery({
+    queryKey: ["videos", tab, sort],
+    initialPageParam: null as QueueCursor,
+    queryFn: async ({ pageParam }) => {
+      let q = supabase
         .from("product_videos")
         .select(
           `id, brand_line, category, price, moq, thumbnail_url, video_url,
@@ -117,20 +123,24 @@ export default function Videos() {
            vendor_id, created_at,
            product:products(name, status)`,
         )
-        .eq("status", tab)
-        .order("created_at", { ascending: false });
+        .eq("status", tab);
+      if (pageParam) q = q.or(afterCursor(pageParam, sort));
+      const { data, error } = await q
+        .order("created_at", { ascending: sort === "oldest" })
+        .order("id", { ascending: sort === "oldest" })
+        .limit(QUEUE_PAGE);
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as VideoRow[];
-      // A video its seller changed after a decision carries an open edit record: shown on its card.
       const [vendors, edits, revs] = await Promise.all([
         fetchVendorsByIds(rows.map((r) => r.vendor_id)),
         fetchListingEdits("product_video", rows.map((r) => r.id)),
         fetchListingRevs("product_videos", rows.map((r) => r.id)),
       ]);
       for (const r of rows) r.rev = revs.get(r.id) ?? 0;
-      return { rows, vendors, edits };
+      return { rows, vendors, edits, next: nextCursor(rows) };
     },
+    getNextPageParam: (last) => last.next,
   });
 
   /**
@@ -227,7 +237,7 @@ export default function Videos() {
   }
   if (videos.error) return <ErrorNote message={(videos.error as Error).message} />;
 
-  const { rows, vendors, edits } = videos.data!;
+  const { rows, vendors, edits } = mergeQueuePages(videos.data?.pages ?? []);
 
   return (
     <Page>
@@ -236,6 +246,7 @@ export default function Videos() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "videos")} />}
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      <QueueSortToggle value={sort} onChange={setSort} />
 
       {rows.length === 0 ? (
         <Empty>

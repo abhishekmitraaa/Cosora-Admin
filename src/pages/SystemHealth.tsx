@@ -82,23 +82,61 @@ interface CronRow {
 }
 
 /**
- * What each job is for, and how long a gap between runs is still normal. The gap
- * is twice the schedule, so one missed tick is noticed without every delayed run
- * turning the badge amber. A job not listed here shows its status and nothing else.
+ * What each job is for (review AR-M10, 2026-11-22: 18 of production's 26 jobs were missing,
+ * so a stopped view fold or notification dispatch never turned amber). How long a gap is
+ * still normal comes from the job's own schedule (`expectedGapMinutes`), so a job added
+ * later is watched too; `maxGapMinutes` here only overrides that.
  */
-const JOBS: Record<string, { purpose: string; maxGapMinutes: number }> = {
-  "ads-schedule-sweep": { purpose: "Starts scheduled campaigns and ends finished ones", maxGapMinutes: 10 },
-  "embedding-health-log": { purpose: "Samples the embedding pipeline for this page", maxGapMinutes: 20 },
-  "faq-snapshots-refresh": { purpose: "Rebuilds the FAQ files the site reads", maxGapMinutes: 120 },
-  "subscription-expiry-sweep": { purpose: "Expires subscriptions past their end date", maxGapMinutes: 48 * 60 },
-  "account-deletion-sweep": { purpose: "Anonymizes accounts past their 14-day cooling-off", maxGapMinutes: 48 * 60 },
-  "account-deletion-sweep-alarm": {
-    purpose: "Fails loudly if the deletion sweep cannot authenticate",
-    maxGapMinutes: 48 * 60,
-  },
-  "fx-rates-refresh": { purpose: "Refreshes display-currency rates", maxGapMinutes: 48 * 60 },
-  "cron-history-prune": { purpose: "Deletes job history older than 14 days", maxGapMinutes: 48 * 60 },
+const JOBS: Record<string, { purpose: string; maxGapMinutes?: number }> = {
+  "account-deletion-sweep": { purpose: "Anonymizes accounts past their 14-day cooling-off" },
+  "account-deletion-sweep-alarm": { purpose: "Fails loudly if the deletion sweep cannot authenticate" },
+  "ad-impressions-fold": { purpose: "Adds queued ad impressions to the campaigns' counts" },
+  "admin-activity-prune": { purpose: "Deletes admin page visits older than 180 days" },
+  "ads-schedule-sweep": { purpose: "Starts scheduled campaigns and ends finished ones" },
+  "billing-reconcile": { purpose: "Completes paid orders whose confirmation never arrived" },
+  "blog-scheduled-sweep": { purpose: "Publishes blog articles at their scheduled time" },
+  "crm-followups": { purpose: "Sends sellers their CRM follow-up reminders" },
+  "cron-history-prune": { purpose: "Deletes job history (successes after 2 days, failures after 14)" },
+  "daily-dedupe-prune": { purpose: "Clears the daily view, enquiry and click dedupe tables" },
+  "embedding-health-alarm": { purpose: "Alerts admins when the embedding pipeline stalls" },
+  "embedding-health-log": { purpose: "Samples the embedding pipeline for this page" },
+  "embedding-worker": { purpose: "Embeds new listings and requirements for search" },
+  "faq-snapshots-refresh": { purpose: "Rebuilds the FAQ files the site reads" },
+  "feed-rank-refresh": { purpose: "Recomputes the buyer feeds' ranking keys" },
+  "fx-rates-refresh": { purpose: "Refreshes display-currency rates" },
+  "lead-alert-digest": { purpose: "Sends sellers their daily lead digest" },
+  "notification-dispatch": { purpose: "Sends queued emails, WhatsApp and SMS messages" },
+  "product-views-fold": { purpose: "Adds queued product views to the listings' counts" },
+  "prune-embed-rate-limit": { purpose: "Clears old embedding rate-limit rows" },
+  "prune-query-embedding-cache": { purpose: "Clears old cached search embeddings" },
+  "rfq-deadline-close": { purpose: "Closes requirements past their deadline" },
+  "search-trends-refresh": { purpose: "Recomputes trending searches for /search" },
+  "subscription-expiry-sweep": { purpose: "Sends plan reminders, starts grace days and lapses plans" },
+  "vendor-catalog-recompute": { purpose: "Re-embeds sellers' catalogues after listing changes" },
+  "vendor-standing-refresh": { purpose: "Recomputes seller Standing for rankings" },
 };
+
+/**
+ * Twice the interval a cron schedule implies (at least 10 minutes), so one missed tick is
+ * noticed without every delayed run turning the badge amber. null when it can't be read.
+ */
+export function expectedGapMinutes(schedule: string): number | null {
+  const f = schedule.trim().split(/\s+/);
+  if (f.length !== 5) return null;
+  const [m, h, dom, mon, dow] = f;
+  const step = (x: string) => {
+    const s = /\/(\d+)$/.exec(x);
+    return s ? Number(s[1]) : null;
+  };
+  let interval: number | null = null;
+  if (dom !== "*" || mon !== "*") interval = 31 * 1440;
+  else if (dow !== "*") interval = 7 * 1440;
+  else if (h === "*") interval = m === "*" ? 1 : (step(m) ?? 60);
+  else if (step(h) !== null) interval = step(h)! * 60;
+  else if (/^\d+(,\d+)*$/.test(h)) interval = h.includes(",") ? 1440 / h.split(",").length : 1440;
+  if (interval === null || !Number.isFinite(interval)) return null;
+  return Math.max(2 * interval, 10);
+}
 
 /** Minutes between now and an ISO instant. */
 const minutesSince = (iso: string) => (Date.now() - new Date(iso).getTime()) / 60_000;
@@ -256,10 +294,12 @@ export default function SystemHealth() {
             <Table head={["Job", "Schedule (UTC)", "Last run", "Last 24 h", "Last message"]}>
               {cronRows.map((j) => {
                 const info = JOBS[j.jobname];
+                const gap = info?.maxGapMinutes ?? expectedGapMinutes(j.schedule);
                 const late =
-                  info !== undefined &&
+                  j.active &&
+                  gap !== null &&
                   j.last_started_at !== null &&
-                  minutesSince(j.last_started_at) > info.maxGapMinutes;
+                  minutesSince(j.last_started_at) > gap;
                 return (
                   <tr key={j.jobname}>
                     <td className="px-3 py-2">

@@ -10,6 +10,7 @@ import {
   LEVEL_LABEL, WINDOW_LABEL, amAssign, amCallbackSet, amMarkRead, amNote, amSend, useAmConcierge, useAmManagers,
   useAmRefresh, useAmVendor, useAmVendors, type AmFilter, type AmVendorRow,
 } from "@/lib/accountManagers";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * My vendors (subscriptions P9, 2026-10-09): an account manager's workspace. The vendors the
@@ -253,7 +254,7 @@ function VendorLine({ v, onOpen }: { v: AmVendorRow; onOpen: () => void }) {
 export default function MyVendors() {
   const role = useRole();
   const leader = role === "super_admin" || role === "manager";
-  const [filter, setFilter] = useState<AmFilter>(leader ? "unassigned" : "mine");
+  const [filter, setFilter] = useUrlState<AmFilter>("filter", leader ? "unassigned" : "mine");
   const vendors = useAmVendors(filter);
   const [openId, setOpenId] = useState<string | null>(null);
   const rows = vendors.data ?? [];

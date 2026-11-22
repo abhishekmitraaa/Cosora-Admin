@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useRecordView } from "@/lib/activity";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 import { supabase, assertWrote } from "@/lib/supabase";
 import { canWrite, readOnlyReason } from "@/lib/roles";
 import { useRole } from "@/hooks/useAdminSession";
@@ -27,6 +26,7 @@ import {
   Stack,
   SubHeading,
 } from "@/components/ui";
+import { BackLink } from "@/components/BackLink";
 
 interface VendorDetailRow {
   id: string;
@@ -144,12 +144,7 @@ export default function VendorDetail() {
 
   return (
     <Page>
-      <Link
-        to="/vendors"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeft size={14} /> All vendors
-      </Link>
+<BackLink fallback="/vendors" label="All vendors" />
 
       <PageHeader
         title={v.brand_name || "Unnamed vendor"}
@@ -195,7 +190,7 @@ export default function VendorDetail() {
           <p className="text-sm text-ink">
             {[v.address_line, v.area, v.landmark, v.city, v.state, v.postal_code, v.country]
               .filter(Boolean)
-              .join(", ") || <span className="text-ink-ghost">No address on file</span>}
+              .join(", ") || <span className="text-ink-faint">No address on file</span>}
           </p>
         </Panel>
 

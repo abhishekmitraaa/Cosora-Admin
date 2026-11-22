@@ -28,6 +28,7 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 const SUBTITLE =
   "Sellers waiting on Cosora, oldest first. Sellers outside India need their registration approved before they can publish; " +
@@ -46,7 +47,7 @@ export default function Registrations() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "registrations");
-  const [tab, setTab] = useState<QueueKind>("approval");
+  const [tab, setTab] = useUrlState<QueueKind>("tab", "approval");
   const [rejecting, setRejecting] = useState<RegistrationQueueRow | null>(null);
   const [reason, setReason] = useState("");
   const counts = useRegistrationCounts();

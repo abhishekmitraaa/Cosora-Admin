@@ -1,10 +1,10 @@
-import { Fragment, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Fragment, useMemo, useState } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useRecordView } from "@/lib/activity";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, Download, FileText, Lock, Phone, User } from "lucide-react";
+import { Ban, Download, FileText, Lock, Phone, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   fetchParticipants,
@@ -28,6 +28,7 @@ import {
   Stack,
   SubHeading,
 } from "@/components/ui";
+import { BackLink } from "@/components/BackLink";
 
 interface MessageRow {
   id: string;
@@ -83,27 +84,45 @@ async function fetchAllMessages(conversationId: string): Promise<MessageRow[]> {
   }
 }
 
-/** Short-lived links to the chat's files. Support and super admins may read them (the bucket's read policy). */
+/**
+ * Short-lived links to the chat's files. Support and super admins may read them (the bucket's read policy).
+ *
+ * Signed in groups of 100, each group its own query (review AR-M18): a new file used to re-sign every link in the
+ * chat. Messages only ever append, so a group is the same paths until it fills; a new file re-signs its group only.
+ */
 function useFileLinks(conversationId: string | undefined, paths: string[]) {
-  return useQuery({
-    queryKey: ["chat-thread-files", conversationId, paths.length, paths[paths.length - 1] ?? ""],
-    enabled: paths.length > 0,
-    // Links last an hour. Re-sign 5 minutes before they lapse while the page is open, and on
-    // coming back to the tab once they are stale (the global default leaves focus refetch off):
-    // a thread left open past the hour showed dead photos, voice notes and PDFs (2026-10-20 audit).
-    staleTime: (SIGNED_URL_SECONDS - 300) * 1000,
-    refetchInterval: (SIGNED_URL_SECONDS - 300) * 1000,
-    refetchOnWindowFocus: true,
-    queryFn: async () => {
-      const links: Record<string, string> = {};
-      for (let i = 0; i < paths.length; i += 100) {
-        const { data, error } = await supabase.storage.from(CHAT_BUCKET).createSignedUrls(paths.slice(i, i + 100), SIGNED_URL_SECONDS);
+  const joined = paths.join("\n");
+  const chunks = useMemo(() => {
+    const out: string[][] = [];
+    for (let i = 0; i < paths.length; i += 100) out.push(paths.slice(i, i + 100));
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined]);
+  const results = useQueries({
+    queries: chunks.map((chunk) => ({
+      queryKey: ["chat-thread-files", conversationId, chunk[0], chunk.length, chunk[chunk.length - 1]],
+      // Links last an hour. Re-sign 5 minutes before they lapse while the page is open, and on
+      // coming back to the tab once they are stale (the global default leaves focus refetch off):
+      // a thread left open past the hour showed dead photos, voice notes and PDFs (2026-10-20 audit).
+      staleTime: (SIGNED_URL_SECONDS - 300) * 1000,
+      refetchInterval: (SIGNED_URL_SECONDS - 300) * 1000,
+      refetchOnWindowFocus: true,
+      queryFn: async () => {
+        const links: Record<string, string> = {};
+        const { data, error } = await supabase.storage.from(CHAT_BUCKET).createSignedUrls(chunk, SIGNED_URL_SECONDS);
         if (error) throw new Error(error.message);
         for (const d of data ?? []) if (d.path && d.signedUrl) links[d.path] = d.signedUrl;
-      }
-      return links;
-    },
+        return links;
+      },
+    })),
   });
+  const stamp = results.map((r) => r.dataUpdatedAt).join(",");
+  const data = useMemo(
+    () => Object.assign({}, ...results.map((r) => r.data ?? {})) as Record<string, string>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stamp],
+  );
+  return { data, isError: results.some((r) => r.isError) };
 }
 
 function formatBytes(n: number | null): string {
@@ -163,7 +182,10 @@ export default function ChatThread() {
   const thread = useQuery({
     queryKey: ["chat-thread", id],
     enabled: Boolean(id),
+    // The whole chat on purpose (staff read it all), so coming back to the tab reloads it only once it is a
+    // minute old, not on every focus (AR-M18).
     refetchOnWindowFocus: true,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data: conversation, error: convError } = await supabase
         .from("conversations")
@@ -233,12 +255,7 @@ export default function ChatThread() {
 
   return (
     <Page>
-      <Link
-        to="/chats"
-        className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeft size={14} /> All chats
-      </Link>
+<BackLink fallback="/chats" label="All chats" />
 
       <PageHeader
         title={`${participantLabel(a, c.user_a)} ↔ ${participantLabel(b, c.user_b)}`}
@@ -356,7 +373,7 @@ export default function ChatThread() {
                       {m.kind === "image" && m.attachment_path ? (
                         url ? (
                           <a href={url} target="_blank" rel="noopener noreferrer" title="Open the full picture">
-                            <img src={url} alt="Photo sent in the chat" className="max-h-64 rounded-lg" />
+                            <img src={url} alt="Photo sent in the chat" loading="lazy" decoding="async" className="max-h-64 rounded-lg" />
                           </a>
                         ) : (
                           <span className="text-ink-faint">{files.isError ? "The photo couldn't be loaded." : "Loading the photo…"}</span>
@@ -376,7 +393,7 @@ export default function ChatThread() {
                       ) : m.kind === "audio" && m.attachment_path ? (
                         url ? (
                           <span className="block">
-                            <audio controls preload="metadata" src={url} className="h-9 w-64 max-w-full" />
+                            <audio controls preload="none" src={url} className="h-9 w-64 max-w-full" />
                             <span className="mt-0.5 block text-2xs text-ink-faint">
                               Voice note · {formatSeconds(m.attachment_seconds)}
                             </span>

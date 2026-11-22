@@ -38,15 +38,19 @@ export async function fetchParticipants(ids: string[]): Promise<Map<string, Part
   // Email through the admin-gated RPC: profiles.email is not client-selectable
   // (MPF-3). Every other column is still a plain select.
   // Status through admin_account_statuses() (buyer review L-89): the column isn't client-readable any more.
-  const [profiles, emails, vendors, statuses] = await Promise.all([
-    supabase.from("profiles").select("id, full_name").in("id", unique),
-    supabase.rpc("admin_profile_emails", { p_ids: unique }),
-    supabase.from("vendor_profiles").select("id, brand_name").in("id", unique),
+  // The ids of the two table reads go in the URL, which a few hundred ids outgrow (AR-M19): 100 at a time.
+  const parts: string[][] = [];
+  for (let i = 0; i < unique.length; i += 100) parts.push(unique.slice(i, i + 100));
+  const [profileParts, emailParts, vendorParts, statuses] = await Promise.all([
+    Promise.all(parts.map((p) => supabase.from("profiles").select("id, full_name").in("id", p))),
+    Promise.all(parts.map((p) => supabase.rpc("admin_profile_emails", { p_ids: p }))),
+    Promise.all(parts.map((p) => supabase.from("vendor_profiles").select("id, brand_name").in("id", p))),
     fetchAccountStatuses(unique),
   ]);
-  if (profiles.error) throw new Error(profiles.error.message);
-  if (emails.error) throw new Error(emails.error.message);
-  if (vendors.error) throw new Error(vendors.error.message);
+  for (const r of [...profileParts, ...emailParts, ...vendorParts]) if (r.error) throw new Error(r.error.message);
+  const profiles = { data: profileParts.flatMap((r) => r.data ?? []) };
+  const emails = { data: emailParts.flatMap((r) => r.data ?? []) };
+  const vendors = { data: vendorParts.flatMap((r) => r.data ?? []) };
 
   const emailOf = new Map((emails.data ?? []).map((e) => [e.id, e.email]));
   const brands = new Map((vendors.data ?? []).map((v) => [v.id, v.brand_name]));

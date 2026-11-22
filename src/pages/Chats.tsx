@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDebounced } from "@/hooks/useDebounced";
 import { Link, useNavigate } from "react-router-dom";
@@ -20,6 +19,7 @@ import {
   Table,
   Tabs,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 interface ConversationRow {
   id: string;
@@ -55,8 +55,8 @@ function safeTerm(raw: string): string {
 
 export default function Chats() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<Filter>("all");
+  const [search, setSearch] = useUrlState<string>("q", "");
+  const [tab, setTab] = useUrlState<Filter>("filter", "all", TABS.map((t) => t.id));
   // Debounced, and the last results stay on screen while the next load (AR-H17): the query key changed on every
   // keystroke, the page swapped itself for a skeleton, and the search box lost focus after one letter.
   const term = safeTerm(useDebounced(search, 300));
@@ -210,7 +210,7 @@ export default function Chats() {
                   </td>
                   <td className="max-w-[22rem] px-3 py-2 text-ink-muted">
                     <span className="line-clamp-2">
-                      {c.last_message || <span className="text-ink-ghost">no messages</span>}
+                      {c.last_message || <span className="text-ink-faint">no messages</span>}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-faint">

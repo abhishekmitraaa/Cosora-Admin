@@ -80,7 +80,10 @@ export default function TrendingSearches() {
       {
         onSuccess: () => {
           toast.success(pending.action === "hide" ? `"${pending.term}" is hidden` : `"${pending.term}" can be listed again`, {
-            description: "The list was recomputed. The site has it in about a minute.",
+            description:
+              pending.action === "hide"
+                ? "Taken off the list now. The site has it in about a minute."
+                : "The list was recomputed. The site has it in about a minute.",
           });
           setPending(null);
           setTyped("");

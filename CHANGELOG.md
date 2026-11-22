@@ -9,9 +9,28 @@ entry in each, from that repo's point of view.
 
 ---
 
+- 2026-11-22 (branch `fix/admin-review-medium1-2026-11-22`; database in textile-spark-net migration `20261122110000`;
+  plan `textile-spark-net/documentation/admin-review-medium1-plan-2026-11-22.md`; **built and tested on the local stack,
+  NOT released**)
+  **Admin review 2026-11-22: Medium batch 1 (AR-M01–M05, M07–M21).**
+  - Address state: `hooks/useUrlState.ts` (`useUrlState`, `useUrlFilters`) keeps tabs, filters and searches in the
+    address on 25 pages (Products, Videos, Catalogues, Ads and its queues, Admin Log, Payments, Customers, Leads, Support
+    queues, Subscriptions, Chats, Chat review, Registrations, Premises photos, Reported reviews, Reports, Blogs, Content,
+    Certificates, Attributes, My vendors, Requirement review). Back: `components/BackLink.tsx` on vendor, chat and ticket
+    pages. Sign-in returns to the page asked for (`safeReturnPath`); sign-out and an account switch clear the query cache.
+  - Moderation queues: `lib/queuePaging.ts` + `components/QueueSortToggle.tsx`: 50 at a time, oldest first on In review
+    (Mitra, "Toggle on the page"). Premises photos' Approved list pages to the end; photo and KYC decisions send what the
+    moderator saw and refresh the queue and badge; Reported reviews and the Review queue load in pages and decide only
+    what's on screen.
+  - Pages: the suspension card says what suspension stops; Geography counts every vendor; System Health describes and
+    watches all 26 jobs (`expectedGapMinutes`); trending hides say they're instant; billing incidents label failed
+    refunds and both autopay kinds; the chat thread no longer reloads on every focus or re-signs every file.
+  - Look: no `text-ink-ghost` on meaningful text; dark `ink-muted` and `ink-faint` raised to AA; KPI figures wrap on
+    phones instead of "₹25,57,5…".
+
 - 2026-11-22 (branch `fix/admin-review-high-2026-11-22`; database in textile-spark-net migrations `20261122100000`,
-  `100100`, `100200`; plan `textile-spark-net/documentation/admin-review-high-fixes-plan-2026-11-22.md`; **built and
-  tested on the local stack, NOT released**)
+  `100100`, `100200`; plan `textile-spark-net/documentation/admin-review-high-fixes-plan-2026-11-22.md`; **RELEASED
+  2026-11-22**, main c974fdb)
   **Admin review 2026-11-22: the 18 High items (AR-H01–AR-H18).**
   - Subscriptions: cancel, plan change and the 7-day close turn the seller's autopay off first when it runs
     (`withAutopayOff`, `subscription-autopay` admin_cancel); Refund is refused on an invoice credited into a later plan;

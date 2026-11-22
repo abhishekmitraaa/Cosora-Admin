@@ -22,6 +22,7 @@ import {
   type Tone,
 } from "@/components/ui";
 import AdminActivity from "@/components/AdminActivity";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * The Admin Log (MPF-26, 2026-09-25): every change an admin makes and every
@@ -192,12 +193,12 @@ function Details({ row }: { row: LogRow }) {
 }
 
 export default function AdminLog() {
-  const [tab, setTab] = useState<"changes" | "activity">("changes");
-  const [actor, setActor] = useState("");
+  const [tab, setTab] = useUrlState<"changes" | "activity">("tab", "changes", ["changes", "activity"]);
+  const [actor, setActor] = useUrlState<string>("actor", "");
   const [area, setArea] = useState("");
-  const [action, setAction] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [action, setAction] = useUrlState<string>("action", "");
+  const [from, setFrom] = useUrlState<string>("from", "");
+  const [to, setTo] = useUrlState<string>("to", "");
 
   const actors = useQuery({
     queryKey: ["admin-log", "actors"],

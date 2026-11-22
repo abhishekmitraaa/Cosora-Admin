@@ -8,6 +8,7 @@ import { useRole } from "@/hooks/useAdminSession";
 import {
   Badge, Button, Card, Empty, ErrorNote, Field, Modal, Note, ReadOnlyBanner, SkeletonList, StatusBadge, Tabs, Textarea,
 } from "./ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * Ad types the Cosora team does by hand (Mitra, 2026-11-17: "bring back all the ad types except the mobile banner and
@@ -63,7 +64,7 @@ export default function AdManualWork() {
   const role = useRole();
   const writable = canWrite(role, "ads");
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>("todo");
+  const [tab, setTab] = useUrlState<Tab>("manual", "todo");
   const [marking, setMarking] = useState<ManualRow | null>(null);
   const [note, setNote] = useState("");
 

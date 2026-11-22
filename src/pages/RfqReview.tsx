@@ -13,6 +13,7 @@ import {
   Attr, AttrGrid, Badge, Button, Card, Empty, ErrorNote, Field, Modal, Note, Notice, Page, PageHeader,
   ReadOnlyBanner, Select, SkeletonList, Tabs, Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * REQUIREMENT REVIEW (2026-10-17). lib/rfqReview.ts. Buyers are told review "usually takes 3–5 minutes", so the
@@ -30,7 +31,7 @@ export default function RfqReview() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "rfq-review");
-  const [tab, setTab] = useState<SubmissionState>("pending");
+  const [tab, setTab] = useUrlState<SubmissionState>("tab", "pending", TABS.map((t) => t.id));
   const [rejecting, setRejecting] = useState<RfqSubmission | null>(null);
   const [reasonId, setReasonId] = useState("");
   const [note, setNote] = useState("");

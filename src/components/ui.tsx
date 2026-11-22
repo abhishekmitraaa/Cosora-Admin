@@ -852,7 +852,7 @@ export function Attr({
     <div className="min-w-0">
       <dt className="inline text-ink-faint">{label}: </dt>
       <dd className={cn("inline text-ink-muted", mono && "font-mono text-2xs")}>
-        {empty ? <span className="text-ink-ghost">not set</span> : value}
+        {empty ? <span className="text-ink-faint">not set</span> : value}
       </dd>
     </div>
   );
@@ -873,7 +873,7 @@ export function DataField({
     <div className="min-w-0">
       <dt className="text-xs text-ink-faint">{label}</dt>
       <dd className={cn("text-sm text-ink", mono && "font-mono text-xs")}>
-        {empty ? <span className="font-sans text-sm text-ink-ghost">not set</span> : value}
+        {empty ? <span className="font-sans text-sm text-ink-faint">not set</span> : value}
       </dd>
     </div>
   );
@@ -916,19 +916,21 @@ export function Stat({
       {icon && (
         <div
           className={cn(
-            "grid h-10 w-10 shrink-0 place-items-center rounded-lg ring-1 ring-inset",
+            "hidden h-10 w-10 shrink-0 place-items-center rounded-lg ring-1 ring-inset sm:grid",
             tone ? TONES[tone] : "bg-brand-tint text-ink ring-line",
           )}
         >
           {icon}
         </div>
       )}
+      {/* Never cut a figure off (review AR-M08): two tiles side by side on a phone left
+          "₹25,57,5…". The figure steps down a size on small screens and may wrap. */}
       <div className="min-w-0">
         <div className="text-xs font-medium text-ink-muted">{label}</div>
-        <div className="mt-0.5 truncate font-display text-metric font-bold tabular-nums text-ink">
+        <div className="mt-0.5 font-display text-xl font-bold tabular-nums text-ink [overflow-wrap:anywhere] sm:text-metric">
           {value}
         </div>
-        {sub && <div className="mt-0.5 truncate text-2xs text-ink-faint">{sub}</div>}
+        {sub && <div className="mt-0.5 text-2xs text-ink-faint [overflow-wrap:anywhere]">{sub}</div>}
       </div>
     </Card>
   );

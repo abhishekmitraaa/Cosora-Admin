@@ -48,14 +48,14 @@ export default function ProductDetailsModal({
             {d.description ? (
               <p className="whitespace-pre-line text-ink-muted">{d.description}</p>
             ) : (
-              <p className="text-ink-ghost">No description.</p>
+              <p className="text-ink-faint">No description.</p>
             )}
           </section>
 
           <section>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-ink-faint">Details</h3>
             {d.fields.length === 0 ? (
-              <p className="text-ink-ghost">None entered.</p>
+              <p className="text-ink-faint">None entered.</p>
             ) : (
               <AttrGrid cols={2}>
                 {d.fields.map((f) => <Attr key={f.label} label={f.label} value={f.value} />)}
@@ -77,7 +77,7 @@ export default function ProductDetailsModal({
               Pictures <span className="font-normal normal-case tracking-normal">({d.images.length})</span>
             </h3>
             {d.images.length === 0 ? (
-              <p className="text-ink-ghost">No pictures.</p>
+              <p className="text-ink-faint">No pictures.</p>
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {d.images.map((url) => (

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { AdminRole } from "@/lib/roles";
 
@@ -35,6 +36,7 @@ const Ctx = createContext<AdminSessionValue | null>(null);
  * Postgres's job on each write (see lib/roles.ts).
  */
 export function AdminSessionProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [identity, setIdentity] = useState<AdminIdentity | null>(null);
@@ -109,6 +111,10 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       // (2026-10-20 audit).
       const nextUserId = next?.user?.id ?? null;
       const sameUser = nextUserId !== null && nextUserId === userIdRef.current;
+      // A different person (sign-out, or another account in this tab) never sees the
+      // last one's cached lists (review AR-M02). Only when someone was signed in before:
+      // the first load has nothing cached, and clearing it would drop queries starting.
+      if (!sameUser && userIdRef.current !== null) queryClient.clear();
       userIdRef.current = nextUserId;
       if (!sameUser) setLoading(true);
       void loadIdentity(next, { quiet: sameUser });
@@ -134,6 +140,7 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
       // Best effort: a failed record never blocks signing out.
       await supabase.rpc("admin_audit_session", { p_action: "sign_out" }).then(() => undefined, () => undefined);
       await supabase.auth.signOut();
+      queryClient.clear();
       setIdentity(null);
     },
   };

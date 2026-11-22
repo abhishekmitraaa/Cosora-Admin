@@ -52,7 +52,7 @@ const PAGE = 50;
 const SUBTITLE = "Accounts, verification and suspension. Open a vendor to review business documents.";
 
 /** Live dates read at full weight, lapsed ones drop back. Two states, one rule. */
-const dateTone = (live: boolean) => (live ? "tabular-nums text-ink-muted" : "tabular-nums text-ink-ghost");
+const dateTone = (live: boolean) => (live ? "tabular-nums text-ink-muted" : "tabular-nums text-ink-faint");
 
 export default function Vendors() {
   const role = useRole();
@@ -185,10 +185,10 @@ export default function Vendors() {
                   </Link>
                 </td>
                 <td className="px-3 py-2 text-ink-muted">
-                  {v.city || <span className="text-ink-ghost">not set</span>}
+                  {v.city || <span className="text-ink-faint">not set</span>}
                 </td>
                 <td className="px-3 py-2 text-ink-muted">
-                  {v.business_type || <span className="text-ink-ghost">not set</span>}
+                  {v.business_type || <span className="text-ink-faint">not set</span>}
                 </td>
                 <td className="px-3 py-2">
                   {v.onboarding_complete ? (
@@ -205,12 +205,12 @@ export default function Vendors() {
                   {s.admin ? (
                     <Badge tone="info">verified</Badge>
                   ) : (
-                    <span className="text-ink-ghost">not set</span>
+                    <span className="text-ink-faint">not set</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-xs">
                   {v.plan_id ? (
-                    <span className={s.subscription ? "text-ink-muted" : "text-ink-ghost"}>
+                    <span className={s.subscription ? "text-ink-muted" : "text-ink-faint"}>
                       {v.plan_id}
                       {v.plan_expires_at && (
                         <span className="block text-2xs tabular-nums">
@@ -220,7 +220,7 @@ export default function Vendors() {
                       )}
                     </span>
                   ) : (
-                    <span className="text-ink-ghost">no plan</span>
+                    <span className="text-ink-faint">no plan</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-xs">
@@ -230,7 +230,7 @@ export default function Vendors() {
                       {format(new Date(v.ad_verified_until), "d MMM yyyy")}
                     </span>
                   ) : (
-                    <span className="text-ink-ghost">none</span>
+                    <span className="text-ink-faint">none</span>
                   )}
                 </td>
               </tr>

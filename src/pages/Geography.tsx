@@ -79,12 +79,15 @@ const SUBTITLE = "Where Cosora's vendors are, aggregated from the city and state
 export default function Geography() {
   const vendors = useQuery({
     queryKey: ["geography-vendors"],
+    // Every vendor, grouped by place in the database (AR-M09): reading the rows stopped at 1,000.
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vendor_profiles")
-        .select("id, brand_name, city, state");
+      const { data, error } = await supabase.rpc("admin_vendor_location_counts" as never);
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return ((data ?? []) as { city: string | null; state: string | null; n: number }[]).map((g) => ({
+        city: g.city,
+        state: g.state,
+        count: g.n,
+      }));
     },
   });
 
@@ -189,7 +192,7 @@ export default function Geography() {
               <tr key={p.key} className={ROW_HOVER}>
                 <td className="px-3 py-2 font-medium text-ink">{p.label}</td>
                 <td className="px-3 py-2 text-ink-muted">
-                  {p.state || <span className="text-ink-ghost">not set</span>}
+                  {p.state || <span className="text-ink-faint">not set</span>}
                 </td>
                 <td className="px-3 py-2 tabular-nums text-ink-muted">{p.count}</td>
                 <td className="px-3 py-2">
@@ -215,10 +218,10 @@ export default function Geography() {
               {a.unplaced.map((u, i) => (
                 <tr key={`${u.city}|${u.state}|${i}`} className={ROW_HOVER}>
                   <td className="px-3 py-2 text-ink">
-                    {u.city || <span className="text-ink-ghost">blank</span>}
+                    {u.city || <span className="text-ink-faint">blank</span>}
                   </td>
                   <td className="px-3 py-2 text-ink-muted">
-                    {u.state || <span className="text-ink-ghost">blank</span>}
+                    {u.state || <span className="text-ink-faint">blank</span>}
                   </td>
                   <td className="px-3 py-2 tabular-nums text-ink-muted">{u.count}</td>
                 </tr>

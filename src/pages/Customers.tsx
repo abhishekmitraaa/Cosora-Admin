@@ -46,6 +46,7 @@ import {
   cn,
   type Tone,
 } from "@/components/ui";
+import { useUrlFilters } from "@/hooks/useUrlState";
 
 /**
  * C5 - CUSTOMERS, from the database (admin completion Phase 6).
@@ -78,8 +79,9 @@ export default function Customers() {
   const role = useRole();
   const writable = canWrite(role, "customers");
 
-  const [draft, setDraft] = useState<CustomerFilters>(NO_FILTERS);
-  const [filters, setFilters] = useState<CustomerFilters>(NO_FILTERS);
+  // The applied filters live in the address (AR-M04); the box shows the draft while typing.
+  const [filters, setFilters] = useUrlFilters<CustomerFilters>(NO_FILTERS);
+  const [draft, setDraft] = useState<CustomerFilters>(filters);
   useEffect(() => {
     const t = setTimeout(() => setFilters(draft), draft.search === filters.search ? 0 : SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
@@ -394,7 +396,7 @@ function CustomerLine({
         ) : (
           // Zero is the true and interesting value for every buyer: buyers do
           // not pay Cosora anything today. A blank would hide that.
-          <span className="text-ink-ghost">nothing yet</span>
+          <span className="text-ink-faint">nothing yet</span>
         )}
       </td>
       <td className="px-3 py-2 tabular-nums text-ink-muted">

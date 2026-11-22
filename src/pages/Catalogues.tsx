@@ -1,6 +1,6 @@
 import { fetchListingRevs, ListingChangedError, ListingEditedError, moderateFrom } from "@/lib/moderation";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -27,6 +27,9 @@ import {
   Tabs,
   Textarea,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
+import { afterCursor, defaultQueueSort, mergeQueuePages, nextCursor, QUEUE_PAGE, QUEUE_SORTS, type QueueCursor, type QueueSort } from "@/lib/queuePaging";
+import { QueueSortToggle } from "@/components/QueueSortToggle";
 
 type Status = "under_review" | "live" | "rejected";
 
@@ -89,18 +92,27 @@ export default function Catalogues() {
   const role = useRole();
   const qc = useQueryClient();
   const writable = canWrite(role, "catalogues");
-  const [tab, setTab] = useState<Status>("under_review");
+  const [tab, setTab] = useUrlState<Status>("tab", "under_review", TABS.map((t) => t.id));
   const [rejecting, setRejecting] = useState<CatalogueRow | null>(null);
   const [reason, setReason] = useState("");
 
-  const catalogues = useQuery({
-    queryKey: ["catalogues", tab],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const [sort, setSort] = useUrlState<QueueSort>("sort", defaultQueueSort(tab), QUEUE_SORTS);
+  // 50 at a time in the moderator's order (AR-M12, AR-M13): the tab used to stop silently at 1,000.
+  const catalogues = useInfiniteQuery({
+    queryKey: ["catalogues", tab, sort],
+    initialPageParam: null as QueueCursor,
+    queryFn: async ({ pageParam }) => {
+      let q = supabase
         .from("catalogues")
-        .select("id, title, description, cover_url, file_url, page_count, status, rejection_reason, vendor_id, created_at")
-        .eq("status", tab)
-        .order("created_at", { ascending: false });
+        .select(
+          "id, title, description, cover_url, file_url, page_count, status, rejection_reason, vendor_id, created_at",
+        )
+        .eq("status", tab);
+      if (pageParam) q = q.or(afterCursor(pageParam, sort));
+      const { data, error } = await q
+        .order("created_at", { ascending: sort === "oldest" })
+        .order("id", { ascending: sort === "oldest" })
+        .limit(QUEUE_PAGE);
       if (error) throw new Error(error.message);
 
       const rows = (data ?? []) as unknown as CatalogueRow[];
@@ -110,8 +122,9 @@ export default function Catalogues() {
         fetchListingRevs("catalogues", rows.map((r) => r.id)),
       ]);
       for (const r of rows) r.rev = revs.get(r.id) ?? 0;
-      return { rows, vendors, edits };
+      return { rows, vendors, edits, next: nextCursor(rows) };
     },
+    getNextPageParam: (last) => last.next,
   });
 
   const moderate = useMutation({
@@ -171,7 +184,7 @@ export default function Catalogues() {
   }
   if (catalogues.error) return <ErrorNote message={(catalogues.error as Error).message} />;
 
-  const { rows, vendors, edits } = catalogues.data!;
+  const { rows, vendors, edits } = mergeQueuePages(catalogues.data?.pages ?? []);
 
   return (
     <Page>
@@ -180,6 +193,7 @@ export default function Catalogues() {
       {!writable && <ReadOnlyBanner reason={readOnlyReason(role, "catalogues")} />}
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
+      <QueueSortToggle value={sort} onChange={setSort} />
 
       {rows.length === 0 ? (
         <Empty>

@@ -176,18 +176,16 @@ export default function AccountStatus({
       </p>
 
       {/*
-        Scope, stated honestly. This is NOT the old "sets a flag only" banner —
-        suspension is really enforced now, just not everywhere. Narrow the claim
-        when the remaining surfaces are gated; do not broaden it before.
+        Scope, stated honestly (review AR-M01, 2026-11-22). Each item is refused by the
+        database for a suspended account (the insert policies call account_is_active()),
+        so the list must match them: widen it only when a new surface is gated.
       */}
       {!deleted && (
-        <Notice tone="caution" title="What suspending actually stops" className="mb-3 text-xs">
-          Chat and calling, for real and server-side:{" "}
-          <span className="font-mono text-2xs">messages_insert</span> requires the sender's account to
-          be active, so a suspended account cannot send a message even with the UI bypassed, and the
-          call gate refuses in both directions. It does <span className="font-semibold">not</span> yet
-          stop them posting RFQs, submitting quotes, uploading products or running ads: those inserts
-          are not gated on account status.
+        <Notice tone="caution" title="What suspending stops" className="mb-3 text-xs">
+          A suspended account can't send messages, call or be called, post requirements, send quotes,
+          add products, videos or catalogues, start ads, or write reviews. The database refuses these
+          even if the app is bypassed. What is already live stays up, a running ad keeps serving, and
+          they can still contact Support to appeal.
         </Notice>
       )}
 

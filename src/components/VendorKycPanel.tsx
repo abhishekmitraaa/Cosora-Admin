@@ -142,7 +142,7 @@ export function useVendorKycDocs(vendorId: string | undefined) {
 /** Signed on demand, for one document, not for the whole list on mount. */
 function ViewDocButton({ doc }: { doc: KycDocRow }) {
   const [loading, setLoading] = useState(false);
-  if (!doc.file_url) return <span className="text-2xs text-ink-ghost">no file</span>;
+  if (!doc.file_url) return <span className="text-2xs text-ink-faint">no file</span>;
 
   const open = async () => {
     setLoading(true);
@@ -180,24 +180,34 @@ export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
   const [reason, setReason] = useState("");
 
   const review = useMutation({
-    mutationFn: async ({ id, verified, reason }: { id: string; verified: boolean; reason?: string }) => {
-      const { error } = await supabase.rpc("set_vendor_document_verified", {
+    mutationFn: async ({
+      id,
+      verified,
+      reason,
+      seen,
+    }: {
+      id: string;
+      verified: boolean;
+      reason?: string;
+      /** The document's reviewed_at as the moderator saw it (null: unreviewed). Refused if it moved (AR-M15). */
+      seen: string | null;
+    }) => {
+      const { error } = await supabase.rpc("set_vendor_document_verified" as never, {
         p_doc_id: id,
         p_verified: verified,
-        // `undefined`, not `null`: p_reason is `text DEFAULT NULL`, so omitting
-        // it and passing null land on the same value, and the generated types
-        // type an optional RPC argument as `string | undefined`. (Surfaced when
-        // database.types.ts was regenerated for certificate_orders — the older
-        // file typed it loosely enough to accept null.)
-        p_reason: reason ?? undefined,
-      });
+        p_reason: reason ?? null,
+        p_seen_reviewed_at: seen,
+      } as never);
       // The function raises on every failure path, so an error here is a real
       // refusal — never a silent no-op.
-      if (error) throw new Error(error.message);
+      if (error) throw new Error((error as { message: string }).message);
     },
-    onSuccess: () => {
+    // A refusal because a colleague decided first refreshes too, so the panel shows their decision.
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["vendor-kyc", vendorId] });
       void qc.invalidateQueries({ queryKey: ["vendor", vendorId] });
+      // The registration queue and its sidebar badge count documents waiting (AR-M15).
+      void qc.invalidateQueries({ queryKey: ["registrations"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -205,7 +215,7 @@ export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
   const submitRejection = () => {
     if (!rejecting || !reason.trim()) return;
     review.mutate(
-      { id: rejecting.id, verified: false, reason: reason.trim() },
+      { id: rejecting.id, verified: false, reason: reason.trim(), seen: rejecting.reviewed_at },
       {
         onSuccess: () => {
           toast.success(`${DOC_LABELS[rejecting.doc_type] ?? rejecting.doc_type} rejected`);
@@ -273,7 +283,7 @@ export default function VendorKycPanel({ vendorId }: { vendorId: string }) {
                       disabled={review.isPending}
                       onClick={() =>
                         review.mutate(
-                          { id: d.id, verified: true },
+                          { id: d.id, verified: true, seen: d.reviewed_at },
                           { onSuccess: () => toast.success(`${DOC_LABELS[d.doc_type] ?? d.doc_type} verified`) },
                         )
                       }

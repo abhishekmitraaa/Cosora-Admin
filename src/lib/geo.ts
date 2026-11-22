@@ -332,26 +332,28 @@ export interface Aggregation {
  * dots one pixel apart, each reading half the real density.
  */
 export function aggregate(
-  vendors: { id: string; city: string | null; state: string | null }[],
+  /** One row per vendor, or per (city, state) with `count` vendors (AR-M09: the database groups them). */
+  vendors: { id?: string; city: string | null; state: string | null; count?: number }[],
 ): Aggregation {
   const points = new Map<string, VendorPoint>();
   const missing = new Map<string, Unplaced>();
 
   for (const v of vendors) {
+    const n = v.count ?? 1;
     const { point, precision } = resolve(v.city, v.state);
     if (!point || precision === "none") {
       const key = `${normalise(v.city)}|${normalise(v.state)}`;
       const row = missing.get(key);
-      if (row) row.count += 1;
-      else missing.set(key, { city: v.city, state: v.state, count: 1 });
+      if (row) row.count += n;
+      else missing.set(key, { city: v.city, state: v.state, count: n });
       continue;
     }
 
     const key = `${point.lat},${point.lng}`;
     const existing = points.get(key);
     if (existing) {
-      existing.count += 1;
-      existing.vendorIds.push(v.id);
+      existing.count += n;
+      if (v.id) existing.vendorIds.push(v.id);
       // A city-precision hit upgrades a point first created by a state
       // fallback: the better label wins, and the marker stops apologising.
       if (precision === "city" && existing.precision === "state") {
@@ -365,9 +367,9 @@ export function aggregate(
         state: v.state,
         lat: point.lat,
         lng: point.lng,
-        count: 1,
+        count: n,
         precision,
-        vendorIds: [v.id],
+        vendorIds: v.id ? [v.id] : [],
       });
     }
   }

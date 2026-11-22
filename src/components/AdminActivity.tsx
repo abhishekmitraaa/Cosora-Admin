@@ -16,6 +16,7 @@ import {
   SkeletonList,
   Table,
 } from "@/components/ui";
+import { useUrlState } from "@/hooks/useUrlState";
 
 /**
  * The Admin Log's Activity tab (2026-10-13): what each admin looked at.
@@ -78,8 +79,8 @@ const roleLabel = (r: string | null) => (r && r in ROLE_LABELS ? ROLE_LABELS[r a
 
 export default function AdminActivity() {
   const [days, setDays] = useState(30);
-  const [actor, setActor] = useState("");
-  const [kind, setKind] = useState("");
+  const [actor, setActor] = useUrlState<string>("viewer", "");
+  const [kind, setKind] = useUrlState<string>("kind", "");
 
   const summary = useQuery({
     queryKey: ["admin-activity", "summary", days],
