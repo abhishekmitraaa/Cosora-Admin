@@ -10,14 +10,14 @@ entry in each, from that repo's point of view.
 ---
 
 - 2026-11-23 (branch `fix/admin-review-low3-2026-11-23`, on top of Low batch 2; database in textile-spark-net migration
-  `20261123110000`; **built and tested on the local stack, NOT released**)
+  `20261123110000`; **LIVE 2026-11-23 (main `fd35854`)**)
   **Admin review: Low batch 3 (AR-L41–L48, L50–L52).** One in-app confirmation (`useConfirm()`) replaces every browser
   `confirm()`; the vendor page shows bulk imports and contact reveals; `/leads?lead=` opens a request (Support's links
   now land on it) with Copy link; tables say when they scroll and short ones fit a phone; Products tab counts; 44 px back
   links; "More below" in the rail; review notes say why a message is missing; long searches are cut. L49 kept (Mitra).
 
 - 2026-11-23 (branch `fix/admin-review-low2-2026-11-23`, on top of Low batch 1; database in textile-spark-net migration
-  `20261123100000`; **built and tested on the local stack, NOT released**)
+  `20261123100000`; **LIVE 2026-11-23 (main `fd35854`)**)
   **Admin review: Low batch 2 (AR-L21–L40).** Confirmations for picture replace / default, blog category delete and role
   changes; Reports keep paise; carousel times in India time; failed reads are errors (System Health, Reports, Admins);
   sign-out is this browser only; managers aren't offered refused resets; the role notice names sections; unknown requests
@@ -25,7 +25,7 @@ entry in each, from that repo's point of view.
   widths and a larger Geography map; tab roles; overdue cues; System Health shows embedding usage and CSP reports.
 
 - 2026-11-23 (branch `fix/admin-review-low1-2026-11-22`; database in textile-spark-net migration `20261122140000`;
-  **built and tested on the local stack, NOT released**)
+  **LIVE 2026-11-23 (main `fd35854`)**)
   **Admin review: Low batch 1 (AR-L01–L20).** Approvals no longer refetch every loaded queue page; Paused is look-only;
   overseas registrations wait for document review and vendor_ops reviews documents (Mitra); one-call reason moves;
   View on site links (`lib/site.ts`); form question errors in words; a request's subject opens; India-time support and
@@ -140,7 +140,7 @@ entry in each, from that repo's point of view.
 
 - 2026-10-18 (with textile-spark-net migration `20261018150000_search_trends_categories_only`; **RELEASED 2026-10-18**). Trending searches: categories only, for now (Mitra). The page shows the new `search_trending_terms` switch: while it is off, a notice says typed terms aren't shown on the site and why (a script can pose as 3 visitors), and the terms table is there to watch. `lib/searchTrends.ts` reads `terms_switch`.
 
-- 2026-10-18 (branch `search/trending-searches`, with textile-spark-net's branch of the same name, which holds migrations `20261018120000_search_trends` and `20261018120100_search_trends_job`; **built and tested on the local stack, NOT released**). Trending searches: a new page, Insight › Trending searches (`/trending-searches`, section `search-trends`).
+- 2026-10-18 (branch `search/trending-searches`, with textile-spark-net's branch of the same name, which holds migrations `20261018120000_search_trends` and `20261018120100_search_trends_job`; **LIVE 2026-11-23 (main `fd35854`)**). Trending searches: a new page, Insight › Trending searches (`/trending-searches`, section `search-trends`).
   - Why: the buyer's /search now lists "Trending yesterday / this week / this month" and the most searched categories, measured nightly from Cosora's own searches; a typed term appears only once 3 different visitors searched it. People type anything, so staff need to see what is published and take a term down.
   - The page (`src/pages/TrendingSearches.tsx`, `src/lib/searchTrends.ts`): the list in force with visitors and visitor-days, the switch's state, hide (from the list or typed, with a reason, in the Admin Log), hidden terms with "Let back", recent computations. Super admins, support and managers read; super admins and support hide (`admin.require_search_trends`).
   - `roles.ts`, `Shell.tsx` (nav), `App.tsx` (route), `database.types.ts` (three RPCs, by hand until regenerated).
