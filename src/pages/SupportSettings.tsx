@@ -438,7 +438,7 @@ function ContactPanel({ s }: { s: Settings }) {
   return (
     <Panel title="Contact details on Help" description="The phone line and email address the Help page offers, including when rollout is Off.">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Phone" htmlFor="support-phone" hint="With the country code, e.g. +91 88155 78226.">
+        <Field label="Phone" htmlFor="support-phone" hint="With the country code, e.g. +91 7904840367.">
           <Input id="support-phone" value={phone} disabled={!s.can_edit} onChange={(e) => setPhone(e.target.value)} />
         </Field>
         <Field label="Email" htmlFor="support-email">
